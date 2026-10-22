@@ -1,0 +1,7 @@
+* text=auto
+# Windows batch files break with LF line endings
+*.bat text eol=crlf
+*.ico binary
+*.png binary
+# Vendored libraries are kept byte-for-byte
+prototype/static/vendor/* -text

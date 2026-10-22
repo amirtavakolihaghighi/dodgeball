@@ -1,0 +1,9 @@
+[
+  {"eval": "document.getElementById('nameInput').value = 'Smoke'; document.getElementById('playBtn').click(); 'joined'"},
+  {"wait": 1000},
+  {"eval": "document.getElementById('resumeBtn').click(); 'playing'"},
+  {"waitFor": "dp.net.latest && dp.net.latest.r.s === 'play' && dp.me", "timeout": 10000},
+  {"wait": 2000},
+  {"eval": "JSON.stringify({round: dp.net.latest.r, players: dp.net.latest.players.size, me: {team: dp.me.team, alive: dp.me.alive, hp: dp.me.hp}})"},
+  {"shot": "smoke.png"}
+]

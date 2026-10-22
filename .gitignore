@@ -1,0 +1,16 @@
+# Local Python environments (machine-specific, never share them)
+.venv/
+__pycache__/
+*.pyc
+
+# Build output: rebuild with prototype\build_exe.bat; releases carry the zip
+build/
+dist/
+
+# Screenshots and other output from the browser tests
+prototype/*.png
+prototype/tests/browser/*.png
+prototype/tests/browser/out/
+
+# Rules the host saved from the lobby (made at runtime, per machine)
+saved_rules.json

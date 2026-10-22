@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dodge &amp; Parry</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23ffc940'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+<script type="importmap">{ "imports": { "three": "/static/vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="hud" hidden>
+  <div id="topbar">
+    <div class="side red"><span class="label">RED</span><span class="score" id="scoreRed">0</span><span class="pips" id="pipsRed"></span></div>
+    <div id="roundbox"><div id="roundLabel">WAITING</div><div id="roundTime"></div></div>
+    <div class="side blue"><span class="pips" id="pipsBlue"></span><span class="score" id="scoreBlue">0</span><span class="label">BLUE</span></div>
+  </div>
+  <div id="feed"></div>
+  <div id="tags"></div>
+  <div id="assist"></div>
+  <div id="crosshair"></div>
+  <div id="ring"><div id="ringArrow"></div></div>
+  <div id="threatText"></div>
+  <div id="popups"></div>
+  <div id="banner"><div id="bannerText"></div><div id="bannerSub"></div></div>
+  <div id="deadmsg" hidden></div>
+
+  <div id="vitals">
+    <div class="who"><span id="myName"></span><span id="myTeam"></span></div>
+    <div class="bar hp"><i id="hpFill"></i><span id="hpText"></span></div>
+    <div class="bar st"><i id="stFill"></i><b id="stCost"></b><span id="stText"></span></div>
+    <div id="cash"></div>
+  </div>
+  <div id="throwbox">
+    <div id="ballState"></div>
+    <div class="bar power"><i id="powerFill"></i></div>
+  </div>
+  <div id="actions">
+    <div class="act" id="actDodge"><kbd>Space</kbd><b>Dodge</b><span></span></div>
+    <div class="act" id="actCatch"><kbd>RMB / F</kbd><b>Catch</b><span></span></div>
+    <div class="act" id="actDeflect"><kbd>E</kbd><b>Deflect</b><span></span></div>
+    <div class="act" id="actRevive"><kbd>R</kbd><b>Revive</b><span></span></div>
+  </div>
+  <div id="netinfo"></div>
+  <div id="vignette"></div>
+  <div id="goldfx"></div>
+</div>
+
+<div id="scoreboard" hidden>
+  <table>
+    <thead><tr><th>Player</th><th>Cash</th><th>Hits</th><th>KOs</th><th>Catches</th><th>Deflects</th><th>Perfects</th><th>Outs</th></tr></thead>
+    <tbody id="scoreRows"></tbody>
+  </table>
+</div>
+
+<div id="overlay" hidden>
+  <div class="panel menu">
+    <h2 id="overlayTitle">Click to play</h2>
+    <button id="resumeBtn" class="primary">Play</button>
+    <div class="cols">
+      <section>
+        <h3>Settings</h3>
+        <label>Mouse sensitivity <input id="sensInput" type="range" min="0.3" max="2.5" step="0.05"></label>
+        <label>Volume <input id="volInput" type="range" min="0" max="1" step="0.05"></label>
+        <label class="check"><input id="ringInput" type="checkbox"> Timing ring for incoming balls (H)</label>
+      </section>
+      <section>
+        <h3>Match (applies to everyone)</h3>
+        <div class="row">Bots fill teams to
+          <button id="fillMinus" class="small">−</button><b id="fillValue">2</b><button id="fillPlus" class="small">+</button> players
+        </div>
+        <label>Bot skill
+          <select id="skillSelect"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select>
+        </label>
+        <button id="teamBtn">Switch team</button>
+        <p class="note">Extra bots join right away and the court grows. Fewer bots and team switches apply next round.</p>
+      </section>
+    </div>
+    <section>
+      <h3>Controls</h3>
+      <ul class="controls">
+        <li><kbd>W A S D</kbd> move &nbsp; <kbd>Mouse</kbd> aim</li>
+        <li><kbd>Hold LMB</kbd> charge a throw: harder is faster but costs more stamina. Release to throw.</li>
+        <li><kbd>Space</kbd>/<kbd>Shift</kbd> dodge: a dash you can't be hit during. At the last moment it's perfect and cheaper.</li>
+        <li><kbd>RMB</kbd>/<kbd>F</kbd> catch: the ball becomes yours. <kbd>E</kbd> deflect: tighter timing, sends it back faster.</li>
+        <li><kbd>R</kbd> revive a fallen teammate with cash &nbsp; <kbd>Tab</kbd> scoreboard &nbsp; <kbd>Esc</kbd> this menu</li>
+      </ul>
+    </section>
+    <section id="joinInfo"></section>
+  </div>
+</div>
+
+<div id="join">
+  <div class="panel">
+    <div class="logo">DODGE <span>&amp;</span> PARRY</div>
+    <p class="tag">Schoolyard dodgeball with Souls-style stamina. Throw hard, read the ball, then dodge, catch or deflect at the last moment.</p>
+    <label class="field">Name <input id="nameInput" maxlength="16" autocomplete="off"></label>
+    <div class="teams">
+      <button data-team="0" class="red">Red</button>
+      <button data-team="-1" class="auto">Auto</button>
+      <button data-team="1" class="blue">Blue</button>
+    </div>
+    <button id="playBtn" class="primary">Join game</button>
+    <p class="note">Testing alone? Open more tabs or windows and join each one as a different player. Bots fill the empty spots.</p>
+  </div>
+</div>
+
+<div id="disconnected" hidden>
+  <div class="panel"><h2>Disconnected</h2><p>Lost the connection to the server.</p><button class="primary" id="reconnectBtn">Reconnect</button></div>
+</div>
+
+<script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
