@@ -14,9 +14,11 @@
 <div id="hud" hidden>
   <div id="topbar">
     <div class="side red"><span class="label">RED</span><span class="score" id="scoreRed">0</span><span class="pips" id="pipsRed"></span></div>
-    <div id="roundbox"><div id="roundLabel">WAITING</div><div id="roundTime"></div></div>
+    <div id="roundbox"><div id="roundLabel">WAITING</div><div id="roundTime"></div><div id="roundGoal"></div></div>
     <div class="side blue"><span class="pips" id="pipsBlue"></span><span class="score" id="scoreBlue">0</span><span class="label">BLUE</span></div>
   </div>
+  <div id="hint"></div>
+  <div id="hostLive" hidden></div>
   <div id="feed"></div>
   <div id="tags"></div>
   <div id="assist"></div>
@@ -55,40 +57,120 @@
   </table>
 </div>
 
+<!-- The lobby / pause menu. Host-only controls are hidden for everyone else. -->
 <div id="overlay" hidden>
   <div class="panel menu">
-    <h2 id="overlayTitle">Click to play</h2>
-    <button id="resumeBtn" class="primary">Play</button>
+    <div class="menuHead">
+      <div class="menuTitle">
+        <h2 id="overlayTitle">Lobby</h2>
+        <p id="menuStatus"></p>
+      </div>
+      <div class="menuButtons">
+        <button id="endBtn" class="hostOnly danger" hidden>End match</button>
+        <button id="startBtn" class="hostOnly go" hidden>Start match</button>
+        <button id="resumeBtn" class="primary">Play</button>
+      </div>
+    </div>
+
+    <section id="hostViewBox" hidden>
+      <h3>The host's screen <span class="tagline">live</span></h3>
+      <p id="hostViewText"></p>
+      <label class="check"><input id="followInput" type="checkbox" checked> Follow the host: open the rules they're looking at</label>
+    </section>
+
     <div class="cols">
       <section>
-        <h3>Settings</h3>
+        <h3>Teams <button id="shuffleBtn" class="small hostOnly" hidden>Shuffle teams</button>
+          <button id="watchBtn" class="small hostOnly" hidden>Spectate</button></h3>
+        <div class="teamCols">
+          <div class="teamCol red"><h4>RED <span id="countRed"></span></h4>
+            <div class="botRow">Bots <button id="botsRedMinus" class="small hostCtl">−</button><b id="botsRedValue">0</b><button id="botsRedPlus" class="small hostCtl">+</button>
+              <span class="soon" id="botsRedSoon"></span></div>
+            <ul id="listRed"></ul></div>
+          <div class="teamCol blue"><h4>BLUE <span id="countBlue"></span></h4>
+            <div class="botRow">Bots <button id="botsBlueMinus" class="small hostCtl">−</button><b id="botsBlueValue">0</b><button id="botsBluePlus" class="small hostCtl">+</button>
+              <span class="soon" id="botsBlueSoon"></span></div>
+            <ul id="listBlue"></ul></div>
+        </div>
+        <p class="note" id="watchers" hidden></p>
+        <p class="note" id="teamsNote"></p>
+      </section>
+      <section>
+        <h3>Match <span id="matchWho" class="tagline"></span></h3>
+        <div class="row">Bot skill
+          <select id="skillSelect" class="hostCtl"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select>
+          <span class="soon" id="skillSoon"></span>
+        </div>
+        <div class="row">Match length
+          <button id="winMinus" class="small hostCtl">−</button><b id="winValue">∞</b><button id="winPlus" class="small hostCtl">+</button>
+          <span class="soon" id="winSoon"></span>
+        </div>
+        <div class="row rulesRow"><button id="rulesBtn">Game rules…</button><span id="rulesSummary" class="note"></span></div>
+        <div id="pendingBox" class="pending" hidden><span id="pendingText"></span> <button id="discardBtn" class="small hostOnly" hidden>Cancel them</button></div>
+      </section>
+    </div>
+
+    <div class="cols">
+      <section>
+        <h3>Your settings</h3>
         <label>Mouse sensitivity <input id="sensInput" type="range" min="0.3" max="2.5" step="0.05"></label>
         <label>Volume <input id="volInput" type="range" min="0" max="1" step="0.05"></label>
         <label class="check"><input id="ringInput" type="checkbox"> Timing ring for incoming balls (H)</label>
       </section>
       <section>
-        <h3>Match (applies to everyone)</h3>
-        <div class="row">Bots fill teams to
-          <button id="fillMinus" class="small">−</button><b id="fillValue">2</b><button id="fillPlus" class="small">+</button> players
-        </div>
-        <label>Bot skill
-          <select id="skillSelect"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select>
-        </label>
-        <button id="teamBtn">Switch team</button>
-        <p class="note">Extra bots join right away and the court grows. Fewer bots and team switches apply next round.</p>
+        <h3>Controls</h3>
+        <ul class="controls">
+          <li><kbd>W A S D</kbd> move &nbsp; <kbd>Mouse</kbd> aim</li>
+          <li><kbd>Hold LMB</kbd> charge a throw: harder is faster but costs more stamina. Release to throw.</li>
+          <li><kbd>Space</kbd>/<kbd>Shift</kbd> dodge: a dash you can't be hit during. Last moment = perfect.</li>
+          <li><kbd>RMB</kbd>/<kbd>F</kbd> catch: the ball becomes yours. <kbd>E</kbd> deflect: tighter timing, sends it back faster.</li>
+          <li><kbd>R</kbd> revive a teammate &nbsp; <kbd>Tab</kbd> scores &nbsp; <kbd>Esc</kbd> this menu</li>
+          <li><kbd>L</kbd> something feels laggy right now: marks the moment in the log</li>
+          <li>Host spectating: <kbd>Mouse</kbd> look, <kbd>W A S D</kbd> fly, <kbd>Space</kbd>/<kbd>Shift</kbd> up/down, <kbd>LMB</kbd>/<kbd>RMB</kbd> follow the next/previous player</li>
+        </ul>
       </section>
     </div>
-    <section>
-      <h3>Controls</h3>
-      <ul class="controls">
-        <li><kbd>W A S D</kbd> move &nbsp; <kbd>Mouse</kbd> aim</li>
-        <li><kbd>Hold LMB</kbd> charge a throw: harder is faster but costs more stamina. Release to throw.</li>
-        <li><kbd>Space</kbd>/<kbd>Shift</kbd> dodge: a dash you can't be hit during. At the last moment it's perfect and cheaper.</li>
-        <li><kbd>RMB</kbd>/<kbd>F</kbd> catch: the ball becomes yours. <kbd>E</kbd> deflect: tighter timing, sends it back faster.</li>
-        <li><kbd>R</kbd> revive a fallen teammate with cash &nbsp; <kbd>Tab</kbd> scoreboard &nbsp; <kbd>Esc</kbd> this menu</li>
-      </ul>
+    <section id="diagBox">
+      <h3>Lag diagnostics</h3>
+      <p class="note" id="diagText"></p>
+      <div class="row">
+        <button id="saveLogBtn">Save my log</button>
+        <button id="hostLogsBtn" class="hostOnly" hidden>Download all logs (zip)</button>
+        <span id="diagStatus" class="note"></span>
+      </div>
+      <p class="note" id="diagWhere"></p>
     </section>
     <section id="joinInfo"></section>
+  </div>
+</div>
+
+<!-- Rules editor: every game number, with a name, a description and an animated preview. -->
+<div id="rulesModal" hidden>
+  <div class="panel rules">
+    <header>
+      <div class="rulesTitle">
+        <h2>Game rules</h2>
+        <p id="rulesMode" class="note"></p>
+      </div>
+      <input id="rulesSearch" type="search" placeholder="Search rules…" autocomplete="off">
+      <button id="rulesClose" class="small" title="Close (Esc)">✕</button>
+    </header>
+    <div class="rulesBody">
+      <nav id="rulesNav"></nav>
+      <div class="rulesMain">
+        <figure class="previewBox">
+          <canvas id="previewCanvas"></canvas>
+          <figcaption><b id="previewTitle"></b> <span id="previewText"></span></figcaption>
+        </figure>
+        <div id="rulesList"></div>
+      </div>
+    </div>
+    <footer id="rulesFooter">
+      <button id="rulesResetAll">Reset all to defaults</button>
+      <button id="rulesRevert">Undo my edits</button>
+      <span id="rulesEditCount"></span>
+      <button id="rulesApply" class="primary">Apply</button>
+    </footer>
   </div>
 </div>
 
@@ -97,13 +179,8 @@
     <div class="logo">DODGE <span>&amp;</span> PARRY</div>
     <p class="tag">Schoolyard dodgeball with Souls-style stamina. Throw hard, read the ball, then dodge, catch or deflect at the last moment.</p>
     <label class="field">Name <input id="nameInput" maxlength="16" autocomplete="off"></label>
-    <div class="teams">
-      <button data-team="0" class="red">Red</button>
-      <button data-team="-1" class="auto">Auto</button>
-      <button data-team="1" class="blue">Blue</button>
-    </div>
     <button id="playBtn" class="primary">Join game</button>
-    <p class="note">Testing alone? Open more tabs or windows and join each one as a different player. Bots fill the empty spots.</p>
+    <p class="note">The host (whoever runs the game on their computer) sets up the teams and the rules, and starts the match. Testing alone? Open more tabs or windows; bots fill the empty spots.</p>
   </div>
 </div>
 

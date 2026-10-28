@@ -4,7 +4,7 @@
 
 const KEY_ACTIONS = {
   Space: 'dodge', ShiftLeft: 'dodge', ShiftRight: 'dodge',
-  KeyF: 'catch', KeyE: 'deflect', KeyR: 'revive', KeyH: 'ring', Tab: 'scores',
+  KeyF: 'catch', KeyE: 'deflect', KeyR: 'revive', KeyH: 'ring', Tab: 'scores', KeyL: 'mark',
 };
 const MOUSE_ACTIONS = { 0: 'throw', 2: 'catch' };
 

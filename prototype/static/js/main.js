@@ -3,11 +3,18 @@
 // The server owns all the rules (balls, hits, stamina, timing). This browser only moves its
 // own player (so movement feels instant), shows the world slightly in the past for
 // smoothness, and tells the server which moment was on screen whenever a button is pressed.
+// The host (whoever plays on the computer running the server) also runs the lobby: teams,
+// bots, the rules and the start and end of the match, and may spectate instead of playing.
+// Everyone else sees it read-only, and can follow the host's screen while they set things up.
 import { Net } from './net.js';
 import { Input } from './input.js';
 import { World } from './world.js';
 import { Hud, TEAM, TEAM_CLASS } from './hud.js';
 import { Sfx } from './sfx.js';
+import { Lobby } from './lobby.js';
+import { RulesEditor } from './rules_ui.js';
+import { launchVelocity } from './physics.js';
+import { Diag } from './diag.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -16,7 +23,7 @@ const clock = () => performance.now() / 1000;
 const ACT_CODE = { dodge: 1, catch: 2, deflect: 3 };
 const DENY = {
   stamina: 'Not enough stamina', busy: 'Still recovering', noball: 'No ball yet',
-  cash: 'Not enough cash', nobody: 'Nobody to revive', round: 'Not now',
+  cash: 'Not enough cash', nobody: 'Nobody to revive', round: 'Not now', host: 'Only the host can do that',
 };
 // Must match sim.py (HAND_FWD, HAND_RIGHT, HAND_UP): balls leave from the right hand.
 const HAND_FWD = 0.3;
@@ -24,13 +31,29 @@ const HAND_RIGHT = 0.32;
 const HAND_UP = 1.45;
 
 const canvas = $('view');
+const params = new URLSearchParams(location.search);
 const net = new Net();
 const input = new Input(canvas);
 const world = new World(canvas);
 const hud = new Hud();
 const sfx = new Sfx();
+// The diagnostics log (see diag.js): it reads the clock and a little context from here.
+const diag = new Diag();
+diag.clock = () => (net.offset === null ? null : performance.now() / 1000 + net.offset);
+diag.context = () => ({
+  ping: Math.round(net.rtt), state: net.latest?.r.s ?? null, alive: me?.alive ? 1 : 0,
+  lock: input.locked ? 1 : 0, interp: Math.round(net.interpDelay * 1000),
+});
+net.onSnapshot = (now, late) => diag.snapshot(now, late);
+net.onStale = (n) => diag.count('stale', n);
+net.onReanchor = (ms) => diag.log('clock', { shift: Math.round(ms) });     // every update arrived late: re-anchored
+const editor = new RulesEditor(net, () => net.latest?.r.s);
+const lobby = new Lobby(net, {
+  onStart: () => { sfx.unlock(); input.lock(); },     // the host's click starts the match and enters it
+  openRules: () => editor.open(),
+});
 
-const settings = { sens: 1, volume: 0.6, ring: true };
+const settings = { sens: 1, volume: 0.6, ring: true, follow: true };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('dp.settings') || '{}'));
 } catch { /* private mode etc: defaults are fine */ }
@@ -40,6 +63,9 @@ const saveSettings = () => {
 sfx.setVolume(settings.volume);
 
 let cfg = null;
+let isHost = false;
+const rules = { defaults: null, active: null, next: null, rv: -1 };     // the lobby's rules, from the server
+let lastSync = 0;
 let myId = null;
 let myTeam = 0;
 let myName = '';
@@ -55,42 +81,62 @@ const warned = new Set();
 const local = {
   x: 0, z: 0, yaw: Math.PI / 2, pitch: 0, tp: -1,
   action: null, actionAt: -9, busyUntil: 0, dashUntil: 0, dashDir: [0, 0],
-  charging: false, chargeAt: 0, throwAt: -9, lastSend: 0, handled: null,
+  charging: false, chargeAt: 0, throwAt: -9, lastSend: 0, handled: null, ignoredAt: -9,
 };
+// The host's spectator camera: flies freely, or rides behind a player (follow = their id).
+const spec = { x: 0, y: 9, z: -20, yaw: 0, pitch: -0.4, follow: null };
+let hostView = null;        // what the host's screen shows (guests): the server's 'hostview' message
+const sharedView = { text: '', at: 0 };    // what this host last told the others about its screen
+const watching = () => me?.team === -1;
 
 world.buildCourt(13, 7, 1);
 
 // ------------------------------------------------------------------ join & menu
 
-let chosenTeam = -1;
 let saved = null;
 try { saved = JSON.parse(sessionStorage.getItem('dp.join') || 'null'); } catch { /* ignore */ }
 $('nameInput').value = saved?.name || `Player-${100 + Math.floor(Math.random() * 900)}`;
-chosenTeam = saved?.team ?? -1;
-const teamButtons = [...document.querySelectorAll('.teams button')];
-const markTeam = () => teamButtons.forEach((b) => b.classList.toggle('on', Number(b.dataset.team) === chosenTeam));
-teamButtons.forEach((b) => b.addEventListener('click', () => { chosenTeam = Number(b.dataset.team); markTeam(); }));
-markTeam();
 $('playBtn').addEventListener('click', join);
 $('nameInput').addEventListener('keydown', (e) => e.key === 'Enter' && join());
-if (saved?.joined) join();     // a reloaded tab rejoins as the same name/team (sessionStorage is per tab)
+if (saved?.joined) join();     // a reloaded tab rejoins under the same name (sessionStorage is per tab); the server gives back its team
 
 function join() {
   myName = $('nameInput').value.trim().slice(0, 16) || 'Player';
   try {
-    sessionStorage.setItem('dp.join', JSON.stringify({ name: myName, team: chosenTeam, joined: true }));
+    sessionStorage.setItem('dp.join', JSON.stringify({ name: myName, joined: true }));
   } catch { /* ignore */ }
   $('join').hidden = true;
   sfx.unlock();
-  net.connect(myName, chosenTeam === -1 ? null : chosenTeam);
-  showMenu('Click to play');
+  diag.name = myName;
+  // ?guest: join without host powers (to see what others see); ?host=KEY: the console's host link
+  const extra = { tab: diag.tab, run: diag.run };
+  if (params.has('guest')) extra.guest = true;
+  if (params.get('host')) extra.hostKey = params.get('host');
+  net.connect(myName, extra);
+  showMenu();
+}
+
+/** The rules changed (or arrived): everything derived from them follows. */
+function applyRules(m) {
+  cfg = m.cfg;
+  rules.active = m.rules;
+  rules.next = m.next;
+  rules.rv = m.rv;
+  net.interpDelay = cfg.interpDelay;
+  net.gravity = cfg.gravity;
+  world.setBallRadius(cfg.ballRadius);
+  courtKey = '';          // the centre strip may have changed: redraw the court
+  editor.setServer(m.rules, m.next);
+  lobby.dirty();
 }
 
 net.on('welcome', (m) => {
   myId = m.id;
-  cfg = m.cfg;
-  net.interpDelay = cfg.interpDelay;
-  net.gravity = cfg.gravity;
+  isHost = m.host;
+  rules.defaults = m.defaults;
+  editor.setup(m.schema, m.defaults, isHost);
+  lobby.setHost(isHost, m.cfg.botsMax);
+  applyRules(m);
   hud.show(true);
   const box = $('joinInfo');
   const h = document.createElement('h3');
@@ -101,52 +147,134 @@ net.on('welcome', (m) => {
     code.textContent = url;
     box.append(code, ' ');
   }
+  diag.log('welcome', { id: m.id, name: myName, host: m.host, version: m.version, logging: m.logging });
+  diag.log('env', envInfo());
+  navigator.getBattery?.().then((b) => {
+    const note = () => diag.log('battery', { level: Math.round(b.level * 100), charging: b.charging });
+    note();
+    b.addEventListener('chargingchange', note);
+  }).catch(() => { /* not available on this page */ });
+  if (m.logging) diag.connect((msg) => net.send(msg));
+  $('diagText').textContent = m.logging
+    ? 'This game records a log to find the cause of lag: frame rate, connection timing and device info (graphics card, CPU cores, screen). It goes to the host\'s computer by itself. In the game, press L the moment something feels laggy.'
+    : 'This server isn\'t saving logs, but you can still save your own.';
+  $('hostLogsBtn').hidden = !(isHost && m.logging);
+  $('diagWhere').textContent = isHost && m.logDir ? `On this computer the logs are in ${m.logDir}` : '';
 });
+net.on('rules', applyRules);
+net.on('logack', (m) => diag.ack(m.run, m.seq));
+net.on('hostview', (m) => { hostView = m.m ? m : null; });
 net.on('close', () => {
+  diag.log('ws', { closed: true });
+  diag.flush();
   $('disconnected').hidden = false;
   document.exitPointerLock?.();
 });
 $('reconnectBtn').addEventListener('click', () => location.reload());
 
-function showMenu(title) {
-  $('overlayTitle').textContent = title;
+function showMenu() {
   $('overlay').hidden = false;
+  lobby.dirty();
 }
 $('resumeBtn').addEventListener('click', () => {
   sfx.unlock();
   input.lock();
 });
 input.onLockChange = (locked) => {
+  diag.log('lock', { on: locked });
   $('overlay').hidden = locked;
-  if (!locked && myId !== null) showMenu('Paused');
+  if (locked) editor.close();
+  else if (myId !== null) showMenu();
 };
 
 $('sensInput').value = settings.sens;
 $('volInput').value = settings.volume;
 $('ringInput').checked = settings.ring;
+$('followInput').checked = settings.follow;
+$('followInput').addEventListener('change', (e) => {
+  settings.follow = e.target.checked;
+  saveSettings();
+  if (!settings.follow) editor.unfollow();
+});
+editor.onStopFollowing = () => {        // closing the editor that followed the host: stop following
+  settings.follow = false;
+  $('followInput').checked = false;
+  saveSettings();
+};
 $('sensInput').addEventListener('input', (e) => { settings.sens = Number(e.target.value); saveSettings(); });
 $('volInput').addEventListener('input', (e) => { settings.volume = Number(e.target.value); sfx.setVolume(settings.volume); saveSettings(); });
 $('ringInput').addEventListener('change', (e) => { settings.ring = e.target.checked; saveSettings(); });
-// Rapid clicks must count from the value already asked for, not the not-yet-updated snapshot.
-let fillWanted = null;
-const changeFill = (step) => {
-  fillWanted = clamp((fillWanted ?? net.latest?.r.fill ?? 2) + step, 0, cfg?.botFillMax ?? 6);
-  net.send({ t: 'cfg', fill: fillWanted });
-};
-$('fillMinus').addEventListener('click', () => changeFill(-1));
-$('fillPlus').addEventListener('click', () => changeFill(1));
-$('skillSelect').addEventListener('change', (e) => net.send({ t: 'cfg', skill: e.target.value }));
-$('teamBtn').addEventListener('click', () => net.send({ t: 'team', team: 1 - myTeam }));
+$('saveLogBtn').addEventListener('click', () => {
+  const bytes = diag.download();
+  hud.popup(`Log saved to your Downloads folder (${Math.max(1, Math.round(bytes / 1024))} KB)`, 'good');
+});
+$('hostLogsBtn').addEventListener('click', downloadAllLogs);
+
+/** The host's "Download all logs": every browser's log and the server's, zipped by the server. */
+async function downloadAllLogs() {
+  const button = $('hostLogsBtn');
+  button.disabled = true;
+  try {
+    diag.flush();
+    await new Promise((resolve) => setTimeout(resolve, 500));     // let our own latest lines arrive
+    const key = params.get('host');
+    const res = await fetch(`/logs/download${key ? `?key=${encodeURIComponent(key)}` : ''}`);
+    if (!res.ok) throw new Error(await res.text());
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await res.blob());
+    a.download = res.headers.get('X-Filename') ?? 'dodgeparry-logs.zip';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    hud.popup('All logs saved to your Downloads folder', 'good');
+  } catch (e) {
+    hud.popup(`Couldn't get the logs: ${e.message}`, 'bad');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+/** The device, for the log: what frame rate and timing depend on. */
+function envInfo() {
+  const gl = world.renderer.getContext();
+  let gpu = null;
+  let vendor = null;
+  try {
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    gpu = gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
+    vendor = gl.getParameter(ext ? ext.UNMASKED_VENDOR_WEBGL : gl.VENDOR);
+  } catch { /* not available */ }
+  const c = navigator.connection;
+  return {
+    ua: navigator.userAgent, platform: navigator.userAgentData?.platform ?? navigator.platform,
+    cores: navigator.hardwareConcurrency ?? null, mem_gb: navigator.deviceMemory ?? null,
+    screen: `${screen.width}x${screen.height}`, dpr: devicePixelRatio, window: `${innerWidth}x${innerHeight}`,
+    canvas: `${canvas.width}x${canvas.height}`, pixel_ratio: world.renderer.getPixelRatio(), gpu, vendor,
+    net: c ? { type: c.effectiveType, rtt: c.rtt, down: c.downlink } : null,
+    url: location.search.replace(/([?&]host=)[^&]*/, '$1(hidden)'), tab: diag.tab, run: diag.run, lang: navigator.language,
+  };
+}
 
 // ------------------------------------------------------------------ actions
 
 input.onPress = (a) => {
   if (a === 'scores') { scoresHeld = true; return; }
+  if (a === 'mark') {
+    diag.log('mark', diag.context());
+    hud.popup('Laggy moment noted in the log. Thanks!', 'dim');
+    return;
+  }
   if (a === 'ring') {
     settings.ring = !settings.ring;
     $('ringInput').checked = settings.ring;
     saveSettings();
     hud.popup(`Timing ring ${settings.ring ? 'on' : 'off'}`, 'dim');
+    return;
+  }
+  if (watching()) {
+    if (a === 'throw') followNext(1);
+    else if (a === 'catch') followNext(-1);
     return;
   }
   if (!me || !cfg || !me.alive) return;
@@ -165,7 +293,7 @@ input.onCancel = () => {
   }
 };
 
-const combatOpen = () => ['wait', 'play'].includes(net.latest?.r.s);
+const combatOpen = () => ['lobby', 'wait', 'play'].includes(net.latest?.r.s);
 // The newest snapshot can lag a throw by a few frames; don't show a ball we just threw.
 const hasBall = () => !!me && me.hasBall && clock() - local.throwAt > 0.35;
 const throwCost = (power) => cfg.throwCost[0] + (cfg.throwCost[1] - cfg.throwCost[0]) * power;
@@ -190,6 +318,7 @@ function syncCourt() {
 function chargePower(t = clock()) {
   const held = clamp((t - local.chargeAt) / cfg.chargeTime, 0, 1);
   const [lo, hi] = cfg.throwCost;
+  if (hi <= lo) return me.stamina >= lo ? held : 0;                     // every throw costs the same
   return Math.min(held, clamp((me.stamina - lo) / (hi - lo), 0, 1));   // stamina caps the power
 }
 
@@ -198,9 +327,19 @@ function denied(text) {
   sfx.deny();
 }
 
+/** A press during the recovery after your last dodge, catch or deflect does nothing. Say so
+ *  (it used to be silent, which felt like a lost key press), and note it in the log. */
+function ignored(kind, t) {
+  diag.log('ignored', { a: kind, left: round(local.busyUntil - t, 3), after: local.action, tti: threat ? round(threat.tti, 3) : null });
+  if (t - local.ignoredAt < 0.4) return;
+  local.ignoredAt = t;
+  denied(`Still recovering (${(local.busyUntil - t).toFixed(1)}s)`);
+}
+
 function startCharge() {
   const t = clock();
-  if (!combatOpen() || t < local.busyUntil) return;
+  if (!combatOpen()) return;
+  if (t < local.busyUntil) return ignored('throw', t);
   if (!hasBall()) return denied(`No ball yet (${me.cooldown.toFixed(1)}s)`);
   if (me.stamina < cfg.throwCost[0]) {
     hud.flashStamina();
@@ -223,7 +362,8 @@ function releaseThrow() {
 
 function tryAction(kind) {
   const t = clock();
-  if (!combatOpen() || t < local.busyUntil) return;
+  if (!combatOpen()) return;
+  if (t < local.busyUntil) return ignored(kind, t);
   const spec = cfg.actions[kind];
   if (me.stamina < spec.cost) {
     hud.flashStamina();
@@ -231,7 +371,7 @@ function tryAction(kind) {
   }
   local.action = kind;
   local.actionAt = t;
-  local.busyUntil = t + spec.window + spec.recovery;
+  local.busyUntil = t + (spec.window + spec.recovery) * cfg.lockoutScale;    // 0: press again at once
   local.charging = false;     // the server cancels the wind-up too
   // The ring moves on to the next ball right away, so a second ball close behind is visible.
   if (threat) local.handled = { id: threat.b.id, rally: threat.b.rally, until: t + spec.window + 0.1, arrive: t + threat.tti };
@@ -242,6 +382,7 @@ function tryAction(kind) {
     dir = local.dashDir.map((v) => round(v, 3));
   }
   net.send({ t: 'act', a: kind, wt: round(net.viewTime(), 4), dir, aim: aim.point, tg: aim.tg });
+  diag.log('press', { a: kind, wt: round(net.viewTime(), 3), tti: threat ? round(threat.tti, 3) : null, ball: threat?.b.id ?? null });
 }
 
 function dodgeDirection() {
@@ -291,10 +432,50 @@ function syncSelf() {
     local.charging = false;
   }
   if (me.team !== myTeam || !document.title.startsWith(myName)) {
+    if (me.team === -1 && myTeam !== -1) startSpectating();
     myTeam = me.team;
     hud.setIdentity(myName, myTeam);
-    document.title = `${myName} · ${TEAM[myTeam]} | Dodge & Parry`;
+    document.title = `${myName} · ${TEAM[myTeam] ?? 'SPECTATING'} | Dodge & Parry`;
   }
+}
+
+// ------------------------------------------------------------------ the host's spectator camera
+
+/** Just started watching: fly from where the camera is, looking at the middle of the court. */
+function startSpectating() {
+  const c = world.camera.position;
+  Object.assign(spec, { x: c.x, y: Math.max(3, c.y), z: c.z, yaw: Math.atan2(-c.x, -c.z), pitch: -0.4, follow: null });
+}
+
+/** Mouse looks; W A S D fly where you look, Space / Shift go up and down. Flying stops following. */
+function moveSpectator(dt) {
+  const [mx, my] = input.takeMouse();
+  const k = 0.0022 * settings.sens;
+  spec.yaw -= mx * k;
+  spec.pitch = clamp(spec.pitch - my * k, -1.45, 1.2);
+  const { f, r } = input.axis();
+  const up = (input.keys.has('Space') ? 1 : 0) - (input.keys.has('ShiftLeft') || input.keys.has('ShiftRight') ? 1 : 0);
+  if (spec.follow !== null && (f || r || up)) spec.follow = null;
+  if (spec.follow !== null) return;
+  const speed = 14;
+  const sy = Math.sin(spec.yaw);
+  const cy = Math.cos(spec.yaw);
+  const { L, W } = court();
+  spec.x = clamp(spec.x + (sy * f - cy * r) * speed * dt, -L - 30, L + 30);
+  spec.z = clamp(spec.z + (cy * f + sy * r) * speed * dt, -W - 30, W + 30);
+  spec.y = clamp(spec.y + up * speed * dt, 0.5, 60);
+}
+
+/** Ride behind the next (step 1) or previous (-1) player still standing. */
+function followNext(step) {
+  const list = [...(view?.players.values() ?? [])].filter((p) => p.team >= 0 && p.alive).sort((a, b) => a.team - b.team || a.id - b.id);
+  if (!list.length) {
+    spec.follow = null;
+    return;
+  }
+  const i = list.findIndex((p) => p.id === spec.follow);
+  const next = list[i < 0 ? (step > 0 ? 0 : list.length - 1) : (i + step + list.length) % list.length];
+  spec.follow = next.id;
 }
 
 function moveLocal(dt, t) {
@@ -323,20 +504,37 @@ function moveLocal(dt, t) {
   [local.x, local.z] = clampToHalf(myTeam, local.x + vx * dt, local.z + vz * dt);
 }
 
+/** Over the right shoulder of someone at (x, z), like Fortnite: the crosshair is the aim. */
+function shoulderCamera(x, z, yaw, pitch) {
+  const cam = world.camera;
+  const cp = Math.cos(pitch);
+  const dx = Math.sin(yaw) * cp;
+  const dy = Math.sin(pitch);
+  const dz = Math.cos(yaw) * cp;
+  const px = x - Math.cos(yaw) * 0.75;
+  const pz = z + Math.sin(yaw) * 0.75;
+  const py = 1.75;
+  const dist = 4.4;
+  cam.position.set(px - dx * dist, Math.max(0.3, py - dy * dist + 0.55), pz - dz * dist);
+  cam.lookAt(px + dx * 20, py + dy * 20, pz + dz * 20);
+}
+
 function placeCamera() {
   const cam = world.camera;
-  if (me && me.alive) {
-    // Over the right shoulder, like Fortnite: the crosshair is the aim.
-    const cp = Math.cos(local.pitch);
-    const dx = Math.sin(local.yaw) * cp;
-    const dy = Math.sin(local.pitch);
-    const dz = Math.cos(local.yaw) * cp;
-    const px = local.x - Math.cos(local.yaw) * 0.75;
-    const pz = local.z + Math.sin(local.yaw) * 0.75;
-    const py = 1.75;
-    const dist = 4.4;
-    cam.position.set(px - dx * dist, Math.max(0.3, py - dy * dist + 0.55), pz - dz * dist);
-    cam.lookAt(px + dx * 20, py + dy * 20, pz + dz * 20);
+  if (watching()) {
+    const p = spec.follow !== null ? view?.players.get(spec.follow) : null;
+    if (p) {
+      shoulderCamera(p.x, p.z, p.yaw, clamp(p.pitch, -0.6, 0.8));
+      // Flying off starts from this view.
+      Object.assign(spec, { x: cam.position.x, y: cam.position.y, z: cam.position.z, yaw: p.yaw, pitch: clamp(p.pitch, -0.6, 0.8) });
+    } else {
+      spec.follow = null;
+      const cp = Math.cos(spec.pitch);
+      cam.position.set(spec.x, spec.y, spec.z);
+      cam.lookAt(spec.x + Math.sin(spec.yaw) * cp * 10, spec.y + Math.sin(spec.pitch) * 10, spec.z + Math.cos(spec.yaw) * cp * 10);
+    }
+  } else if (me && me.alive) {
+    shoulderCamera(local.x, local.z, local.yaw, local.pitch);
   } else {
     // Joining or knocked out: orbit above the court (the mouse turns it).
     const radius = 8 + court().L * 1.05;
@@ -420,24 +618,6 @@ function computeAim() {
   if (aim.ang > cfg.deflectCone) aim.tg = null;
 }
 
-/** Same arc maths as the server (sim.launch_velocity): the flatter arc through `to`. */
-function launchVelocity(from, to, speed) {
-  const dx = to[0] - from[0];
-  const dy = to[1] - from[1];
-  const dz = to[2] - from[2];
-  const d = Math.hypot(dx, dz);
-  const g = cfg.gravity;
-  if (g <= 0 || d < 0.3) {
-    const l = Math.hypot(dx, dy, dz) || 1;
-    return [(dx / l) * speed, (dy / l) * speed, (dz / l) * speed];
-  }
-  const s2 = speed * speed;
-  const disc = s2 * s2 - g * (g * d * d + 2 * dy * s2);
-  const theta = disc < 0 ? Math.PI / 4 : Math.atan2(s2 - Math.sqrt(disc), g * d);
-  const h = (Math.cos(theta) * speed) / d;
-  return [dx * h, Math.sin(theta) * speed, dz * h];
-}
-
 function touchesEnemy(x, y, z) {
   const R = cfg.playerRadius + cfg.ballRadius;
   for (const p of view.players.values()) {
@@ -450,9 +630,9 @@ function touchesEnemy(x, y, z) {
 function previewPath(speed) {
   const { L, W } = court();
   const r = cfg.ballRadius;
-  const { normalKeep: kn, tangentKeep: kt, minSpeed } = cfg.ricochet;
+  const { normalKeep: kn, tangentKeep: kt, minSpeed, max: maxBounces } = cfg.ricochet;
   let [x, y, z] = handPos();
-  let [vx, vy, vz] = launchVelocity([x, y, z], aim.point, speed);
+  let [vx, vy, vz] = launchVelocity([x, y, z], aim.point, speed, cfg.gravity);
   const pts = [];
   let bounce = null;
   let after = 0;
@@ -472,7 +652,7 @@ function previewPath(speed) {
       floor = false;
     }
     if (floor !== null) {
-      if (bounce) break;
+      if (bounce || maxBounces < 1) break;
       [vx, vy, vz] = floor ? [vx * kt, -vy * kn, vz * kt] : [vx * kt, vy * kt, -vz * kn];
       pts.push([x, y, z]);
       if (Math.hypot(vx, vy, vz) < minSpeed) break;
@@ -495,10 +675,11 @@ function isBankShot(target) {
 }
 
 /** Balls as drawn. Near me they are shifted onto my present position: the server judged them
- *  against where it last knew me, and that offset is what this browser is ahead by. */
+ *  against where it last knew me, and that offset is what this browser is ahead by. With
+ *  sidestep compensation the server judges them against my screen instead, so no shift. */
 function displayBalls(viewMe) {
   const out = [];
-  const shift = viewMe && viewMe.alive && me?.alive;
+  const shift = !cfg.sidestepComp && viewMe && viewMe.alive && me?.alive;
   const ox = shift ? local.x - viewMe.x : 0;
   const oz = shift ? local.z - viewMe.z : 0;
   for (const b of view.balls.values()) {
@@ -576,6 +757,7 @@ function sendInput(t) {
     t: 'in', x: round(local.x, 2), z: round(local.z, 2), yaw: round(local.yaw, 3), pitch: round(local.pitch, 3),
     wt: round(viewTime, 4), tp: local.tp, aim: aim.point, tg: aim.tg,
   });
+  diag.count('ins');
 }
 
 // ------------------------------------------------------------------ events from the server
@@ -597,6 +779,7 @@ function volumeFor(id) {
 function onEvent(e) {
   const mine = e.p === myId;
   const pos = posOf(e.p);
+  if ((mine && ['hit', 'catch', 'deflect', 'dodge', 'deny', 'sidestep'].includes(e.k)) || e.k === 'round' || e.k === 'match') diag.log('ev', e);
   switch (e.k) {
     case 'throw':
       if (!mine) {
@@ -620,6 +803,9 @@ function onEvent(e) {
         who(e.by), [e.ko ? ' knocked out ' : ' hit '], who(e.p), [`  ${Math.round(e.speed)} m/s, ${e.dmg} dmg`],
         [e.bank ? '  ricochet!' : '', 'gold'], [e.rally ? `  rally ×${e.rally}` : '', 'gold'],
       ]);
+      break;
+    case 'sidestep':      // it missed: on my screen I had already stepped out of its way
+      if (mine) hud.popup('SIDESTEPPED', 'dim');
       break;
     case 'bounce':
       world.spark(e.x, e.y, e.z, 0xffffff, e.y < 0.5);
@@ -667,7 +853,8 @@ function onEvent(e) {
         hud.banner('FIGHT!', '', '', 900);
         sfx.beep(true);
       } else if (e.s === 'over') {
-        hud.banner(e.w === -1 ? 'DRAW' : `${TEAM[e.w]} WINS`, `Round ${e.n}`, e.w === -1 ? '' : TEAM_CLASS[e.w], 3500);
+        if (e.m !== undefined) hud.banner(`${TEAM[e.m]} WINS THE MATCH`, `Round ${e.n}`, TEAM_CLASS[e.m], 3800);
+        else hud.banner(e.w === -1 ? 'DRAW' : `${TEAM[e.w]} WINS`, `Round ${e.n}`, e.w === -1 ? '' : TEAM_CLASS[e.w], 3500);
       } else if (e.s === 'wait') hud.banner('Waiting for players', 'One team is empty', '', 2500);
       break;
     case 'join':
@@ -676,11 +863,32 @@ function onEvent(e) {
     case 'leave':
       hud.feed([[e.name], [' left']]);
       break;
-    case 'team':
-      if (mine) hud.popup(e.now ? `You're on ${TEAM[e.team]}` : `Switching to ${TEAM[e.team]} next round`, 'dim');
+    case 'team':     // the host moved someone
+      if (e.cancel) {
+        if (mine) hud.popup('Your team change was cancelled', 'dim');
+      } else if (mine) hud.popup(e.now ? `The host put you on ${TEAM[e.team]}` : `You'll play for ${TEAM[e.team]} from the next round`, 'dim');
+      else hud.feed([who(e.p), [` moves to ${TEAM[e.team]}${e.now ? '' : ' next round'}`]]);
       break;
-    case 'cfg':
-      hud.feed([[`Bots fill teams to ${e.fill} (${e.skill})`, 'gold']]);
+    case 'shuffle':
+      hud.feed([[`The host shuffled the teams${e.now ? '' : ' (from the next round)'}`, 'gold']]);
+      break;
+    case 'spectate':
+      if (mine) hud.popup(e.on ? (e.now ? 'Spectating' : 'You spectate from the next round') : (e.now ? 'Back in the game' : 'You play again from the next round'), 'dim');
+      else hud.feed([who(e.p), [e.on ? ` spectates${e.now ? '' : ' from the next round'}` : ` plays again${e.now ? '' : ' from the next round'}`]]);
+      break;
+    case 'rules': {
+      const more = e.n > e.names.length ? ` and ${e.n - e.names.length} more` : '';
+      hud.feed([[e.discard ? 'The host cancelled the waiting rule changes'
+        : `Rules changed: ${e.names.join(', ')}${more}${e.next ? ' (from the next round)' : ''}`, 'gold']]);
+      break;
+    }
+    case 'match':
+      if (e.s === 'end') {
+        const how = e.w === null ? 'The host ended the match' : `${TEAM[e.w]} won the match`;
+        hud.banner('BACK TO THE LOBBY', `${how}: ${e.score[0]} – ${e.score[1]}`, e.w === null ? '' : TEAM_CLASS[e.w], 3500);
+        document.exitPointerLock?.();       // everyone sees the lobby with the result
+        showMenu();
+      }
       break;
   }
 }
@@ -690,6 +898,7 @@ function onEvent(e) {
 function playerStates(t) {
   const out = [];
   for (const p of view.players.values()) {
+    if (p.team < 0 || (p.id === myId && me && me.team < 0)) continue;     // spectating: nobody to draw
     if (p.id === myId && me) {
       const actAge = t - local.actionAt;
       out.push({
@@ -716,18 +925,50 @@ function updateHud(t) {
     const n = Math.ceil(r.left);
     if (n !== lastCount && n > 0) {
       lastCount = n;
-      hud.banner(String(n), `Round ${r.n}`, '', 1000);
+      hud.banner(String(n), r.n === 1 ? 'The match is starting' : `Round ${r.n}`, '', 1000);
       sfx.beep(false);
     }
   } else lastCount = -1;
   hud.showScores(scoresHeld, players, myId);
   hud.setNet(`${Math.round(net.rtt)} ms · ${Math.round(fps)} fps`);
-  if (fillWanted === r.fill) fillWanted = null;
+  const lobbyOn = r.s === 'lobby';
+  const spectating = watching();
+  hud.setWatching(spectating);
+  hud.setHint(spectating
+    ? spec.follow !== null ? `Spectating ${nameOf(spec.follow)} · LMB / RMB: next / previous player · W A S D: fly free · Esc: menu`
+      : 'Spectating · Mouse: look · W A S D: fly · Space / Shift: up / down · LMB: follow a player · Esc: menu'
+    : !lobbyOn ? (r.s === 'wait' ? 'Waiting for players: one team is empty' : '')
+      : isHost ? 'Lobby warm-up · press Esc to set up teams and rules, then Start match' : 'Lobby warm-up · the host starts the match');
+  followHost();
   if (!$('overlay').hidden) {
-    $('fillValue').textContent = fillWanted ?? r.fill;
-    if ($('skillSelect').value !== r.skill) $('skillSelect').value = r.skill;
+    lobby.update(net.latest, myId, rules);
+    const s = diag.status();
+    const text = !s.sending ? `${s.lines} lines logged, kept in this browser`
+      : s.waiting ? `${s.lines} lines logged; ${s.waiting} not on the host's computer yet` : `${s.lines} lines logged, all on the host's computer`;
+    if ($('diagStatus').textContent !== text) $('diagStatus').textContent = text;
   }
+  editor.tick();
+  // A rules update went missing (the snapshot knows a newer version): ask for it again.
+  if (r.rv !== rules.rv && rules.rv >= 0) {
+    if (!lastSync) lastSync = t;
+    else if (t - lastSync > 1) {
+      lastSync = t;
+      net.send({ t: 'sync' });
+    }
+  } else lastSync = 0;
   if (!me) return;
+  if (spectating) {
+    const tags = [];
+    for (const p of view.players.values()) {
+      const s = p.alive && p.team >= 0 ? world.project(p.x, 2.2, p.z) : null;
+      if (s && s.onScreen) tags.push({ id: p.id, name: p.name, team: p.team, x: s.x, y: s.y, hp: (100 * p.hp) / cfg.maxHp, stamina: (100 * p.stamina) / cfg.maxStamina });
+    }
+    hud.setTags(tags);
+    hud.setAssist(null, '');
+    hud.setThreat(null);
+    hud.setDead(null);
+    return;
+  }
 
   const power = local.charging ? chargePower(t) : 0;
   hud.setVitals(me, cfg, local.charging ? throwCost(power) : 0);
@@ -745,7 +986,9 @@ function updateHud(t) {
   for (const p of view.players.values()) {
     if (p.id === myId || !p.alive) continue;
     const s = world.project(p.x, 2.2, p.z);
-    if (s && s.onScreen) tags.push({ id: p.id, name: p.name, team: p.team, x: s.x, y: s.y, hp: p.hp, stamina: p.stamina });
+    if (s && s.onScreen) {
+      tags.push({ id: p.id, name: p.name, team: p.team, x: s.x, y: s.y, hp: (100 * p.hp) / cfg.maxHp, stamina: (100 * p.stamina) / cfg.maxStamina });
+    }
   }
   hud.setTags(tags);
 
@@ -759,13 +1002,55 @@ function updateHud(t) {
   }
   hud.setAssist(marker, kind);
   showThreat();
-  hud.setDead(me.alive || r.s !== 'play' ? null : `You're out. A teammate can revive you (${reviveCost} cash). Move the mouse to look around.`);
+  hud.setDead(me.alive || r.s !== 'play' ? null : `You're out. A teammate can revive you (${reviveCost} ${cfg.teamCash ? 'team cash' : 'cash'}). Move the mouse to look around.`);
+}
+
+/** Guests: show what the host is doing in the menus, and (if they follow) open the same rules. */
+function followHost() {
+  if (isHost) {
+    $('hostViewBox').hidden = true;
+    return;
+  }
+  const parts = editor.describe(hostView);
+  hud.setHostLive(parts);
+  $('hostViewBox').hidden = !hostView;
+  const text = parts ?? [['The host is playing.']];
+  const sig = JSON.stringify(text);
+  if ($('hostViewText').dataset.sig !== sig) {
+    $('hostViewText').dataset.sig = sig;
+    $('hostViewText').replaceChildren(...text.map(([s, bold]) => {
+      const span = document.createElement(bold ? 'b' : 'span');
+      span.textContent = s;
+      return span;
+    }));
+  }
+  const want = settings.follow && !$('overlay').hidden && hostView?.m === 'rules';
+  if (want && editor.following !== hostView) editor.follow(hostView);
+  else if (!want && editor.following) editor.unfollow();
+}
+
+/** The host tells the server what their screen shows, a few times a second at most. */
+function shareHostView(t) {
+  if (!isHost) return;
+  const v = editor.hostView() ?? { m: $('overlay').hidden ? 'game' : 'menu' };
+  const text = JSON.stringify(v);
+  if (text === sharedView.text || t - sharedView.at < 0.12) return;
+  sharedView.text = text;
+  sharedView.at = t;
+  net.send({ t: 'hostview', ...v });
 }
 
 let last = performance.now();
 function frame() {
   requestAnimationFrame(frame);
   const tMs = performance.now();
+  const frozen = drawFrame(tMs);
+  diag.frame(tMs, performance.now() - tMs, frozen);
+}
+
+/** One frame. Returns true when no newer world update existed to show, so the picture of the
+ *  other players and the balls stood still: what the diagnostics log calls "frozen". */
+function drawFrame(tMs) {
   const dt = Math.min(0.1, (tMs - last) / 1000);
   last = tMs;
   fps = fps * 0.95 + (1 / Math.max(dt, 1e-3)) * 0.05;
@@ -775,7 +1060,7 @@ function frame() {
     local.yaw += dt * 0.05;      // slow orbit behind the join screen
     placeCamera();
     world.render();
-    return;
+    return false;
   }
   syncCourt();
   viewTime = net.viewTime();
@@ -783,7 +1068,8 @@ function frame() {
   me = net.latest.players.get(myId) || null;
   if (me) {
     syncSelf();
-    moveLocal(dt, t);
+    if (watching()) moveSpectator(dt);
+    else moveLocal(dt, t);
     // A catch/deflect frees your hands the moment it lands (the server does the same), so a
     // second ball right behind the first can be answered before the confirmation arrives.
     const h = local.handled;
@@ -808,15 +1094,21 @@ function frame() {
     const { pts, bounce } = previewPath(throwSpeed(chargePower(t)));
     world.setPreview(pts, bounce);
   } else world.setPreview(null);
-  if (me) sendInput(t);
+  if (me && !watching()) sendInput(t);
   for (const e of net.takeEvents(viewTime)) onEvent(e);
   world.syncPlayers(playerStates(t), dt);
   world.syncBalls(balls, t);
   world.updateFx(dt, t);
   updateHud(t);
+  shareHostView(t);
   world.render();
+  return viewTime > net.latest.st;
 }
 requestAnimationFrame(frame);
 
 // Handle for automated tests and console poking.
-window.dp = { net, input, local, aim, get me() { return me; }, get threat() { return threat; }, get view() { return view; } };
+window.dp = {
+  net, input, local, aim, world, lobby, editor, rules, diag, showMenu, spec, followNext,
+  get hostView() { return hostView; },
+  get me() { return me; }, get threat() { return threat; }, get view() { return view; }, get cfg() { return cfg; }, get isHost() { return isHost; },
+};

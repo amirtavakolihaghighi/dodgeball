@@ -1,8 +1,10 @@
 # Dodge & Parry: LAN prototype
 
 Schoolyard dodgeball with Souls-style stamina, in 3D in the browser. One computer runs a small
-Python server. Everyone on the same Wi-Fi opens a web page and plays. Bots fill empty spots, so
-you can also play and tune it alone.
+Python server. Everyone on the same Wi-Fi opens a web page and plays. The host can add bots to
+either team, so you can also play and tune it alone.
+
+The server starts in a **lobby**. The **host**, whoever plays on the computer running the server, sets up the teams, the bots and every rule of the game, then presses **Start match**. Others can join at any time; only the host can change anything.
 
 ## Run it
 
@@ -18,10 +20,30 @@ python -m venv .venv
 
 The server window shows the addresses to open:
 
-- **This computer:** `http://localhost:8000`. If 8000 is busy it uses the next free port and says so.
+- **This computer:** `http://localhost:8000`. If 8000 is busy it uses the next free port and says so. The browser that opens here is **the host**.
 - **Other devices on the same Wi-Fi:** `http://<the 192.168.x.x address it shows>:8000`. The in-game menu (Esc) shows it too.
+- **Host from another device:** the window also shows a private host link (`...?host=...`). Whoever opens it gets the host's controls. Don't share it.
 
 When playing together on one Wi-Fi, only the host runs the game. Everyone else just opens that address in a browser.
+
+## The lobby (for the host)
+
+The menu (Esc) is the lobby. As the host you get:
+
+- **Start match** and **End match**. Ending takes a second click, because it ends the match for everyone.
+- **Teams:** a newcomer joins the team with fewer people; after that nothing moves anyone but you. **⇄** moves someone to the other team, and **Shuffle teams** deals everyone into random, even teams. A player who reconnects gets their team back.
+- **Bots:** each team has its own **− / +** (0–12 bots each). Nothing adds, removes or balances them but you. Bot skill sits under Match.
+- **Match length:** "first to N" round wins, or endless.
+- **Spectate:** watch instead of playing. The others (and the bots) play on; you keep all the host controls. Mouse looks, **W A S D** fly, **Space / Shift** go up and down, **left / right click** ride behind the next / previous player. **Join a team** brings you back to the team you had. During a match both take effect from the next round.
+- **Game rules…**: every number of the game, about 110 of them, in 16 groups. For example: throw speeds, charge time, damage, gravity, ricochets, aim assist, every dodge/catch/deflect window, stamina, movement, hitboxes, court size, cash and revives, rounds, the bots' skill numbers and the network smoothing.
+  - Each rule has a plain description, its default, and an **animated preview**. The preview runs the default next to your value in real time, using the game's own formulas: you see the throw arc higher, the timing window widen, the ball bend harder, and so on.
+  - Drag, type or reset values, then press **Apply**. **Undo my edits** and **Reset all to defaults** are there too.
+
+**When changes take effect:** in the lobby, at once. Everyone can warm up and feel them; in the warm-up, knocked-out players stand back up after 2 s. During a match, from the next round. The menu and the editor mark such values "next round (now X)", and **Cancel them** drops the waiting changes.
+
+**Saved rules:** your rules are saved in `saved_rules.json` next to the app and come back the next time you start it. To pass your rules to another host, give them that file.
+
+Everyone else sees the same lobby read-only: the teams, the bots, the settings, and the rules with their previews. They also see **what you're doing**, live: a line says which menu or rule you're on and any value you've changed but not applied yet ("Ricochets › Curve kept after a bounce 0.50× → 0.30× (not applied yet)"). With **Follow the host** ticked (the default), their own rules editor opens on the same page and highlights the rule you're on.
 
 ## Share it with people who don't have Python
 
@@ -29,21 +51,47 @@ Double-click **`build_exe.bat`** (after running `run.bat` once). It builds **`di
 
 - Windows may say "Windows protected your PC", because the app isn't signed by a publisher: click **More info**, then **Run anyway**.
 - Closing the app's window stops the game server.
-- Rebuild after changing the code or `config.py`; the settings are baked into the app.
+- Rebuild after changing the code or `config.py`; the defaults are baked into the app. Rules the host sets in the lobby aren't baked in: they're saved in `saved_rules.json` next to `DodgeAndParry.exe`.
 - It's Windows-only. Friends on a Mac need Python and the manual steps above.
 
 If you share this source folder instead, leave out `.venv`, `build` and `dist`. They're made on your computer and are big. A copied `.venv` won't work elsewhere, but `run.bat` notices and rebuilds it.
 
-If other devices can't connect, it's almost always Windows Firewall:
+If other devices can't connect, it's almost always Windows Firewall. **Don't turn the firewall off.** Instead, on the host's computer, either:
 
-- Allow Python when Windows asks.
-- Make sure the Wi-Fi network is set to **Private**, not Public.
+- double-click **`Allow friends to connect.bat`** (next to `DodgeAndParry.exe`, or in this folder) once. It asks for administrator permission, then lets computers on your local network (never the internet) reach the game's ports 8000–8019, whether Windows calls the Wi-Fi Public or Private, and removes the old "block" rules Windows made when its "allow access" prompt was answered for private networks only. `Allow friends to connect.bat check` shows what it would do; `... undo` removes the rule; or
+- set the Wi-Fi network to **Private** in Windows settings, and allow the app when Windows asks.
 
 ## Testing alone
 
-- **Bots** fill each team up to 2 players by default. Change the count (0–6) and skill (easy/normal/hard) in the Esc menu. Extra bots join right away and the court grows with them; fewer bots apply at the next round.
-- **Several players on one PC:** open more tabs or windows and join each with a different name and team. Two browser windows side by side work best, because background tabs stop drawing. The tab title shows who is who, and only the focused tab plays sound.
-- **Simulate bad Wi-Fi:** add `?lag=120` to the URL for a 120 ms round trip. Timing stays fair up to about 150 ms; beyond that, presses start counting late.
+- **Bots:** by default RED gets 1 and BLUE 2. Set each team's count (0–12) and the skill (easy/normal/hard) in the lobby. In the lobby that happens at once; during a match, from the next round.
+- **Several players on one PC:** open more tabs or windows and join each with a different name. Move them between teams in the lobby. Two browser windows side by side work best, because background tabs stop drawing. The tab title shows who is who, and only the focused tab plays sound.
+- **Every tab on the host's PC is a host.** To see what other players see, add `?guest` to the address, for example `http://localhost:8000/?guest`.
+- **Simulate bad Wi-Fi:** add `?lag=120` to the URL for a 120 ms round trip. Timing stays fair up to about 150 ms; beyond that, presses start counting late. Add `&jitter=150` for uneven delay of up to 150 ms more, which is what makes the picture freeze and jump.
+
+## Logs, for finding lag
+
+Every session writes a diagnostics log, so lag can be traced to its cause instead of guessed.
+
+- **The server** writes its own numbers into a `logs` folder next to the app, one folder per run:
+  - its timing, including any moment it stalled;
+  - the host computer's CPU, memory, power, Wi-Fi signal, network adapters (VPNs) and whether the console window was clicked into;
+  - each player's connection as it arrives (input gaps, how far behind their screen runs);
+  - presses that arrived after the ball had already hit.
+- **Every browser** keeps its own log and sends it to the host's computer every few seconds. Nobody has to collect anything from the other PCs. It contains:
+  - frame rate and hitches, and how late world updates arrive;
+  - how long the picture of the others stood frozen, and the ping;
+  - the graphics card, CPU cores and screen.
+- **Press L** in the game the moment something feels laggy. The log marks it, so the numbers around that moment can be read later.
+- **After the session** the host opens the menu (Esc) and clicks **Download all logs (zip)**, then sends that zip. If someone's connection dropped, they can click **Save my log** to keep their own copy (it goes to their Downloads folder).
+- **What's in it:** player names, LAN addresses, device details (browser, graphics card, CPU cores, screen) and performance numbers. Nothing else.
+- **Housekeeping:** the 30 newest sessions are kept. `--no-log` turns logging off.
+
+To read a session: `python tools\log_report.py <the zip or a session folder>`. It prints:
+
+- the host computer's state and the server's stalls;
+- a table of every player: frame rate, frozen time, late updates, ping, input gaps while playing, late presses, presses made while still recovering;
+- freezes several players shared, which point at the host;
+- the numbers just before every L.
 
 ## Controls
 
@@ -55,11 +103,13 @@ If other devices can't connect, it's almost always Windows Firewall:
 | Right mouse or F | **catch**: the ball becomes yours, so you can throw right away |
 | E | **deflect**: tighter timing, returns the ball instantly and faster |
 | R | revive a fallen teammate (costs cash) |
-| Tab / H / Esc | scoreboard / toggle timing ring / menu |
+| Tab / H / Esc | scoreboard / toggle timing ring / the lobby menu |
+| L | something feels laggy right now: marks the moment in the log |
+| Spectating (host) | mouse look, W A S D fly, Space / Shift up / down, left / right click follow the next / previous player |
 
 ## Rules
 
-All numbers live in **`config.py`**. These are the defaults.
+These are the **defaults** (they live in `config.py`). The host can change every one of them in the lobby.
 
 - **Throwing:** holding longer throws faster, and **speed is what deals damage**.
   - A quick tap is 12 m/s for 6 stamina and does about 15 damage.
@@ -69,11 +119,13 @@ All numbers live in **`config.py`**. These are the defaults.
   - A new ball appears 1.6 s after each throw.
 - **Arcs:** balls follow a gentle gravity arc. Quick taps lob visibly, full-power throws fly almost flat. The ball still lands exactly where your crosshair points, and a dotted line previews the arc while you charge.
 - **Aim assist:** if an enemy is within 10° of your crosshair, the ball bends gently toward them. That fixes small aim errors, but a slow ball can still be juked. The gold diamond shows who it would bend toward.
-- **Ricochets:** a ball that hits the floor or a side wall bounces once and loses some speed (so it hits softer). It then curves toward the nearest enemy ahead of it.
+  - **The slower the ball, the less it curves:** over the same distance a quick tap bends half as much as a full-power throw ("Slow-ball curve" 0.5).
+- **Ricochets:** a ball that hits the floor or a side wall bounces once and loses some speed (so it hits softer). It then curves toward the nearest enemy ahead of it, but only half as hard as a ball that never bounced ("Curve kept after a bounce" 0.5): a bank shot is about the angle, not homing.
   - Aim at the floor in front of someone, or at the side glass, for a bank shot. The preview shows the bounce point.
   - The second contact ends the ball, and the team-colored end walls always stop it.
   - Bots use bank shots too.
-- **Defence:** press just before the ball arrives. Each action has a window. Arriving in its first fraction ("the last moment") is **perfect**: it refunds most of the stamina and pays extra cash. Pressing too early wastes the stamina, and there's a short recovery, so mashing is punished.
+- **Defence:** press just before the ball arrives. Each action has a window. Arriving in its first fraction ("the last moment") is **perfect**: it refunds most of the stamina and pays extra cash. Pressing too early wastes the stamina, and there's a short recovery, so mashing is punished. A press during that recovery does nothing, and the game says **"Still recovering"** so you know why.
+  - **Fairness on Wi-Fi** (Game rules › Network, each with its own explanation): your screen shows the world 0.10 s in the past to stay smooth; presses are judged against what your screen showed, plus 0.02 s of **press grace** (your screen is drawn a moment before your finger moves); with **sidestep compensation** on, stepping out of a ball's way also counts by your screen ("SIDESTEPPED"); and **Lockout after a missed press** sets how long you wait before pressing again (0 = press again at once).
 
   | Action | Stamina (perfect) | Window | Perfect zone |
   | --- | --- | --- | --- |
@@ -87,7 +139,9 @@ All numbers live in **`config.py`**. These are the defaults.
   - A deflected ball leaves a glowing path that lingers in the air, longer as the rally grows, plus afterimages.
   - The HUD warns "RALLY ×N".
 - **Timing ring:** when a ball is about to reach you, a ring shrinks around the crosshair. When it touches the crosshair, the ball arrives. Press H to turn it off.
-- **Health, cash, revives:** 100 HP; at 0 you're out. Cash comes from hits, knockouts, catches, deflects and perfect timing. Pressing R revives the teammate who has been down the longest. They return with 50 HP and 2 s of invulnerability. A team's revives cost 80, then 120, 160 and so on within a round. Cash resets every round.
+- **Health, cash, revives:** 100 HP; at 0 you're out. Cash comes from hits, knockouts, catches, deflects and perfect timing. Pressing R revives the teammate who has been down the longest. They return with 50 HP and 2 s of invulnerability. A team's revives cost 80, then 120, 160 and so on within a round; prices start over every round.
+  - **Cash resets every round** by default. Turn "Cash resets each round" off (Game rules › Cash & revives) to keep it from round to round; a new match always starts at 0.
+  - **Shared team cash** (off by default): everything anyone earns goes into one pot per team, and anyone on the team can spend it on revives.
 - **Arena size:** the court is sized for the biggest team. Each player adds width and a little length:
 
   | Players per team | Court size |
@@ -97,12 +151,17 @@ All numbers live in **`config.py`**. These are the defaults.
   | 6 | 30 × 28 m |
 
   It grows as soon as someone joins and only shrinks between rounds.
-- **Rounds:** each team stays on its half. The round ends when a team is wiped out; after 3 minutes, the team with more players standing wins. When everyone leaves, the match resets.
+- **Rounds:**
+  - Each team stays on its half.
+  - A round ends when a team is wiped out. After 3 minutes, the team with more players standing wins it.
+  - The match goes on round after round until a team reaches the match length (endless by default) or the host ends it. Then everyone is back in the lobby.
+  - When everyone leaves, the score resets; the host's rules stay.
 
 ## How it works
 
-- `server.py`: FastAPI web server and WebSocket endpoint. It runs the game at 60 Hz and sends the world to every browser 30 times a second. A slow device can't stall the game.
-- `sim.py`: the rules, owned by the server (balls, hits, stamina, timing windows, revives, rounds). It's plain Python with explicit timestamps, so the tests drive it directly.
+- `server.py`: FastAPI web server and WebSocket endpoint. It runs the game at 60 Hz and sends the world to every browser 30 times a second. A slow device can't stall the game. It also decides who the host is, sends rule changes to everyone, and saves the host's rules.
+- `sim.py`: the game, owned by the server (balls, hits, stamina, timing windows, revives, rounds, the lobby and the host's actions). It's plain Python with explicit timestamps, so the tests drive it directly.
+- `rules.py`: every rule the host can change, with its name, description, allowed range and preview. `config.py` holds the defaults.
 - `bots.py`: bots wander their half, throw with some aim error, and defend with imperfect timing.
 - `static/`: the browser client, written in Three.js and bundled in `static/vendor`, so no internet is needed at the party.
   - Your browser moves your own player instantly, and the server keeps the movement legal.
@@ -112,7 +171,8 @@ All numbers live in **`config.py`**. These are the defaults.
 ## Tests
 
 ```powershell
-.venv\Scripts\python tests\test_sim.py
+.venv\Scripts\python tests\test_sim.py       # 50 rule tests
+.venv\Scripts\python tests\test_server.py    # 6 server tests: real WebSockets, the host's screen, the session logs, the log report
 ```
 
 End-to-end browser tests (headless Chrome) are in `tests\browser\`; see its README. The full project history and technical reference is `..\PROJECT.md`.
@@ -123,8 +183,9 @@ The tests cover:
 - throw cost, power and cooldown
 - arcs that still land where you aimed
 - floor and wall ricochets: one bounce per throw, refreshed by a deflect
+- slow balls curving less, and a bounce taking curve away
+- the press grace, sidestep compensation, and the adjustable lockout after a missed press
 - the court growing with players and only shrinking between rounds
-- extra bots joining mid-round
 - catch, deflect and dodge windows, including perfect presses, early presses and the deflect window being tighter than catch
 - the rally speeding up to its cap
 - late-arriving inputs, which still count if they were in time on screen
@@ -132,8 +193,15 @@ The tests cover:
 - aim assist and juking
 - the centre line
 - knockouts, revives and rounds
-- bot filling
+- each team's bots: set by the host, never balanced by people joining or leaving
 - a full bot-only match
+- the host spectating; shared team cash; cash carrying over while revive prices start over
+- the lobby: only the host starts, ends, moves players or changes rules; lobby changes apply at once and match changes from the next round; a reconnecting player keeps their team; "first to N" ends the match
+- the rules: bad values are rejected or clamped, every listed rule is really used by the game, and 20 matches with random rule values run without errors
+- the host's screen reaching everyone else (and only the host's)
+- the logs: the server and a browser's log end up in the host's zip, without duplicates
+- the logs' detectors: server stalls, presses that arrived after the hit, and console prints held up by a click
+- the log report: it blames a freeze during a server stall on the host, a player's own freezes on their connection, and gives each lag mark the right cause
 
 ## Known limits
 

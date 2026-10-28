@@ -1,0 +1,10 @@
+[
+  {"eval": "document.getElementById('nameInput').value = 'Clocky'; document.getElementById('playBtn').click(); 'joined'"},
+  {"waitFor": "dp.cfg && dp.net.latest && !document.getElementById('startBtn').hidden", "timeout": 8000},
+  {"eval": "document.getElementById('startBtn').click(); 'match started'"},
+  {"waitFor": "dp.net.latest && dp.net.latest.r.s === 'play'", "timeout": 10000},
+  {"wait": 3000},
+  {"eval": "(() => { const real = performance.now.bind(performance); window.__skew = 0; performance.now = () => real() + window.__skew; const start = real(); window.__skewStart = Date.now(); const id = setInterval(() => { const k = Math.min(1, (real() - start) / 10000); window.__skew = 300 * k; if (k >= 1) clearInterval(id); }, 50); return 'this page\\'s clock now runs fast: +300 ms over 10 s (like an OS clock correction)'; })()"},
+  {"wait": 25000},
+  {"eval": "(() => { const secs = dp.diag.lines.filter((l) => l.ty === 'sec' && l.wall >= window.__skewStart); const frozen = secs.map((l) => l.frozen); const late = secs.map((l) => l.late_max); const lastFrozen = frozen.reduce((a, f, i) => (f > 100 ? i : a), -1); return JSON.stringify({frozenPerSecond: frozen, lateMax: late, frozenSecondsTotal: Math.round(frozen.reduce((a, b) => a + b, 0) / 1000), lastFrozenSecond: lastFrozen, seconds: secs.length}); })()"}
+]

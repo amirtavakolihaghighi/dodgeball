@@ -1,0 +1,15 @@
+[
+  {"eval": "document.getElementById('nameInput').value = 'Logger'; document.getElementById('playBtn').click(); 'joined'"},
+  {"waitFor": "dp.cfg && dp.net.latest && !document.getElementById('startBtn').hidden", "timeout": 8000},
+  {"eval": "JSON.stringify({allLogsButton: !document.getElementById('hostLogsBtn').hidden, where: document.getElementById('diagWhere').textContent.slice(0, 60)})"},
+  {"eval": "document.getElementById('startBtn').click(); 'match started'"},
+  {"wait": 8000},
+  {"eval": "dispatchEvent(new KeyboardEvent('keydown', {code: 'KeyL'})); setTimeout(() => dispatchEvent(new KeyboardEvent('keyup', {code: 'KeyL'})), 50); 'pressed L'"},
+  {"wait": 2000},
+  {"eval": "const t0 = performance.now(); while (performance.now() - t0 < 400) {} 'this page stalled for 400 ms'"},
+  {"wait": 10000},
+  {"eval": "(() => { const L = dp.diag.lines; const n = (ty) => L.filter((l) => l.ty === ty).length; return JSON.stringify({sec: n('sec'), freeze: n('freeze'), hitch: n('hitch'), mark: n('mark'), env: n('env'), status: dp.diag.status()}); })()"},
+  {"eval": "dp.showMenu(); (async () => { dp.diag.flush(); await new Promise((r) => setTimeout(r, 800)); const res = await fetch('/logs/download'); const b = new Uint8Array(await res.arrayBuffer()); return JSON.stringify({status: res.status, bytes: b.length, zip: b[0] === 80 && b[1] === 75, name: res.headers.get('X-Filename')}); })()"},
+  {"wait": 600},
+  {"shot": "logs_menu.png"}
+]

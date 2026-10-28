@@ -102,6 +102,7 @@ export class World {
     this.scene.add(this.preview, this.bounceMark);
 
     this.court = null;
+    this.ballScale = 1;     // the lobby's ball radius over the 0.2 m the meshes are built for
     addEventListener('resize', () => this.resize());
     this.resize();
   }
@@ -345,6 +346,10 @@ export class World {
       this.bounceMark.rotation.set(bounce.floor ? -Math.PI / 2 : 0, 0, 0);
       if (bounce.floor) this.bounceMark.position.y = 0.03;
     }
+  }
+
+  setBallRadius(r) {
+    this.ballScale = r / 0.2;
   }
 
   cameraRay() {
@@ -617,6 +622,7 @@ class Stickman {
     }
     this.mat.emissiveIntensity = 0.18 + Math.max(0, 1 - this.hitT / 0.18) * 1.6 + (spinning ? 0.6 : 0);
     this.held.visible = s.alive && s.hasBall && this.throwT > 0.12;
+    this.held.scale.setScalar(this.world.ballScale);
     this.heldMat.emissiveIntensity = 0.4 + (s.charging ? s.charge * 1.4 : 0);
   }
 
@@ -741,7 +747,9 @@ class BallView {
 
   update(b, t) {
     const p = b.pos;
+    const scale = this.world.ballScale;
     this.mesh.position.set(p.x, p.y, p.z);
+    this.mesh.scale.setScalar(scale);
     this.glow.position.set(p.x, p.y, p.z);
     const live = b.state !== 2;
     const col = live ? rallyColor(b.rally) : 0x8a8f99;
@@ -754,7 +762,7 @@ class BallView {
       this.glow.material.color.setHex(col);
     }
     this.glow.visible = live;
-    this.glow.scale.setScalar(1.0 + 0.3 * Math.min(b.rally, 5));
+    this.glow.scale.setScalar((1.0 + 0.3 * Math.min(b.rally, 5)) * scale);
     if (live) {
       // Every throw leaves a short speed streak; deflected balls leave a long, lingering
       // path plus afterimages. A new rally starts a new trail and the old one fades in place.
@@ -772,7 +780,7 @@ class BallView {
     }
     if (this.trail) this.trail.update(t, this.world.camera.position);
     this.shadow.position.set(p.x, 0.025, p.z);
-    this.shadow.scale.setScalar(0.45 + p.y * 0.12);
+    this.shadow.scale.setScalar((0.45 + p.y * 0.12) * scale);
     this.shadowMat.opacity = clamp(1 - p.y / 6, 0.2, 0.9);
   }
 

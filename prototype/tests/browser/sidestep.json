@@ -1,0 +1,11 @@
+[
+  {"eval": "document.getElementById('nameInput').value = 'Stepper'; document.getElementById('playBtn').click(); 'joined'"},
+  {"waitFor": "dp.cfg && dp.net.latest && !document.getElementById('startBtn').hidden", "timeout": 8000},
+  {"eval": "(() => { const on = new URLSearchParams(location.search).get('comp') !== '0'; dp.net.send({t: 'rules', reset: true}); dp.net.send({t: 'rules', set: {SIDESTEP_COMP: on, BOTS_RED: 0, BOTS_BLUE: 2, BOT_SKILL: 'hard'}}); return 'sidestep compensation ' + (on ? 'on' : 'off'); })()"},
+  {"waitFor": "dp.rules.active.BOTS_RED === 0 && dp.rules.active.BOT_SKILL === 'hard'", "timeout": 4000},
+  {"eval": "document.getElementById('startBtn').click(); 'match started'"},
+  {"waitFor": "dp.net.latest && dp.net.latest.r.s === 'play'", "timeout": 10000},
+  {"evalFile": "sidestep.js"},
+  {"wait": 45000},
+  {"eval": "__report()"}
+]

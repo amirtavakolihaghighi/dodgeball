@@ -18,6 +18,7 @@ export class Hud {
     this.pipSig = ['', ''];
     this.bannerUntil = 0;
     this.lastScoreSig = '';
+    this.liveSig = '';
   }
 
   show(on) {
@@ -27,9 +28,11 @@ export class Hud {
   setRound(r, players, myId) {
     setText($('scoreRed'), String(r.score[0]));
     setText($('scoreBlue'), String(r.score[1]));
-    const label = { wait: 'WAITING FOR PLAYERS', count: `ROUND ${r.n}`, play: `ROUND ${r.n}`, over: `ROUND ${r.n} OVER` }[r.s];
+    const label = { lobby: 'LOBBY', wait: 'WAITING FOR PLAYERS', count: `ROUND ${r.n}`, play: `ROUND ${r.n}`, over: `ROUND ${r.n} OVER` }[r.s];
     setText($('roundLabel'), label);
-    setText($('roundTime'), r.s === 'play' ? fmtTime(r.left) : r.s === 'count' ? 'GET READY' : r.s === 'wait' ? '—' : '');
+    const goal = r.win ? ` · TO ${r.win}` : '';
+    setText($('roundTime'), r.s === 'play' ? fmtTime(r.left) : r.s === 'count' ? 'GET READY' : r.s === 'lobby' ? 'WARM-UP' : r.s === 'wait' ? '—' : '');
+    setText($('roundGoal'), r.s === 'lobby' ? '' : goal);
     [0, 1].forEach((team) => {
       const members = [...players.values()].filter((p) => p.team === team).sort((a, b) => a.id - b.id);
       const sig = members.map((p) => `${p.id}${p.alive ? 'a' : 'd'}`).join(',');
@@ -49,8 +52,13 @@ export class Hud {
   setIdentity(name, team) {
     setText($('myName'), name);
     const t = $('myTeam');
-    setText(t, TEAM[team]);
-    t.className = TEAM_CLASS[team];
+    setText(t, TEAM[team] ?? 'SPECTATING');
+    t.className = TEAM_CLASS[team] ?? '';
+  }
+
+  /** Spectating: no body, so no vitals, ball, actions or crosshair. */
+  setWatching(on) {
+    this.root.classList.toggle('watching', on);
   }
 
   setVitals(me, cfg, cost) {
@@ -67,7 +75,7 @@ export class Hud {
       costEl.style.left = `${(Math.max(0, st - cost) / cfg.maxStamina) * 100}%`;
       costEl.style.width = `${(Math.min(cost, st) / cfg.maxStamina) * 100}%`;
     } else costEl.style.display = 'none';
-    setText($('cash'), `◆ ${me.cash} cash`);
+    setText($('cash'), `◆ ${me.cash} ${cfg.teamCash ? 'team cash' : 'cash'}`);
   }
 
   flashStamina() {
@@ -228,10 +236,31 @@ export class Hud {
     setText($('netinfo'), text);
   }
 
+  /** A line under the score bar: what's going on in the lobby or while waiting. */
+  setHint(text) {
+    const el = $('hint');
+    setText(el, text);
+    el.hidden = !text;
+  }
+
+  /** What the host is doing in the menus, for everyone else. parts: [[text, bold?]] or null. */
+  setHostLive(parts) {
+    const sig = JSON.stringify(parts);
+    if (sig === this.liveSig) return;
+    this.liveSig = sig;
+    const el = $('hostLive');
+    el.hidden = !parts;
+    if (parts) el.replaceChildren(...parts.map(([text, bold]) => {
+      const span = document.createElement(bold ? 'b' : 'span');
+      span.textContent = text;
+      return span;
+    }));
+  }
+
   showScores(on, players, myId) {
     $('scoreboard').hidden = !on;
     if (!on) return;
-    const rows = [...players.values()].sort((a, b) => a.team - b.team || b.cash - a.cash || a.id - b.id);
+    const rows = [...players.values()].filter((p) => p.team >= 0).sort((a, b) => a.team - b.team || b.cash - a.cash || a.id - b.id);
     const sig = JSON.stringify(rows.map((p) => [p.id, p.name, p.cash, p.stats]));
     if (sig === this.lastScoreSig) return;
     this.lastScoreSig = sig;

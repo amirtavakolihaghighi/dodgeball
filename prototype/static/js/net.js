@@ -18,7 +18,9 @@ function decodePlayer(a) {
   return {
     id: a[0], name: a[1], team: a[2], x: a[3], z: a[4], yaw: a[5], pitch: a[6], hp: a[7], stamina: a[8],
     cash: a[9], alive: !!(f & 1), charging: !!(f & 2), hasBall: !!(f & 4), bot: !!(f & 8), invuln: !!(f & 16),
+    host: !!(f & 32), switching: !!(f & 64),
     act: a[11], actAge: a[12], cooldown: a[13], tp: a[14], charge: a[15], stats: a[16],
+    next: a[17] ?? null,        // the team the host's move takes them to next round (-1: spectating)
   };
 }
 
@@ -37,12 +39,21 @@ export class Net {
     this.latest = null;
     this.offset = null;     // server clock minus local clock (minus the quickest one-way delay)
     this.offsetAt = 0;
+    this.windowStart = 0;   // the least late update of the current few seconds: see addSnapshot
+    this.windowBest = Infinity;
     this.rtt = 0;
     this.interpDelay = 0.08;
     this.gravity = 0;
     this.handlers = {};
-    // ?lag=120 simulates a bad network: 120 ms round trip (half each way), for testing.
-    this.fakeLag = Number(new URLSearchParams(location.search).get('lag')) / 2000 || 0;
+    this.onSnapshot = null;     // (arrival ms, how much later than the quickest update so far, ms): diagnostics
+    this.onStale = null;        // (number of events dropped as too old): diagnostics
+    this.onReanchor = null;     // (ms the clock estimate moved back): diagnostics
+    // For testing: ?lag=120 simulates a 120 ms round trip (half each way). ?jitter=150 delays
+    // what arrives by up to 150 ms more, unevenly but in order, like bad Wi-Fi over TCP.
+    const params = new URLSearchParams(location.search);
+    this.fakeLag = Number(params.get('lag')) / 2000 || 0;
+    this.fakeJitter = Number(params.get('jitter')) / 1000 || 0;
+    this.nextArrival = 0;
   }
 
   on(type, fn) {
@@ -50,15 +61,19 @@ export class Net {
     return this;
   }
 
-  connect(name, team) {
+  /** extra: {guest: true} to join without host powers, {hostKey} from the console's host link. */
+  connect(name, extra = {}) {
     const ws = (this.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`));
     ws.onopen = () => {
-      this.send({ t: 'join', name, team });
+      this.send({ t: 'join', name, ...extra });
       this.pinger = setInterval(() => this.send({ t: 'ping', c: performance.now() }), 1000);
     };
     ws.onmessage = (e) => {
-      if (this.fakeLag) setTimeout(() => this.receive(JSON.parse(e.data)), this.fakeLag * 1000);
-      else this.receive(JSON.parse(e.data));
+      if (!this.fakeLag && !this.fakeJitter) return this.receive(JSON.parse(e.data));
+      const now = performance.now();
+      const at = Math.max(this.nextArrival, now + (this.fakeLag + Math.random() * this.fakeJitter) * 1000);
+      this.nextArrival = at;
+      setTimeout(() => this.receive(JSON.parse(e.data)), at - now);
     };
     ws.onclose = () => {
       clearInterval(this.pinger);
@@ -91,6 +106,21 @@ export class Net {
       if (sample > this.offset) this.offset = sample;
     }
     this.offsetAt = now;
+    // If even the least late update of the last few seconds came well behind the estimate, the
+    // estimate is stale: this computer's clock was adjusted (an OS time correction can run it
+    // fast for a while) or the route got slower for good. Re-anchor at once; otherwise the slow
+    // drift above takes minutes, and meanwhile the picture stands still and presses lose their
+    // lag compensation. Ordinary Wi-Fi jitter always has some quick update in the window.
+    if (now - this.windowStart >= 1.5) {
+      if (this.windowBest > 0.04 && this.windowBest !== Infinity) {
+        this.offset -= this.windowBest;
+        this.onReanchor?.(this.windowBest * 1000);
+      }
+      this.windowStart = now;
+      this.windowBest = Infinity;
+    }
+    this.windowBest = Math.min(this.windowBest, this.offset - sample);
+    this.onSnapshot?.(now * 1000, (this.offset - sample) * 1000);
     const snap = { st: m.st, r: m.r, players: new Map(), balls: new Map() };
     for (const a of m.p) snap.players.set(a[0], decodePlayer(a));
     for (const a of m.b) snap.balls.set(a[0], decodeBall(a));
@@ -169,10 +199,13 @@ export class Net {
   /** Events whose moment has now been reached on screen (stale ones are dropped). */
   takeEvents(rt) {
     const due = [];
+    let stale = 0;
     while (this.events.length && this.events[0].t <= rt) {
       const e = this.events.shift();
       if (e.t > rt - 1.0) due.push(e);
+      else stale++;
     }
+    if (stale) this.onStale?.(stale);
     return due;
   }
 }

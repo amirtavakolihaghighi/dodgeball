@@ -27,10 +27,13 @@ if (!url || !stepsFile) {
   process.exit(2);
 }
 const port = Number(portArg || 9333);
+// CDP_SIZE=640x360 renders a smaller page: several software-rendered browsers at once
+// otherwise max out the CPU and slow the server they're testing.
+const [W, H] = (process.env.CDP_SIZE || '1280x720').split('x').map(Number);
 const chrome = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const profile = path.join(os.tmpdir(), `dodgeparry-chrome-${port}`);
 const proc = spawn(chrome, [
-  '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--window-size=1280,720',
+  '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, `--window-size=${W},${H}`,
   '--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--no-first-run', '--no-default-browser-check',
   '--autoplay-policy=no-user-gesture-required', 'about:blank',
 ], { stdio: 'ignore' });
@@ -75,7 +78,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await send('Runtime.enable');
   await send('Log.enable');
   await send('Page.enable');
-  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+  await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url });
   await sleep(1500);
 

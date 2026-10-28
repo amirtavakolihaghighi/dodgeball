@@ -1,7 +1,7 @@
 [
-  {"eval": "document.getElementById('nameInput').value = 'AutoTest'; document.querySelector('.teams button.red').click(); document.getElementById('playBtn').click(); 'joined'"},
-  {"wait": 1000},
-  {"eval": "document.getElementById('resumeBtn').click(); 'playing'"},
+  {"eval": "document.getElementById('nameInput').value = 'AutoTest'; document.getElementById('playBtn').click(); 'joined'"},
+  {"waitFor": "dp.cfg && dp.net.latest && !document.getElementById('startBtn').hidden", "timeout": 8000},
+  {"eval": "document.getElementById('startBtn').click(); 'match started'"},
   {"waitFor": "dp.net.latest && dp.net.latest.r.s === 'play'", "timeout": 10000},
   {"evalFile": "autodefend.js"},
   {"wait": 40000},

@@ -12,5 +12,12 @@ prototype/*.png
 prototype/tests/browser/*.png
 prototype/tests/browser/out/
 
-# Rules the host saved from the lobby (made at runtime, per machine)
+# Made at runtime, per machine: the host's saved rules and the session logs
 saved_rules.json
+logs/
+
+# Written by build_exe.py during a build
+build_info.json
+
+# Session logs the user collects from office tests: coworkers' names and IP addresses
+prototype/testlog/
