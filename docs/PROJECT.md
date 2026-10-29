@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it).
+Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it; then the look-and-feel cycle (graphics, juice and sound, with the art made in Blender), on the branch `look-and-feel`).
 
 ## Contents
 
@@ -672,6 +672,64 @@ This is the short version, kept on `main` while internet mode waits on its branc
 3. The merge into `main`, when the user says so. In the merge's conflicts keep the branch's versions: its full phase 14 and decisions 102–111 replace this short entry and the placeholder row. Also take `--branch internet-mode` (and the sentence after it) out of the guide's clone command.
 4. A release, if the user wants one (the routine is in `CONTRIBUTING.md`).
 
+### Phase 15: the look and feel, on its own branch (2026-10-29)
+
+This is the short version, kept on `main` while the work happens on the branch `look-and-feel`. This file on that branch has the full record: the analysis, how the art is made, the branch's own decisions (118 onward) and its progress. On the branch, `docs/LOOK_AND_FEEL.md` is the working plan. None of it is on `main` yet.
+
+**Where it started:** the user asked what a graphical overhaul of the whole game would take. They wanted better models, animation, physics visuals, sound and visual effects ("make it juicy"), so the game looks and feels professionally made. How much would the technology have to change? What would it cost, what would it look like (with games made with similar technology as benchmarks), and what would it do to performance? It was discussed before anything was built:
+
+- **The stack stays.** How the game looks is decided entirely in the browser. The Python server, the network messages and the rules don't change. For one arena and up to about 24 players, three.js and the browser aren't the limit.
+- **"Juicy" and "AA" are different things.** Juice (impact, shake, particles, punchy sound) is code, and cheap. An AA look is mostly art: a content budget of typically 50–100 people and $10M–$40M. Another engine wouldn't change that.
+- **Where the game stood:** everything on screen was built from code (stick figures from capsules and spheres, blob shadows), and the sound was synthesized beeps. It was light: about 22,000 triangles and 1.7 ms of code per frame in a 4v4, and every office player ran at 60 fps or more.
+- **The risks are performance, not looks:**
+  - Here a laptop's frame rate is part of fairness.
+  - The host's PC also runs the server, and its memory was 90–96% used in the office sessions.
+  - A bigger first download goes over the host's Wi-Fi.
+  - An effect prepared for the first time mid-match freezes the picture, which looks exactly like lag.
+- **What a two-person, $0 approach can reach,** with Claude making the art in Blender:
+  - arena, lighting, effects and HUD close to the browser games the user liked;
+  - characters that are good if designed around what Claude can make (no faces);
+  - lively animation, built in code;
+  - sound that's good only with the user listening.
+
+**The user's choices** (decisions 112–117):
+
+- juice and good art, starting from the highest expectations and scaling down to what's realistic;
+- no money and no other people: the user, Claude and free tools, with the user giving time;
+- Claude makes the art in Blender, connected through an MCP add-on;
+- a vibrant, smooth, clean 3D style;
+- the lag study's D1, D2 and B4 in this cycle, plus every effect prepared in the lobby and a lower graphics default for the host's tab;
+- the work on its own branch while `main` stays as it is.
+
+**What the cycle is:**
+
+- **Smooth and fair first:**
+  - a graphics setting that scales itself down when the frame rate drops;
+  - a warning when Chrome draws without the graphics card;
+  - presses timed from the key itself;
+  - every effect prepared in the lobby;
+  - the host's tab on a lower setting by default.
+- **Juice and sound:** impact, camera, particles and a crowd; recorded, layered sounds and music.
+- **Art:**
+  - the arena and its lighting, the ball and its effects, and the characters, made in Blender by scripts kept in the repository;
+  - animation in code, on top of free motion capture;
+  - the HUD and menus.
+- **Only art that may be published in this public, MIT-licensed repository:** art made here, or CC0.
+
+**Its purpose:** to make the game look and feel professionally made without a budget or a team, while keeping it smooth and fair on office laptops.
+
+**Where it stands:** the branch `look-and-feel` starts from this commit. It's checked out in its own folder (a git worktree), so this folder can stay on `main` or `internet-mode`. The first step is two or three style samples for the user to choose the art direction from.
+
+**The plan:**
+
+1. Style samples; the user picks the art direction.
+2. The performance items, which make the rest safe.
+3. Juice and sound.
+4. Art: the arena and lighting, the ball and effects, the characters and their animation, the HUD.
+5. An office session, where the logs measure frame rates, freezes and the first download on real laptops.
+6. The merge into `main`, when the user says so. In the merge's conflicts, keep the branch's versions: its full phase 15 and its decision rows replace this short entry and the placeholder row.
+7. A release, if the user wants one.
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -782,6 +840,13 @@ This is the short version, kept on `main` while internet mode waits on its branc
 | 102 | Playing over the internet: friends with a password, on a cloud server | U | Chosen over "anyone" (which would need cheat checks and a kick button) and over the user's own PC through a tunnel |
 | 103–110 | Internet mode's own design: the host by password only, the limits, where it listens, logs per game night, the message size limit, refusals, the cloud setup | C | Recorded in this file on the branch `internet-mode` (phase 14) |
 | 111 | Internet mode waits on its own branch, `internet-mode` (pushed, not merged), until the user's friend has tried it on a cloud server; it goes into main only when the user says so | U | "Commit to a separate branch dedicated for this feature… then if it's okay, I tell you to merge." The user isn't a developer; the friend is |
+| 112 | The game should look and feel professionally made: better models, animation, physics visuals, sound and effects, "juicy". Both juice and good art, starting from the highest expectations, then scaled down to what's realistic | U | "Juicy and good visual and art. I want both (if possible I'm starting with highest expectations to make the realistic afterward)" |
+| 113 | No money and no other people: the user, Claude and free tools. The user gives time: judging, testing, listening | U | Rules out paid assets and hired artists |
+| 114 | Claude makes the art in Blender, connected through an MCP add-on (the community "MCP for Blender") | U | The user installed Blender and the add-on. How it's connected: C, on the branch |
+| 115 | The style: vibrant, smooth, clean 3D. No pixel art or retro look, no blocky (Minecraft- or Roblox-shaped) humanoids, no dull colours | U | From pictures of other games: liked Slow Roads, Venge.io, Rocket League and Knockout City; not Krunker's characters, Shell Shockers, Vampire Survivors or CrossCode |
+| 116 | This cycle includes the lag study's D1 (a graphics setting that scales itself), D2 (a warning when Chrome draws without the graphics card) and B4 (presses timed from the key event), plus every effect prepared in the lobby and a lower graphics default for the host's tab | U | "They belong in this cycle of development." Heavier graphics turn a slow laptop's frame rate into unfairness, and the host's PC also runs the server |
+| 117 | Each development cycle gets its own branch from `main`. This one is `look-and-feel`, and `main` stays as it is. `main`'s docs say why a branch exists and give its plan; the branch's docs hold its full record | U | "I want the current state of the game to be left intact." The same pattern as `internet-mode` (decision 111) |
+| 118– | The look-and-feel cycle's own decisions: keeping the stack, which art may be used, how the art is made, how Blender is connected | C | Recorded in this file on the branch `look-and-feel` (phase 15) |
 
 ## 6. Current features
 
