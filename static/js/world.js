@@ -2,9 +2,13 @@
 import * as THREE from 'three';
 
 export const TEAM_COLORS = [0xff4d5e, 0x3fa9ff];
-// Ball colour by rally (number of deflections): a distinct hue per level, ending white-hot.
+// Ball colour by rally (number of deflections): a distinct hue per level, ending white-hot. A ball
+// nobody has deflected shows its thrower's colour instead (a rule: each team's people's and bots').
 export const RALLY_COLORS = [0xffd23f, 0x3ff2ff, 0xff4bd8, 0xff3b3b, 0xffffff];
 export const rallyColor = (rally) => RALLY_COLORS[Math.min(rally, RALLY_COLORS.length - 1)];
+const DEAD_BALL = 0x8a8f99;
+/** "#rrggbb" -> 0xrrggbb (anything else: the plain ball yellow). */
+const hex = (css) => (typeof css === 'string' && /^#[0-9a-f]{6}$/i.test(css) ? parseInt(css.slice(1), 16) : RALLY_COLORS[0]);
 
 const tmpV = new THREE.Vector3();
 const tmpDir = new THREE.Vector3();
@@ -206,7 +210,7 @@ export class World {
     }
   }
 
-  /** players: [{id, team, isMe, x, z, yaw, alive, charging, charge, act, actAge, hasBall, invuln}] */
+  /** players: [{id, team, isMe, x, z, yaw, alive, charging, charge, act, actAge, hasBall, invuln, ballColor}] */
   syncPlayers(players, dt) {
     const seen = new Set();
     for (const s of players) {
@@ -231,7 +235,7 @@ export class World {
     }
   }
 
-  /** balls: [{...ball, pos: {x, y, z}}] */
+  /** balls: [{...ball, pos: {x, y, z}, color: its thrower's "#rrggbb"}] */
   syncBalls(balls, t) {
     const seen = new Set();
     for (const b of balls) {
@@ -623,6 +627,11 @@ class Stickman {
     this.mat.emissiveIntensity = 0.18 + Math.max(0, 1 - this.hitT / 0.18) * 1.6 + (spinning ? 0.6 : 0);
     this.held.visible = s.alive && s.hasBall && this.throwT > 0.12;
     this.held.scale.setScalar(this.world.ballScale);
+    if (s.ballColor !== this.ballColor) {      // the ball in hand is the colour it'll fly in
+      this.ballColor = s.ballColor;
+      this.heldMat.color.setHex(hex(s.ballColor));
+      this.heldMat.emissive.setHex(hex(s.ballColor));
+    }
     this.heldMat.emissiveIntensity = 0.4 + (s.charging ? s.charge * 1.4 : 0);
   }
 
@@ -752,8 +761,8 @@ class BallView {
     this.mesh.scale.setScalar(scale);
     this.glow.position.set(p.x, p.y, p.z);
     const live = b.state !== 2;
-    const col = live ? rallyColor(b.rally) : 0x8a8f99;
-    const key = `${b.rally}:${live}`;
+    const col = !live ? DEAD_BALL : b.rally ? rallyColor(b.rally) : hex(b.color);
+    const key = `${col}:${live}`;
     if (key !== this.key) {
       this.key = key;
       this.mat.color.setHex(col);

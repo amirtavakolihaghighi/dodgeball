@@ -173,22 +173,37 @@ def may_download_logs(ip: str | None, key: str | None) -> bool:
     return is_this_computer(ip) or (bool(key) and key == HOST_KEY)
 
 
-def client_config() -> dict:
-    """Rules the browser needs for its HUD and its own movement (the server stays in charge)."""
-    return {**game.rules.for_client(), "joinUrls": [f"http://{ip}:{port}" for ip in own_ips]}
+def client_config(name: str | None = None) -> dict:
+    """Rules the browser needs for its HUD and its own movement (the server stays in charge):
+    the ones its player plays by, with their own settings."""
+    mine = game.rules.for_player(name) if name else game.rules
+    return {**mine.for_client(), "joinUrls": [f"http://{ip}:{port}" for ip in own_ips]}
 
 
-def rules_message() -> dict:
+def rules_message(name: str | None = None) -> dict:
+    """The lobby's rules and every player's own settings (live, and waiting for the next round),
+    plus `cfg`: the numbers this browser's player plays by."""
     nxt = game.next_rules
-    return {"t": "rules", "cfg": client_config(), "rules": game.rules.values(),
-            "next": nxt.values() if nxt is not None else None, "rv": game.rules_version}
+    return {"t": "rules", "cfg": client_config(name), "rules": game.rules.values(), "players": game.rules.players,
+            "next": nxt.values() if nxt is not None else None, "nextPlayers": nxt.players if nxt is not None else None,
+            "rv": game.rules_version}
+
+
+def send_rules():
+    """Everyone gets the changed rules, each with their own `cfg`."""
+    for client in list(clients.values()):
+        client.send(dumps(rules_message(client.name)))
 
 
 def clean_host_view(msg: dict) -> dict:
     """The host's browser reports what it shows, so the others can follow along: which screen,
-    which group of rules, the search, the rule in focus and the edits not applied yet. Untrusted
-    like any message: only known screens, groups and rules, with valid values, get through."""
+    which group of rules (and whose: `pl`, a player's own settings), the search, the rule in focus
+    and the edits not applied yet. Untrusted like any message: only known screens, groups and
+    rules, with valid values, get through."""
     out = {"t": "hostview", "m": msg.get("m") if msg.get("m") in HOST_VIEWS else "game"}
+    pl = msg.get("pl")
+    if isinstance(pl, dict) and isinstance(pl.get("n"), str) and rules_mod.clean_name(pl["n"]):
+        out["pl"] = {"n": rules_mod.clean_name(pl["n"]), "t": 1 if pl.get("t") == 1 else 0, "b": pl.get("b") is True}
     if msg.get("g") in GROUP_IDS:
         out["g"] = msg["g"]
     if isinstance(msg.get("q"), str):
@@ -217,17 +232,24 @@ def share_host_view(msg: dict | None, sender: int | None = None):
 
 
 def load_saved_rules():
-    """The rules the host chose last time (only the values that differ from the defaults)."""
+    """The rules the host chose last time (only the values that differ from the defaults) and
+    each player's own settings. Older versions saved just the rules, as one flat object."""
     try:
         saved = json.loads(RULES_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return
-    if isinstance(saved, dict):
+    if not isinstance(saved, dict):
+        return
+    if isinstance(saved.get("rules"), dict):
+        game.rules = rules_mod.Rules(saved["rules"], saved.get("players"))
+    else:
         game.rules = rules_mod.Rules(saved)
-        changed = game.rules.differences()
-        if changed:
-            print(f"  Loaded the rules you saved last time ({len(changed)} changed from the defaults).")
-            print("  To undo: Esc > Game rules > Reset all, in the host's browser.\n")
+    changed, own = game.rules.differences(), len(game.rules.players)
+    if changed or own:
+        players = f", and own settings for {own} player{'' if own == 1 else 's'}" if own else ""
+        print(f"  Loaded the rules you saved last time ({len(changed)} changed from the defaults{players}).")
+        print("  To undo: Esc > Game rules > Reset all, in the host's browser"
+              f"{' (a player: the gear next to their name)' if own else ''}.\n")
 
 
 def save_current_rules():
@@ -236,7 +258,8 @@ def save_current_rules():
     if not save_rules:
         return None
     wanted = game.next_rules or game.rules
-    data = {k: v for k, v in wanted.values().items() if v != rules_mod.DEFAULTS[k]}
+    data = {"rules": {k: v for k, v in wanted.values().items() if v != rules_mod.DEFAULTS[k]},
+            "players": wanted.players}
     path = RULES_FILE
 
     def write():
@@ -263,9 +286,7 @@ async def game_loop():
             ticked = time.perf_counter()
             if game.rules_version != sent_rules:
                 sent_rules = game.rules_version
-                text = dumps(rules_message())
-                for client in list(clients.values()):
-                    client.send(text)
+                send_rules()
                 save_current_rules()
             snap = None
             if now >= next_snap:
@@ -341,7 +362,7 @@ async def play(ws: WebSocket):
             if kind == "ping":
                 client.send(dumps({"t": "pong", "c": msg.get("c"), "st": round(now, 4)}))
             elif kind == "sync":    # the browser noticed it missed a rules update
-                client.send(dumps(rules_message()))
+                client.send(dumps(rules_message(client.name)))
             elif kind == "join" and client.pid is None:
                 ip = ws.client.host if ws.client else None
                 host = (is_this_computer(ip) and msg.get("guest") is not True) or msg.get("hostKey") == HOST_KEY
@@ -349,8 +370,9 @@ async def play(ws: WebSocket):
                 client.pid, client.name = p.id, p.name
                 clients[p.id] = client
                 extra = {"logDir": str(session_log.dir)} if host and session_log else {}
-                client.send(dumps({**rules_message(), "t": "welcome", "id": p.id, "host": host, "defaults": rules_mod.DEFAULTS,
-                                   "schema": SCHEMA, "logging": session_log is not None, "version": VERSION, **extra}))
+                client.send(dumps({**rules_message(p.name), "t": "welcome", "id": p.id, "host": host,
+                                   "defaults": rules_mod.DEFAULTS, "schema": SCHEMA, "logging": session_log is not None,
+                                   "version": VERSION, **extra}))
                 if host_view and not host:
                     client.send(dumps(host_view))
                 if session_log:
@@ -424,7 +446,7 @@ def start_logging(folder, args):
     session_log.write({"ty": "meta", "st": round(time.perf_counter(), 3), "wall": diag.wall_ms(), "version": VERSION,
                        "python": platform.python_version(), "os": platform.platform(), "machine": platform.machine(),
                        "cpus": os.cpu_count(), "ram_mb": host.total_ram_mb(), "frozen": FROZEN, "port": port,
-                       "own_ips": own_ips, "args": vars(args), "rules_changed": changed,
+                       "own_ips": own_ips, "args": vars(args), "rules_changed": changed, "players_own": game.rules.players,
                        "utc_offset_min": round(offset.total_seconds() / 60) if offset else 0})
     diag.watch_host(session_log, host)
     atexit.register(session_log.flush, 2.0)

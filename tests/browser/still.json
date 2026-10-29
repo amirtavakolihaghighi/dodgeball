@@ -1,0 +1,19 @@
+[
+  {"eval": "document.getElementById('nameInput').value = 'Stella'; document.getElementById('playBtn').click(); 'joined'"},
+  {"waitFor": "dp.cfg && dp.net.latest && !document.getElementById('startBtn').hidden", "timeout": 8000},
+  {"eval": "dp.net.send({t: 'rules', reset: true}); 'rules and own settings reset'"},
+  {"waitFor": "dp.rules.active.BOTS_BLUE === 2 && !Object.keys(dp.rules.players).length", "timeout": 4000},
+  {"eval": "dp.net.send({t: 'rules', set: {HEALTH_REGEN: true, HEALTH_REGEN_DELAY: 0, HEALTH_REGEN_RATE: 1, HEALTH_REGEN_STILL: 'only', HEALTH_REGEN_STILL_TIME: 1, HEALTH_REGEN_STILL_EXTRA: 3, HEALTH_REGEN_CAP_SHARE: 90, BOTS_RED: 0, BOTS_BLUE: 1, BOT_SKILL: 'easy', ROUND_TIME_LIMIT: 30}}); 'own health: only while standing still (1 s), 1 + 3 = 4 per second, up to 90%; one BLUE bot; 30 s rounds'"},
+  {"waitFor": "dp.cfg.regen.on && dp.net.latest.players.size === 2", "timeout": 4000},
+  {"eval": "dp.net.send({t: 'rules', player: 'Bot Blitz', set: {THROW_COOLDOWN: 10, BOT_EASY_GAP_MIN: 10, BOT_EASY_GAP_MAX: 10, BOT_EASY_AIM: 0, BOT_EASY_BANK: 0, DAMAGE_MIN: 40, DAMAGE_MAX: 40}}); dp.net.send({t: 'rules', player: 'Stella', set: {WALK_SPEED: 1.5}}); 'Bot Blitz: a dead-on throw for 40 every 20 s; me: walking at 1.5 m/s (room to walk and dodge)'"},
+  {"waitFor": "dp.rules.players['Bot Blitz'] && dp.cfg.walk === 1.5", "timeout": 4000},
+  {"evalFile": "still.js"},
+  {"eval": "window.__health = () => dp.me.hp; document.getElementById('startBtn').click(); 'start'"},
+  {"waitFor": "dp.net.latest.r.s === 'play'", "timeout": 10000},
+  {"eval": "window.__stillRun().then((r) => JSON.stringify(r, null, 1))"},
+  {"shot": "still_own.png"},
+  {"eval": "dp.net.send({t: 'rules', set: {TEAM_HEALTH: true, TEAM_REGEN: true, TEAM_REGEN_DELAY: 0, TEAM_REGEN_RATE: 1, TEAM_REGEN_STILL: 'only', TEAM_REGEN_STILL_TIME: 1, TEAM_REGEN_STILL_EXTRA: 3, TEAM_REGEN_CAP_SHARE: 90}}); 'next round: team health, the bar only while someone stands still, the same numbers'"},
+  {"waitFor": "dp.net.latest.r.n >= 2 && dp.net.latest.r.s === 'play' && dp.cfg.teamHealth", "timeout": 45000},
+  {"eval": "window.__health = () => dp.net.latest.r.th[0][0]; window.__stillRun().then((r) => JSON.stringify(r, null, 1))"},
+  {"shot": "still_team.png"}
+]

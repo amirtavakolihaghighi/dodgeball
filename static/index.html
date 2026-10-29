@@ -13,9 +13,11 @@
 
 <div id="hud" hidden>
   <div id="topbar">
-    <div class="side red"><span class="label">RED</span><span class="score" id="scoreRed">0</span><span class="pips" id="pipsRed"></span></div>
+    <div class="side red"><span class="label">RED</span><span class="score" id="scoreRed">0</span><span class="pips" id="pipsRed"></span>
+      <div class="thbar red" id="thRed"><i></i><b></b><span></span></div></div>
     <div id="roundbox"><div id="roundLabel">WAITING</div><div id="roundTime"></div><div id="roundGoal"></div></div>
-    <div class="side blue"><span class="pips" id="pipsBlue"></span><span class="score" id="scoreBlue">0</span><span class="label">BLUE</span></div>
+    <div class="side blue"><span class="pips" id="pipsBlue"></span><span class="score" id="scoreBlue">0</span><span class="label">BLUE</span>
+      <div class="thbar blue" id="thBlue"><i></i><b></b><span></span></div></div>
   </div>
   <div id="hint"></div>
   <div id="hostLive" hidden></div>
@@ -31,8 +33,9 @@
 
   <div id="vitals">
     <div class="who"><span id="myName"></span><span id="myTeam"></span></div>
-    <div class="bar hp"><i id="hpFill"></i><span id="hpText"></span></div>
+    <div class="bar hp"><i id="hpFill"></i><b id="hpLimit" title="Health regenerates up to here"></b><span id="hpText"></span></div>
     <div class="bar st"><i id="stFill"></i><b id="stCost"></b><span id="stText"></span></div>
+    <div id="regenState" hidden></div>
     <div id="cash"></div>
   </div>
   <div id="throwbox">
@@ -105,7 +108,13 @@
           <button id="winMinus" class="small hostCtl">−</button><b id="winValue">∞</b><button id="winPlus" class="small hostCtl">+</button>
           <span class="soon" id="winSoon"></span>
         </div>
+        <div class="row">Round time
+          <button id="timeMinus" class="small hostCtl">−</button><b id="timeValue">3:00</b><button id="timePlus" class="small hostCtl">+</button>
+          <span class="soon" id="timeSoon"></span>
+        </div>
         <div class="row rulesRow"><button id="rulesBtn">Game rules…</button><span id="rulesSummary" class="note"></span></div>
+        <div class="row"><button id="exportBtn" class="small" title="Save every rule and each player's own settings as a file">Export settings</button>
+          <button id="importBtn" class="small hostOnly" hidden title="Load a settings file: it replaces every rule and each player's own settings">Import settings…</button></div>
         <div id="pendingBox" class="pending" hidden><span id="pendingText"></span> <button id="discardBtn" class="small hostOnly" hidden>Cancel them</button></div>
       </section>
     </div>
@@ -149,7 +158,7 @@
   <div class="panel rules">
     <header>
       <div class="rulesTitle">
-        <h2>Game rules</h2>
+        <h2 id="rulesHeading">Game rules</h2>
         <p id="rulesMode" class="note"></p>
       </div>
       <input id="rulesSearch" type="search" placeholder="Search rules…" autocomplete="off">
@@ -166,10 +175,12 @@
       </div>
     </div>
     <footer id="rulesFooter">
-      <button id="rulesResetAll">Reset all to defaults</button>
-      <button id="rulesRevert">Undo my edits</button>
+      <button id="rulesResetAll" class="hostOnly">Reset all to defaults</button>
+      <button id="rulesRevert" class="hostOnly">Undo my edits</button>
       <span id="rulesEditCount"></span>
-      <button id="rulesApply" class="primary">Apply</button>
+      <button id="rulesExportPlayer" class="small" hidden title="Save this player's own settings as a file (a profile you can load onto anyone)">Export</button>
+      <button id="rulesImportPlayer" class="small hostOnly" hidden title="Load a player's settings file onto this player: it replaces their own settings">Import…</button>
+      <button id="rulesApply" class="primary hostOnly">Apply</button>
     </footer>
   </div>
 </div>

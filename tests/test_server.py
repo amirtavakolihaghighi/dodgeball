@@ -164,6 +164,36 @@ def test_lobby_protocol_over_websockets():
         asyncio.run(scenario(f"ws://127.0.0.1:{port}/ws", key))
 
 
+async def own_settings_scenario(url):
+    host = await Browser.join(url, "Host")                          # RED, with Bot Ace
+    alice = await Browser.join(url, "Alice", guest=True)            # BLUE, with Bot Blitz and Bot Dash
+    assert alice.welcome["players"] == {} and alice.welcome["nextPlayers"] is None
+    await alice.send(t="rules", player="Alice", set={"MAX_HP": 400})                # a guest can't
+    await host.send(t="rules", player="Alice", set={"MAX_HP": 150, "WALK_SPEED": 9, "GRAVITY": 1})
+    await asyncio.gather(host.pump(0.4), alice.pump(0.4))
+    a, h = alice.rules_msgs[-1], host.rules_msgs[-1]
+    assert a["players"] == h["players"] == {"Alice": {"MAX_HP": 150, "WALK_SPEED": 9.0}}  # gravity is everyone's
+    assert a["cfg"]["maxHp"] == 150 and a["cfg"]["walk"] == 9 and h["cfg"]["maxHp"] == 100     # each browser its own
+    assert a["rules"]["MAX_HP"] == 100 and [e["why"] for e in alice.my_events("deny")] == ["host"]
+    me = next(p for p in alice.snap["p"] if p[0] == alice.welcome["id"])
+    assert me[7] == 150                                             # and the server plays by them
+    # A settings file: its rules (any it leaves out back to their default) and players' own settings.
+    await host.send(t="rules", **{"import": {"rules": {"TEAM_HEALTH": True, "BALL_COLOR_RED": "#00FF00"},
+                                             "players": {"Bot Ace": {"BOT_SKILL": "hard"}, "Alice": {"NOT_A_RULE": 1}}}})
+    await asyncio.gather(host.pump(0.4), alice.pump(0.4))
+    m = alice.rules_msgs[-1]
+    assert m["rules"]["TEAM_HEALTH"] is True and m["rules"]["BALL_COLOR_RED"] == "#00ff00"
+    assert m["players"] == {"Bot Ace": {"BOT_SKILL": "hard"}} and m["cfg"]["maxHp"] == 100 and m["cfg"]["teamHealth"]
+    assert alice.snap["r"]["th"] == [[200, 200], [300, 300]]       # team health: everyone's health added up
+    for b in (host, alice):
+        await b.ws.close()
+
+
+def test_each_player_gets_their_own_settings_and_a_file_replaces_the_setup():
+    with running_server() as (port, _key):
+        asyncio.run(own_settings_scenario(f"ws://127.0.0.1:{port}/ws"))
+
+
 async def host_view_scenario(url):
     host = await Browser.join(url, "Host")
     guest = await Browser.join(url, "Guest", guest=True)
@@ -177,6 +207,10 @@ async def host_view_scenario(url):
     late = await Browser.join(url, "Late", guest=True)             # joining now: sees it straight away
     await late.pump(0.2)
     assert late.hostviews and late.hostviews[0]["f"] == "RICOCHET_CURVE_KEEP"
+    # One player's own settings: whose page it is goes along, cleaned like the rest.
+    await host.send(t="hostview", m="rules", pl={"n": "Bot Comet\n", "t": 7, "b": "yes"}, g="bots", f="BOT_SKILL")
+    await guest.pump(0.3)
+    assert guest.hostviews[-1]["pl"] == {"n": "Bot Comet", "t": 0, "b": False} and guest.hostviews[-1]["f"] == "BOT_SKILL"
     await host.ws.close()                                          # the host leaves: everyone is told
     await asyncio.gather(guest.pump(0.5), late.pump(0.5))
     assert guest.hostviews[-1] == late.hostviews[-1] == {"t": "hostview", "m": None}
@@ -318,11 +352,18 @@ def test_the_hosts_rules_are_saved_and_come_back():
         server.save_rules = True
         server.game = Game()
         server.game.set_rules({"GRAVITY": 3, "MATCH_ROUNDS_TO_WIN": 5}, 0.0)
+        server.game.set_player_rules("Bot Comet", {"BOT_SKILL": "hard", "MAX_HP": 150}, 0.0)
         server.save_current_rules().join()
-        assert json.loads(server.RULES_FILE.read_text()) == {"GRAVITY": 3.0, "MATCH_ROUNDS_TO_WIN": 5}
+        assert json.loads(server.RULES_FILE.read_text()) == {
+            "rules": {"GRAVITY": 3.0, "MATCH_ROUNDS_TO_WIN": 5}, "players": {"Bot Comet": {"BOT_SKILL": "hard", "MAX_HP": 150}}}
         server.game = Game()
         server.load_saved_rules()
         assert server.game.rules.GRAVITY == 3 and server.game.rules.MATCH_ROUNDS_TO_WIN == 5
+        assert server.game.rules.for_player("Bot Comet").MAX_HP == 150      # players' own settings come back too
+        server.RULES_FILE.write_text(json.dumps({"GRAVITY": 4}))           # older versions saved the rules alone
+        server.game = Game()
+        server.load_saved_rules()
+        assert server.game.rules.GRAVITY == 4 and not server.game.rules.players
         server.RULES_FILE.write_text("{not json")                  # a damaged file is ignored
         server.game = Game()
         server.load_saved_rules()

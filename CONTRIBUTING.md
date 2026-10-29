@@ -38,7 +38,7 @@ The game keeps two things between runs, next to `server.py`: the host's rules
 - Never point a test at a server that is hosting a real session.
 
 ```bash
-python tests/test_sim.py       # the rules: 53 tests, about a minute
+python tests/test_sim.py       # the rules: 69 tests, about two minutes
 python tests/test_server.py    # the server over real WebSockets, the session logs, the log report
 ```
 
@@ -58,8 +58,13 @@ in headless Chrome, on every push and pull request.
 - **The server decides everything** (`sim.py`, `bots.py`); the browser only moves its own player.
 - **Some code exists twice and must stay in sync:** `sim.launch_velocity` and
   `physics.js launchVelocity`; `rules.Rules.curve_share` and `physics.js curveShare`; the `HAND_*`
-  constants in `sim.py` and `main.js`; `rules.Rules._fix` and `rules_ui.js enforce`; the formulas
-  in `previews.js` and `rules.py` / `sim.py`.
+  constants in `sim.py` and `main.js`; `rules.Rules._fix` and `rules_ui.js keepConsistent`; the
+  formulas in `previews.js` and `rules.py` / `sim.py`; the rally colours in `world.js` and
+  `previews.js`.
+- **A player's own settings** exist only for rules marked with `who` in `rules.py` (`all`,
+  `people` or `bots`). The game reads a player's numbers from `p.rules` (theirs, or everyone's);
+  only rules that are the same for everyone (the court, ball flight, rounds...) come from
+  `game.rules`.
 - **Text players read is plain language**: describe what a player notices, not the mechanism.
 - **Comments explain why**, not what the line already says.
 - Files use LF line endings (`.gitattributes` handles it), except Windows `.bat` files.

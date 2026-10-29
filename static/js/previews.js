@@ -977,7 +977,7 @@ SCENES.damage = {
     circle(ctx, sx(v), sy(damageFor(B, v)), 6, null, COL.text, 2);
     const hits = (R, p) => Math.ceil(R.MAX_HP / Math.max(1, Math.round(damageFor(R, throwSpeed(R, p)))));
     let y = 44;
-    for (const [R, mine, label] of [[A, false, 'DEFAULT'], [B, true, 'THIS LOBBY']]) {
+    for (const [R, mine, label] of [[A, false, env.nameA.toUpperCase()], [B, true, env.nameB.toUpperCase()]]) {
       const e = { ...env, mine };
       const cx = x1 + 34;
       txt(ctx, label, cx, y, { size: 10, weight: 800, color: mine ? COL.gold : COL.dim });
@@ -1072,7 +1072,7 @@ SCENES.court = {
 
 SCENES.cash = {
   title: 'Cash and revives',
-  caption: 'What each play earns (bars), and what revives cost a team within one round. Grey: default, gold: this lobby.',
+  caption: (env) => `What each play earns (bars), and what revives cost a team within one round. Grey: ${env.nameA}, gold: ${env.nameB}.`,
   draw(ctx, box, t, A, B, env) {
     const rows = [['Hit', 'CASH_HIT'], ['Knockout bonus', 'CASH_KO'], ['Catch', 'CASH_CATCH'], ['Perfect catch', 'CASH_PERFECT_CATCH'],
       ['Deflect', 'CASH_DEFLECT'], ['Perfect deflect', 'CASH_PERFECT_DEFLECT'], ['Perfect dodge', 'CASH_PERFECT_DODGE'], ['Rally bonus (each)', 'CASH_RALLY_BONUS']];
@@ -1232,10 +1232,12 @@ SCENES.bots = {
       });
       return;
     }
-    if (k === 'BOT_SKILL' || k === 'BOT_STAMINA_RESERVE') {
+    if (k === 'BOT_SKILL' || k === 'BOT_STAMINA_RESERVE' || k === 'BOT_STAND_TO_REGEN') {
       readout(ctx, [['Bots use the '], [`${skill}`, ['BOT_SKILL']], [` profile: defend ${Math.round(prof('REACT') * 100)}% of balls, timing ±${Math.round(prof('SD') * 1000)} ms, aim ±${r1(prof('AIM'))}°, `],
         [`${Math.round(prof('BANK') * 100)}% bank shots`]], 16, 34, env, 12);
       readout(ctx, [['They throw only with '], [`${Math.round(R.BOT_STAMINA_RESERVE)} stamina`, ['BOT_STAMINA_RESERVE']], [' left over for defending']], 16, 56, env, 12);
+      readout(ctx, [['When standing still would bring health back, hurt bots '], [R.BOT_STAND_TO_REGEN ? 'stand still' : 'keep moving', ['BOT_STAND_TO_REGEN']],
+        [R.BOT_STAND_TO_REGEN ? ' (and are easier to hit)' : '']], 16, 78, env, 12);
       return;
     }
     if (field === 'react' || field === 'bank') {
@@ -1355,6 +1357,233 @@ SCENES.network = {
   },
 };
 
+// ---------------------------------------------------------------- ball colours, team health
+
+const RALLY_COLORS = ['#3ff2ff', '#ff4bd8', '#ff3b3b', '#ffffff'];     // world.js RALLY_COLORS, deflected 1, 2, 3, 4+ times
+
+SCENES.colors = {
+  title: 'Ball colours',
+  caption: 'Each team\'s balls crossing the court: people\'s, then bots\'. On the right, the colours a deflected ball takes instead (1×, 2×, 3×, 4× and more): a team\'s colours should stand apart from those.',
+  lanes: 'rows',
+  period: () => 2.4,
+  lane(ctx, box, t, R, env) {
+    const w = box.w - 120;
+    const top = 24;
+    const rowH = (box.h - top - 6) / 4;
+    rect(ctx, 96, top, w - 96, box.h - top - 6, 'rgba(18,26,43,0.9)');       // the court
+    const rows = [['RED people', 'BALL_COLOR_RED', COL.red, 1], ['RED bots', 'BALL_COLOR_RED_BOTS', COL.red, 1],
+      ['BLUE people', 'BALL_COLOR_BLUE', COL.blue, -1], ['BLUE bots', 'BALL_COLOR_BLUE_BOTS', COL.blue, -1]];
+    rows.forEach(([name, key, team, dir], i) => {
+      const y = top + rowH * (i + 0.5);
+      const hot = env.focus === key;
+      txt(ctx, name, 12, y + 4, { size: 11, weight: hot ? 800 : 600, color: hot && env.mine ? COL.gold : team });
+      const from = dir > 0 ? 110 : w - 14;
+      const to = dir > 0 ? w - 14 : 110;
+      const k = ((t / 2.4) + i * 0.17) % 1;
+      const x = from + (to - from) * k;
+      const color = R[key];
+      line(ctx, x - dir * 26, y, x, y, `${color}55`, 4);       // the short streak every throw leaves
+      ball(ctx, x, y, Math.max(4, rowH * 0.18), color);
+    });
+    const cx = w + 14;
+    txt(ctx, 'DEFLECTED', cx, top + 10, { size: 10, weight: 800, color: COL.dim });
+    RALLY_COLORS.forEach((color, i) => {
+      const y = top + 26 + i * Math.min(22, (box.h - top - 40) / 4);
+      ball(ctx, cx + 8, y, 5, color);
+      txt(ctx, `${i + 1}×${i === 3 ? '+' : ''}`, cx + 22, y + 4, { size: 11, color: COL.dim });
+    });
+  },
+};
+
+/** Three teammates taking a three-quarter-power hit every half second while earning 10 cash in
+ *  between, until they're all down: with team health one shared bar (R buys health whenever the
+ *  rules let it), without it everyone their own health. */
+function teamFight(R) {
+  return memo(`fight|${keyOf(R, ['TEAM_HEALTH', 'TEAM_HEALTH_SIZE', 'TEAM_HEALTH_FIXED', 'TEAM_HEAL_MODE', 'TEAM_HEAL_AMOUNT',
+    'TEAM_HEAL_COST', 'TEAM_HEAL_COST_STEP', 'TEAM_HEAL_PER_CASH', 'MAX_HP', 'DAMAGE_MIN', 'DAMAGE_PER_SPEED', 'DAMAGE_MAX',
+    'THROW_SPEED_MIN', 'THROW_SPEED_MAX'])}`, () => {
+    const team = !!R.TEAM_HEALTH;
+    const size = !team ? R.MAX_HP : R.TEAM_HEALTH_SIZE === 'fixed' ? R.TEAM_HEALTH_FIXED : 3 * R.MAX_HP;
+    const dmg = Math.max(1, Math.round(damageFor(R, throwSpeed(R, 0.75))));
+    const bars = team ? [size] : [size, size, size];
+    const down = [false, false, false];
+    const steps = [{ t: 0, bars: [...bars], down: [...down], note: '' }];
+    let cash = 0;
+    let packs = 0;
+    let t = 0;
+    let who = 0;
+    for (let i = 0; i < 80 && !down.every(Boolean); i++) {
+      t += 0.5;
+      cash += 10;
+      let note = `−${dmg}`;
+      if (team) {
+        bars[0] = Math.max(0, bars[0] - dmg);
+        if (!bars[0]) down.fill(true);
+      } else {
+        while (down[who % 3]) who++;
+        const k = who++ % 3;
+        bars[k] = Math.max(0, bars[k] - dmg);
+        down[k] = !bars[k];
+      }
+      if (team && bars[0] > 0) {
+        const missing = size - bars[0];
+        if (R.TEAM_HEAL_MODE === 'pack') {
+          const price = R.TEAM_HEAL_COST + R.TEAM_HEAL_COST_STEP * packs;
+          if (missing >= R.TEAM_HEAL_AMOUNT && cash >= price) {
+            cash -= price;
+            packs++;
+            bars[0] += R.TEAM_HEAL_AMOUNT;
+            note = `+${R.TEAM_HEAL_AMOUNT} for ${price} cash`;
+          }
+        } else if (cash > 0 && missing >= Math.min(cash * R.TEAM_HEAL_PER_CASH, size * 0.25)) {
+          const spend = Math.min(cash, Math.ceil(missing / R.TEAM_HEAL_PER_CASH - 1e-9));
+          const gain = Math.round(Math.min(missing, spend * R.TEAM_HEAL_PER_CASH));
+          cash -= spend;
+          bars[0] += gain;
+          note = `+${gain} for ${spend} cash`;
+        }
+      }
+      steps.push({ t, bars: [...bars], down: [...down], note });
+    }
+    return { steps, end: t, size, dmg, team };
+  });
+}
+
+SCENES.teamhp = {
+  title: 'Team health',
+  caption: 'Three teammates take a ¾-power hit every half second and earn 10 cash in between. Their own health: they fall one by one. Team health: one bar falls together, and R buys health for it when the cash allows.',
+  lanes: 'rows',
+  period: (A, B) => Math.max(teamFight(A).end, teamFight(B).end) + 1.6,
+  lane(ctx, box, t, R, env) {
+    const fight = teamFight(R);
+    let now = fight.steps[0];
+    for (const s of fight.steps) if (s.t <= t) now = s;
+    const s = Math.min(26, (box.h - 44) / 2.1);
+    const ground = box.h - 10;
+    const x0 = 40;
+    for (let i = 0; i < 3; i++) figure(ctx, x0 + i * s * 1.8, ground, s, COL.red, { down: now.down[i], arms: 'down' });
+    const bx = x0 + 3 * s * 1.8 + 10;
+    const bw = box.w - bx - 16;
+    const shade = env.mine ? 'rgba(255,201,64,0.8)' : 'rgba(140,150,170,0.7)';
+    if (fight.team) {
+      const y = ground - s * 1.2;
+      rect(ctx, bx, y, bw, 12, 'rgba(255,255,255,0.1)');
+      rect(ctx, bx, y, (bw * now.bars[0]) / fight.size, 12, shade);
+      txt(ctx, `TEAM ${now.bars[0]} / ${fight.size}`, bx, y - 6, { size: 11, weight: 800, color: env.mine ? COL.gold : COL.text });
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const x = x0 + i * s * 1.8 - s * 0.6;
+        rect(ctx, x, ground - s * 2.15, s * 1.2, 5, 'rgba(255,255,255,0.1)');
+        rect(ctx, x, ground - s * 2.15, (s * 1.2 * now.bars[i]) / fight.size, 5, shade);
+      }
+      txt(ctx, `Each their own ${fight.size}: they fall one by one`, bx, ground - s * 1.2 - 6, { size: 11, color: env.mine ? '#d5dbe8' : COL.dim });
+    }
+    if (t - now.t < 0.45 && now.note) txt(ctx, now.note, bx, ground - s * 0.35, { size: 12, weight: 800, color: now.note.startsWith('+') ? COL.good : COL.bad });
+    if (now.down.every(Boolean)) txt(ctx, fight.team ? 'The whole team is out' : 'All out', bx + bw * 0.45, ground - s * 0.35, { size: 12, weight: 800, color: COL.bad });
+    const parts = !fight.team ? [['Team health '], ['off', ['TEAM_HEALTH']]]
+      : [['One bar: '], [R.TEAM_HEALTH_SIZE === 'fixed' ? `${fight.size}, fixed` : `3 × ${R.MAX_HP} health added up`, ['TEAM_HEALTH_SIZE', 'TEAM_HEALTH_FIXED']],
+        ['  ·  R: '], R.TEAM_HEAL_MODE === 'pack'
+          ? [`+${R.TEAM_HEAL_AMOUNT} for ${R.TEAM_HEAL_COST}, ${R.TEAM_HEAL_COST + R.TEAM_HEAL_COST_STEP}, ${R.TEAM_HEAL_COST + 2 * R.TEAM_HEAL_COST_STEP}… cash`,
+            ['TEAM_HEAL_MODE', 'TEAM_HEAL_AMOUNT', 'TEAM_HEAL_COST', 'TEAM_HEAL_COST_STEP']]
+          : [`all your cash, ${R.TEAM_HEAL_PER_CASH} health each`, ['TEAM_HEAL_MODE', 'TEAM_HEAL_PER_CASH']]];
+    readout(ctx, parts, bx, 30, env, 11);
+  },
+};
+
+/** Health regained per second (rules.Rules.regen_speed): `standing` is 1 for a player standing still
+ *  long enough, or how many of a team's players are. */
+function regenSpeed(R, standing, team) {
+  const k = team ? 'TEAM_REGEN' : 'HEALTH_REGEN';
+  const [base, still] = [R[`${k}_RATE`], R[`${k}_STILL`]];
+  if (still === 'off') return base;
+  if (!standing) return still === 'only' ? 0 : base;
+  return R[`${k}_STILL_BOOST`] === 'extra' ? base + R[`${k}_STILL_EXTRA`] * standing : base * (1 + (R[`${k}_STILL_PERCENT`] / 100) * standing);
+}
+
+const STILL_FROM = 8;       // the regeneration scene: they move until 8 s, then stand still
+
+/** Health over 30 s: a player hit twice early on (for the team bar's rules, a team of three hit six
+ *  times), moving until 8 s and standing still after (two of the three), with regeneration after
+ *  its pause, up to its limit. */
+function regenRun(R, team) {
+  const k = team ? 'TEAM_REGEN' : 'HEALTH_REGEN';
+  const keys = [k, `${k}_RATE`, `${k}_DELAY`, `${k}_CAP_MODE`, `${k}_CAP_SHARE`, `${k}_CAP_AMOUNT`, `${k}_STILL`, `${k}_STILL_TIME`,
+    `${k}_STILL_BOOST`, `${k}_STILL_EXTRA`, `${k}_STILL_PERCENT`];
+  return memo(`regen|${team}|${keyOf(R, [...keys, 'MAX_HP', 'TEAM_HEALTH_SIZE', 'TEAM_HEALTH_FIXED', 'DAMAGE_MIN', 'DAMAGE_PER_SPEED',
+    'DAMAGE_MAX', 'THROW_SPEED_MIN', 'THROW_SPEED_MAX'])}`, () => {
+    const [on, , pause, mode, share, amount, still, stillTime] = keys.map((key) => R[key]);
+    const full = !team ? R.MAX_HP : R.TEAM_HEALTH_SIZE === 'fixed' ? R.TEAM_HEALTH_FIXED : 3 * R.MAX_HP;
+    const limit = !on ? null : mode === 'share' ? (full * share) / 100 : Math.min(amount, full);   // hud.js regenLimit
+    const dmg = Math.max(1, Math.round(damageFor(R, throwSpeed(R, 0.75))));
+    const hits = [];
+    let h = full;
+    for (let i = 0; i < (team ? 6 : 2) && h - dmg > full * 0.12; i++) {
+      hits.push(1 + i * (team ? 0.6 : 1.5));
+      h -= dmg;
+    }
+    const standers = team ? 2 : 1;
+    const countsAt = STILL_FROM + stillTime;
+    const pts = [];
+    let hurt = -99;
+    h = full;
+    for (let i = 0, t = 0; t <= 30; i++, t = i * 0.05) {
+      if (hits.some((x) => Math.abs(x - t) < 0.025)) {
+        h -= dmg;
+        hurt = t;
+      } else if (on && t - hurt >= pause && h < limit) h = Math.min(limit, h + regenSpeed(R, t >= countsAt ? standers : 0, team) * 0.05);
+      pts.push([t, h]);
+    }
+    return { pts, full, limit, hits, low: full - hits.length * dmg, pause, share, mode, still, stillTime, countsAt, standers,
+      moving: regenSpeed(R, 0, team), standing: regenSpeed(R, standers, team) };
+  });
+}
+
+SCENES.regen = {
+  title: 'Health regeneration',
+  caption: 'Health over 30 seconds, shown 3× faster: hits early on (red ticks), then, after its pause, health coming back up to its limit (dashed). They move until 8 s, then stand still (shaded). For the team bar: a team of three, hit six times; two of them stand still.',
+  lanes: 'rows',
+  period: () => 10,
+  lane(ctx, box, t, R, env) {
+    const team = env.focus.startsWith('TEAM_');
+    const run = regenRun(R, team);
+    const x0 = 46;
+    const x1 = box.w - 16;
+    const y0 = box.h - 16;
+    const y1 = 42;
+    const sx = (s) => x0 + (s / 30) * (x1 - x0);
+    const sy = (v) => y0 - (v / run.full) * (y0 - y1);
+    rect(ctx, sx(STILL_FROM), y1, x1 - sx(STILL_FROM), y0 - y1, 'rgba(93,255,155,0.05)');
+    if (run.still !== 'off' && run.countsAt < 30) line(ctx, sx(run.countsAt), y1, sx(run.countsAt), y0, 'rgba(93,255,155,0.35)', 1, [3, 3]);
+    txt(ctx, team ? `${run.standers} of 3 standing still` : 'standing still', sx(STILL_FROM) + 4, y0 - 4, { size: 9, color: 'rgba(93,255,155,0.7)' });
+    line(ctx, x0, y0, x1, y0, COL.line, 1.5);
+    for (let s = 0; s <= 30; s += 5) txt(ctx, `${s}s`, sx(s), y0 + 12, { size: 9, color: COL.dim, align: 'center' });
+    txt(ctx, `${run.full}`, x0 - 6, y1 + 4, { size: 9, color: COL.dim, align: 'right' });
+    for (const s of run.hits) line(ctx, sx(s), y0, sx(s), y0 - 10, COL.bad, 2);
+    const last = run.hits[run.hits.length - 1] ?? 0;
+    const color = env.mine ? COL.gold : COL.dim;
+    if (run.limit !== null) {
+      rect(ctx, sx(last), y1, Math.max(1, sx(Math.min(30, last + run.pause)) - sx(last)), y0 - y1, 'rgba(255,255,255,0.04)');
+      line(ctx, x0, sy(run.limit), x1, sy(run.limit), color, 1.2, [5, 4]);
+      txt(ctx, `up to ${Math.round(run.limit)}`, x1, sy(run.limit) - 4, { size: 10, color, align: 'right' });
+    }
+    path(ctx, run.pts.map(([s, v]) => [sx(s), sy(v)]), env.mine ? COL.good : 'rgba(140,150,170,0.8)', 2.2);
+    const now = (t * 3) % 30;
+    const [, v] = run.pts[Math.min(run.pts.length - 1, Math.round(now / 0.05))];
+    line(ctx, sx(now), y1, sx(now), y0, 'rgba(255,255,255,0.35)', 1);
+    circle(ctx, sx(now), sy(v), 4, COL.text);
+    const k = team ? 'TEAM_REGEN' : 'HEALTH_REGEN';
+    const each = team ? `, ${run.standers} standing` : '';
+    const parts = run.limit === null
+      ? [[team ? 'Bar regeneration ' : 'Health regeneration '], ['off', [k]], [team ? ': only R fills the bar' : ': health only comes back with a revive']]
+      : [[`Down to ${run.low}; `], [`${r1(run.pause)} s pause`, [`${k}_DELAY`]], ['; '],
+        [run.still === 'only' ? 'nothing while moving' : `${r1(run.moving)}/s moving`, [`${k}_RATE`, `${k}_STILL`]],
+        [run.still === 'off' ? ' or standing still' : `, ${r1(run.standing)}/s standing still${each}`, [`${k}_STILL`, `${k}_STILL_BOOST`, `${k}_STILL_EXTRA`, `${k}_STILL_PERCENT`]],
+        [run.still === 'off' ? '' : ` after ${r1(run.stillTime)} s`, [`${k}_STILL_TIME`]], ['; up to '],
+        [run.mode === 'share' ? `${run.share}% (${Math.round(run.limit)})` : `${Math.round(run.limit)} HP`, [`${k}_CAP_MODE`, `${k}_CAP_SHARE`, `${k}_CAP_AMOUNT`]]];
+    readout(ctx, parts, x0, 32, env, 11);
+  },
+};
+
 // ---------------------------------------------------------------- the canvas
 
 export class Preview {
@@ -1366,16 +1595,21 @@ export class Preview {
     this.t0 = performance.now();
   }
 
-  /** Shows `sceneId` for the rule `focus`, comparing defaults A with this lobby's values B. */
-  show(sceneId, focus, A, B, labelB) {
+  /** Shows `sceneId` for the rule `focus`, comparing A (the defaults, or for one player's own
+   *  settings everyone's values) with B (this lobby's, or theirs). labelA / labelB: the lanes'
+   *  titles; nameA / nameB: what charts call the two ('default' and 'this lobby', or 'everyone'
+   *  and the player's name). */
+  show(sceneId, focus, A, B, labelB, labelA = 'DEFAULT', nameA = 'default', nameB = 'this lobby') {
     if (sceneId !== this.sceneId || (sceneId === 'defence' && focus.split('_')[0] !== this.focus?.split('_')[0])) this.t0 = performance.now();
     this.sceneId = sceneId;
     this.focus = focus;
     this.A = A;
     this.B = B;
+    this.labelA = labelA;
     this.labelB = labelB;
+    this.names = { nameA, nameB };
     const scene = SCENES[sceneId] || SCENES.duration;
-    return { title: scene.title, caption: scene.caption };
+    return { title: scene.title, caption: typeof scene.caption === 'function' ? scene.caption(this.names) : scene.caption };
   }
 
   start() {
@@ -1413,7 +1647,7 @@ export class Preview {
     ctx.fillRect(0, 0, w, h);
     const S = SCENES[this.sceneId] || SCENES.duration;
     const t = (performance.now() - this.t0) / 1000;
-    const env = { focus: this.focus };
+    const env = { focus: this.focus, ...this.names };
     if (!S.lanes) {
       S.draw(ctx, { w, h }, t, this.A, this.B, env);
       return;
@@ -1423,7 +1657,7 @@ export class Preview {
     const cols = S.lanes === 'cols';
     const lw = cols ? (w - 1) / 2 : w;
     const lh = cols ? h : (h - 1) / 2;
-    [[this.A, 'DEFAULT', false], [this.B, this.labelB, true]].forEach(([R, label, mine], i) => {
+    [[this.A, this.labelA, false], [this.B, this.labelB, true]].forEach(([R, label, mine], i) => {
       const ox = cols ? i * (lw + 1) : 0;
       const oy = cols ? 0 : i * (lh + 1);
       ctx.save();

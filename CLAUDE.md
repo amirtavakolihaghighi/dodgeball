@@ -18,6 +18,7 @@ Quick facts:
 - **Stack:**
   - A Python server (FastAPI + uvicorn) runs the authoritative rules in `sim.py` and `bots.py`.
   - Every number is a host-editable rule: `rules.py` holds the name, description, range and preview; `config.py` holds the defaults. The game reads them from `game.rules`, never from `config` directly.
+  - A player (or bot) may have their own settings for the rules marked `who` in `rules.py`. A player's numbers come from `p.rules` (`Rules.for_player`: everyone's with theirs on top), a ball's from `b.rules` (its thrower's); `game.rules` only for what's the same for everyone.
   - The browser client is three.js (`static/js/`).
 - **The lobby:**
   - The server starts in a lobby. The host (a browser on the server's PC, or the console's `?host=KEY` link) sets up teams, bots and rules, then starts the match.
@@ -27,7 +28,7 @@ Quick facts:
   - Always pass `--no-browser` in tests, or windows open on the user's desktop.
   - Always pass `--fresh`, or tests load or overwrite the user's `saved_rules.json`.
   - Restart the server after Python changes, and between browser test suites (it keeps changed rules in memory).
-- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 53 must pass) and `tests\test_server.py` (all 6 must pass).
+- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 69 must pass) and `tests\test_server.py` (all 7 must pass).
 - **Session logs:**
   - Every server run writes `logs\<date_time>\` next to the app (`diag.py`). Every browser sends in its own log (`static/js/diag.js`; L marks a laggy moment).
   - The host downloads them all as one zip, and `tools\log_report.py <zip or folder>` turns them into a diagnosis. The user sends these zips to be analysed. Logs from before the rename are named `dodgeparry-...`; the report reads them the same way.
@@ -37,6 +38,7 @@ Quick facts:
   - Re-run the auto-defender after touching `net.js`, `main.js` threat detection or the pending/lag-compensation logic, `sidestep.json` (with `&lag=150`) after touching sidestep compensation or position reports, and `clock.json` after touching the clock estimate in `net.js`.
   - The lag study's fixes are settings under Network (advanced): view delay, press grace, sidestep compensation, the lockout scale. Defaults are in `config.py`.
   - Re-run the lobby tests after touching the lobby, rules or host code, `logs.json` after touching the logging, and `why_hit.json` after touching the hit marks or the hit popup.
+  - Re-run `team_health.json` after touching team health, `regen.json` after touching health regeneration or the lobby's round-time buttons, `still.json` after touching standing still (what counts as walking, the dodge's dash, the hint), and `own_settings.json` after touching players' own settings, the ball colours or the settings files (export/import).
   - Kill test servers by their process tree (the venv's `python.exe` is a launcher with the server as its child).
 - **Standalone Windows app:** `build_exe.bat` produces `dist\Dodgeball-windows.zip`, with `Allow friends to connect.bat` (the firewall helper) next to the exe. Rebuild to ship any change; releases are built by GitHub Actions.
 - **Decisions:** don't change decisions the user made (marked **U** in `docs/PROJECT.md` section 5) without asking. Ask about genuine design forks; decide the obvious things yourself.
@@ -50,8 +52,11 @@ Quick facts:
 - **Keep in sync:**
   - `sim.launch_velocity` ↔ `static/js/physics.js launchVelocity`;
   - the `HAND_*` constants in `sim.py` and `main.js`;
-  - `rules.Rules._fix` ↔ `rules_ui.js enforce`;
+  - `rules.Rules._fix` ↔ `rules_ui.js keepConsistent` (also how a player's own settings combine with everyone's);
+  - the rally colours: `world.js RALLY_COLORS` ↔ `previews.js RALLY_COLORS`;
+  - where regeneration stops and how fast: `rules.Rules.regen_limit` ↔ `hud.js regenLimit`, `rules.Rules.regen_speed` ↔ `previews.js regenSpeed`;
+  - standing still: `sim.Game._track_still` (2 cm from where you stopped; a dash, plus 0.06 s, doesn't count) ↔ `main.js trackStill`;
   - the formulas in `previews.js` ↔ `rules.py` / `sim.py`;
   - `rules.Rules.curve_share` ↔ `physics.js curveShare` (how hard a ball bends at a given speed).
-- **Adding a rule:** a default in `config.py`, an `_add(...)` line in `rules.py`, and a read through `game.rules`. `test_every_rule_is_used_by_the_game` fails if nothing reads it.
+- **Adding a rule:** a default in `config.py`, an `_add(...)` line in `rules.py`, and a read through `game.rules`. `test_every_rule_is_used_by_the_game` fails if nothing reads it. If a player may have their own value, give it `who=` and read it through `p.rules`.
 - **Keep this documentation current:** after meaningful changes, update `docs/PROJECT.md` (history, decisions, numbers) and add a line under "Unreleased" in `CHANGELOG.md`.

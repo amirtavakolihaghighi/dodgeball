@@ -24,6 +24,14 @@ PLAYER_RADIUS = 0.42    # hit capsule radius (generous on purpose)
 BALL_RADIUS = 0.2
 CHEST_HEIGHT = 1.15     # where aim assist and bots aim
 
+# --- Ball colours ----------------------------------------------------------------
+# Each team's balls, people's and (paler) bots'. Deflected balls show their rally colour
+# instead (cyan, magenta, red, white: world.js), so these stay clear of those.
+BALL_COLOR_RED = "#ff8a2a"          # orange
+BALL_COLOR_RED_BOTS = "#ffc48f"     # peach
+BALL_COLOR_BLUE = "#4f6dff"         # royal blue
+BALL_COLOR_BLUE_BOTS = "#aab8ff"    # periwinkle
+
 # --- Movement ----------------------------------------------------------------
 WALK_SPEED = 6.0
 CHARGE_WALK_SPEED = 4.0     # while winding up a throw
@@ -32,6 +40,44 @@ DEFEND_WALK_SPEED = 2.5     # while a catch / deflect is active
 # --- Health & stamina --------------------------------------------------------
 MAX_HP = 100
 MAX_STAMINA = 100
+# Team health (off by default): one shared bar per team; the whole team falls together.
+TEAM_HEALTH = False
+TEAM_HEALTH_SIZE = "sum"        # sum: everyone's health added up | fixed: TEAM_HEALTH_FIXED for every team
+TEAM_HEALTH_FIXED = 300
+TEAM_HEAL_MODE = "pack"         # what R buys for the bar: pack (a fixed amount, rising price) | cash (all your cash)
+TEAM_HEAL_AMOUNT = 50           # health per pack...
+TEAM_HEAL_COST = 80             # ...the team's first pack in a round costs this...
+TEAM_HEAL_COST_STEP = 40        # ...and each further one that round this much more (like revives)
+TEAM_HEAL_PER_CASH = 0.5        # all your cash: health per cash. At 1, cash came in about as fast as damage and
+                                # every 3v3 bot round ran to the time limit; at 0.5 rounds last ~90 s, like without
+                                # team health (the packs: ~70 s)
+# Health regeneration (off by default): health comes back by itself once nobody has hit you for a
+# while, up to a limit: a share of full health, or a fixed amount. Never above it, never taking any.
+HEALTH_REGEN = False
+HEALTH_REGEN_RATE = 2.0         # HP per second...
+HEALTH_REGEN_DELAY = 4.0        # ...from this long after the last hit (or coming back in)
+HEALTH_REGEN_CAP_MODE = "share" # up to: share (of full health) | amount
+HEALTH_REGEN_CAP_SHARE = 50     # %
+HEALTH_REGEN_CAP_AMOUNT = 50    # HP
+# Standing still (not walking; a dodge's dash doesn't count) for a moment makes it faster, or is
+# needed for it at all, or doesn't matter.
+HEALTH_REGEN_STILL = "faster"   # faster | only | off
+HEALTH_REGEN_STILL_TIME = 2.0   # standing still this long counts
+HEALTH_REGEN_STILL_BOOST = "extra"  # faster by: extra (HP per second) | percent
+HEALTH_REGEN_STILL_EXTRA = 4.0  # 2 + 4 = 6 per second standing still
+HEALTH_REGEN_STILL_PERCENT = 200    # +200% = three times as fast
+# The team bar's own regeneration, with team health on (off by default).
+TEAM_REGEN = False
+TEAM_REGEN_RATE = 5.0           # HP per second for the whole bar...
+TEAM_REGEN_DELAY = 4.0          # ...from this long after anyone on the team was hit
+TEAM_REGEN_CAP_MODE = "share"
+TEAM_REGEN_CAP_SHARE = 50       # % of the bar
+TEAM_REGEN_CAP_AMOUNT = 150     # HP
+TEAM_REGEN_STILL = "faster"     # each teammate standing still adds to the bar's speed (or: needed, or not)
+TEAM_REGEN_STILL_TIME = 2.0
+TEAM_REGEN_STILL_BOOST = "extra"
+TEAM_REGEN_STILL_EXTRA = 4.0    # per teammate standing still: 5 + 3 x 4 = 17 per second with three
+TEAM_REGEN_STILL_PERCENT = 50   # per teammate standing still: three = +150%
 STAMINA_REGEN = 30.0        # per second
 STAMINA_REGEN_DELAY = 0.6   # regen pauses this long after any stamina spend
 
@@ -141,6 +187,7 @@ BOTS_BLUE = 2
 BOTS_PER_TEAM_MAX = 12
 BOT_SKILL = "normal"        # easy | normal | hard
 BOT_STAMINA_RESERVE = 30    # bots keep this much stamina for defending before they throw
+BOT_STAND_TO_REGEN = True   # a hurt bot stands still when that brings its health (or its team's bar) back
 # react: chance to attempt a defence at all; sd: timing spread (s); aim: aim error (deg);
 # gap_min/gap_max: extra pause between throws (s); mix_*: preference for each defence;
 # bank: chance a throw is a ricochet off the floor or a side wall

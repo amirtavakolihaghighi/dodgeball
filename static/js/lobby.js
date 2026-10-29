@@ -5,6 +5,9 @@
 import { TEAM } from './hud.js';
 
 const $ = (id) => document.getElementById(id);
+// The round time's quick steps (any other value can be typed in the rules editor).
+const ROUND_TIMES = [20, 30, 45, 60, 90, 120, 180, 240, 300, 420, 600, 900];
+const minutes = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -14,7 +17,7 @@ function el(tag, cls, text) {
 }
 
 export class Lobby {
-  /** opts: {onStart(), openRules()} */
+  /** opts: {onStart(), openRules(), openPlayer({name, team, bot}), exportSettings(), importSettings()} */
   constructor(net, opts) {
     this.net = net;
     this.isHost = false;
@@ -44,6 +47,8 @@ export class Lobby {
     $('shuffleBtn').addEventListener('click', () => net.send({ t: 'shuffle' }));
     $('discardBtn').addEventListener('click', () => net.send({ t: 'rules', discard: true }));
     $('rulesBtn').addEventListener('click', () => opts.openRules());
+    $('exportBtn').addEventListener('click', () => opts.exportSettings());
+    $('importBtn').addEventListener('click', () => opts.importSettings());
     for (const [team, key] of [['Red', 'BOTS_RED'], ['Blue', 'BOTS_BLUE']]) {
       $(`bots${team}Minus`).addEventListener('click', () => this.step(key, -1, 0, this.maxBots));
       $(`bots${team}Plus`).addEventListener('click', () => this.step(key, 1, 0, this.maxBots));
@@ -51,11 +56,15 @@ export class Lobby {
     $('watchBtn').addEventListener('click', () => net.send({ t: 'spectate', on: !this.watching }));
     $('winMinus').addEventListener('click', () => this.step('MATCH_ROUNDS_TO_WIN', -1, 0, 15));
     $('winPlus').addEventListener('click', () => this.step('MATCH_ROUNDS_TO_WIN', 1, 0, 15));
+    $('timeMinus').addEventListener('click', () => this.stepThrough('ROUND_TIME_LIMIT', -1, ROUND_TIMES));
+    $('timePlus').addEventListener('click', () => this.stepThrough('ROUND_TIME_LIMIT', 1, ROUND_TIMES));
     $('skillSelect').addEventListener('change', (e) => this.set('BOT_SKILL', e.target.value));
     for (const id of ['listRed', 'listBlue']) {
       $(id).addEventListener('click', (e) => {
         const b = e.target.closest('button[data-p]');
         if (b) net.send({ t: 'move', p: Number(b.dataset.p) });
+        const own = e.target.closest('button[data-own]');      // ⚙: that player's own settings
+        if (own) opts.openPlayer({ name: own.dataset.own, team: Number(own.dataset.team), bot: own.dataset.bot === '1' });
       });
     }
   }
@@ -65,6 +74,7 @@ export class Lobby {
     this.maxBots = maxBots;
     for (const e of document.querySelectorAll('.hostCtl')) e.disabled = !isHost;
     $('rulesBtn').textContent = isHost ? 'Game rules…' : 'View the game rules…';
+    $('importBtn').hidden = !isHost;
     this.sig = '';
   }
 
@@ -80,10 +90,24 @@ export class Lobby {
     this.sig = '';
   }
 
+  /** What a click steps from: the value just asked for, else the host's latest choice. Read now,
+   *  not from the copy update() keeps: a rules message can arrive between two frames. */
+  chosen(key) {
+    return this.wanted[key] ?? (this.rules?.next ?? this.rules?.active)?.[key];
+  }
+
   step(key, delta, lo, hi) {
-    const now = this.wanted[key] ?? this.desired?.[key] ?? 0;
+    const now = this.chosen(key) ?? 0;
     const value = Math.max(lo, Math.min(hi, now + delta));
     if (value !== now) this.set(key, value);
+  }
+
+  /** The next value up (dir 1) or down (-1) in `steps`, from what's asked for (a value set in the
+   *  editor between two steps goes to the nearer one that way). */
+  stepThrough(key, dir, steps) {
+    const now = this.chosen(key) ?? steps[0];
+    const value = dir > 0 ? steps.find((v) => v > now) : [...steps].reverse().find((v) => v < now);
+    if (value !== undefined) this.set(key, value);
   }
 
   /** Called every frame while the menu is open; rebuilds only when something changed. */
@@ -91,7 +115,9 @@ export class Lobby {
     if (!snap || !rules.active) return;
     const r = snap.r;
     const players = [...snap.players.values()];
+    this.rules = rules;
     this.desired = rules.next ?? rules.active;
+    this.own = rules.nextPlayers ?? rules.players;     // each player's own settings, as the host last chose
     const sig = JSON.stringify([r.s, r.n, r.score, r.res, r.pend, rules.rv, this.isHost, this.wanted,
       players.map((p) => [p.id, p.name, p.team, p.bot, p.host, p.next])]);
     if (sig === this.sig) return;
@@ -132,6 +158,7 @@ export class Lobby {
     this.value('botsRedValue', 'botsRedSoon', rules, 'BOTS_RED', (v) => String(v));
     this.value('botsBlueValue', 'botsBlueSoon', rules, 'BOTS_BLUE', (v) => String(v));
     this.value('winValue', 'winSoon', rules, 'MATCH_ROUNDS_TO_WIN', (v) => (v ? `first to ${v}` : 'endless'));
+    this.value('timeValue', 'timeSoon', rules, 'ROUND_TIME_LIMIT', minutes);
     const skill = this.wanted.BOT_SKILL ?? this.desired.BOT_SKILL;
     if ($('skillSelect').value !== skill) $('skillSelect').value = skill;
     $('skillSoon').textContent = rules.next && rules.next.BOT_SKILL !== rules.active.BOT_SKILL ? 'next round' : '';
@@ -166,6 +193,12 @@ export class Lobby {
     if (p.host) li.append(el('span', 'tag host', 'host'));
     if (p.bot) li.append(el('span', 'tag', 'bot'));
     if (p.next !== null) li.append(el('span', 'tag soon', p.next === -1 ? '→ spectating next round' : `→ ${TEAM[p.next]} next round`));
+    const own = Object.keys(this.own?.[p.name] ?? {}).length;
+    if (own) li.append(el('span', 'tag own', `own settings: ${own}`));
+    const gear = el('button', 'small gear', '⚙');      // everyone may look; only the host changes them
+    Object.assign(gear.dataset, { own: p.name, team: p.team, bot: p.bot ? '1' : '0' });
+    gear.title = this.isHost ? `Settings just for ${p.name}` : `${p.name}'s own settings`;
+    li.append(gear);
     if (this.isHost && !p.bot && !(p.id === myId && p.next === -1)) {
       const b = el('button', 'small move', p.next !== null ? '✕' : '⇄');
       b.dataset.p = p.id;

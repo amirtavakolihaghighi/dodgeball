@@ -388,7 +388,9 @@ class Stats:
     def _late_press(self, pid, action, wt, now, game):
         """A defence whose press was in time on the player's screen, but that reached the
         server after the ball had already been counted as a hit: lag cost them that ball."""
-        spec = game.rules.actions.get(action) if isinstance(action, str) else None
+        player = game.players.get(pid)
+        rules = player.rules if player is not None else game.rules     # their own windows, if they have any
+        spec = rules.actions.get(action) if isinstance(action, str) else None
         hits = self.hits.get(pid)
         if spec is None or not hits:
             return
@@ -398,7 +400,7 @@ class Stats:
             if wt <= contact <= wt + spec.window:
                 self.log.write({"ty": "late_press", "st": round(now, 3), "p": pid, "a": action, "contact": round(contact, 3),
                                 "wt": round(wt, 3), "screen_ms": ms(now - wt), "after_hit_ms": ms(now - decided),
-                                "over_cap": now - wt > game.rules.MAX_LAG_COMP, "wall": wall_ms()})
+                                "over_cap": now - wt > rules.MAX_LAG_COMP, "wall": wall_ms()})
                 return
 
     def events(self, events, now, game):

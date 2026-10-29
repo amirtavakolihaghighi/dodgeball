@@ -8,6 +8,58 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 
 ## [Unreleased]
 
+### Added
+
+- **Team ball colours.** A ball shows its thrower's colour until someone deflects it: RED's people
+  throw orange balls and RED's bots peach ones, BLUE's people royal blue and BLUE's bots
+  periwinkle, chosen to stay clear of the rally colours a deflected ball takes (cyan, magenta,
+  red, white). The ball in a player's hand has the same colour. All four are rules, with colour
+  pickers and a preview under Game rules › Ball colours.
+- **Team health** (off by default, Game rules › Team health): one shared health bar per team,
+  shown under its score. Every hit drains it, nobody falls alone, and when it's empty the whole
+  team falls at once and loses the round. R spends cash on health for the bar instead of
+  revives, and bots do too. The host picks the bar's size (everyone's health added up, or a
+  fixed size) and what R buys (a pack whose price rises within a round, or all your cash at a
+  fixed rate), and tunes every number. When time runs out, more of the bar left wins.
+- **Each player's own settings.** The ⚙ next to any person or bot in the lobby opens the rules
+  editor for just them, with the rules that can differ per player (health, stamina, movement,
+  throwing, damage, aim assist, defences, cash, ball colour, network fairness; skill for bots).
+  Everyone sees who has their own settings and can look at them; settings go by name, so a
+  person keeps theirs after a reload.
+- **Health regeneration** (off by default, Game rules › Damage & health): health comes back by
+  itself, so many points a second, once nobody has hit you for a while, up to a limit: a share
+  of full health or a fixed amount. It never takes health away. The team's bar has its own
+  (Game rules › Team health), paused by a hit on anyone on the team. Every number is a rule, a
+  player can have their own, and a marker on the health bars shows where it stops.
+- **Standing still** makes regeneration faster, or is needed for it (the host picks, or turns it
+  off): after standing still for a moment (2 s), health comes back faster, by extra health per
+  second or by a percentage. For the team bar, every teammate standing still adds to it. A
+  dodge's dash doesn't count as moving, even with a direction held, as long as the key is let go
+  before the dash ends. A line under your bars says when it counts ("Standing still:
+  regenerating faster"). Hurt bots stand still to regenerate too (a Bots setting).
+- **Round time in the lobby.** Round time − / + sits next to Match length (20 s to 15 min); it
+  was only in Game rules before.
+- **Settings files.** Export settings saves every rule and everyone's own settings as a `.json`
+  file; the host's Import settings loads one (or an older `saved_rules.json`) and replaces the
+  whole setup. A player's ⚙ page exports and imports just their settings, as a profile to load
+  onto anyone.
+
+### Changed
+
+- Bots are named by their place on the team (RED: Ace, Comet, Echo…; BLUE: Blitz, Dash,
+  Flick…), and fewer bots takes away a team's last ones first, so a bot keeps its own settings
+  when it's taken away and added back.
+- `saved_rules.json` also holds players' own settings. Files saved by older versions still load;
+  an older version can't read the new file and starts with the default rules.
+- The rules editor fits small laptop screens better: a shorter preview on short windows, and
+  on narrow ones nothing covers its buttons any more.
+
+### Fixed
+
+- The lobby's − / + buttons (bots, match length, round time) could step from an older value when
+  a click came right after the server's update, just before the menu redrew: + from 20 s jumped
+  to 3:00.
+
 ## [2.1.0] - 2026-10-29
 
 Players now see why a ball got through their defence.

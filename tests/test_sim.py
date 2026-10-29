@@ -1,4 +1,5 @@
 """Rule tests for the simulation. Run with:  python tests/test_sim.py   (or pytest)"""
+import collections
 import json
 import math
 import random
@@ -18,9 +19,10 @@ DT = 1 / 120
 R = Rules()                 # the default rules, for expected values
 
 
-def start_duel(distance=10.0, defenders=1, rules=None):
-    """Red attacker vs blue defender(s), standing `distance` apart, round already in play."""
-    g = Game(seed=7, rules=Rules(rules) if rules else None)
+def start_duel(distance=10.0, defenders=1, rules=None, players=None):
+    """Red attacker "A" vs blue defender(s) "D0"..., standing `distance` apart, round already in
+    play. `players`: their own settings, {name: {key: value}}."""
+    g = Game(seed=7, rules=Rules(rules, players) if rules or players else None)
     g.bots_each = 0
     t = 100.0
     a = g.add_player("A", 0, t)
@@ -815,18 +817,22 @@ def test_every_rule_is_used_by_the_game():
     """No decorative settings: every rule the editor lists is read by the game somewhere."""
     root = Path(__file__).resolve().parent.parent
     code = "".join((root / f).read_text(encoding="utf-8") for f in ("sim.py", "bots.py", "server.py"))
-    client = rules_mod.Rules.for_client.__code__.co_names + rules_mod.Rules.throw_cost.__code__.co_names \
-        + rules_mod.Rules.throw_speed.__code__.co_names + rules_mod.Rules.damage_for.__code__.co_names         + rules_mod.Rules.curve_share.__code__.co_names + rules_mod.Rules.bots_for.__code__.co_names
+    formulas = ("for_client", "throw_cost", "throw_speed", "damage_for", "curve_share", "bots_for", "regen_limit",
+                "regen_speed")      # the formulas the game uses, on Rules
+    client = sum((getattr(rules_mod.Rules, f).__code__.co_names for f in formulas), ())
     spec_fields = {"COST": ".cost", "PERFECT_COST": ".perfect_cost", "WINDOW": ".window", "PERFECT": ".perfect",
                    "RECOVERY": ".recovery"}
+    drawn = (root / "static" / "js" / "main.js").read_text(encoding="utf-8")    # the browser reads the ball colours
     unused = []
     for p in PARAMS:
         k = p.key
         kind, _, field = k.partition("_")
         if kind in ("DODGE", "CATCH", "DEFLECT") and field in spec_fields:
             ok = spec_fields[field] in code
-        elif p.sub:                                                   # per-skill bot numbers
+        elif p.group == "bots" and p.sub:                             # per-skill bot numbers
             ok = f'prof["{k.split("_", 2)[2].lower()}"]' in code
+        elif p.kind == "color":                                       # only drawn: each ball takes its thrower's
+            ok = f"'{k}'" in drawn
         else:
             ok = f".{k}" in code or k in client
         if not ok:
@@ -835,7 +841,8 @@ def test_every_rule_is_used_by_the_game():
 
 
 def test_random_rules_never_break_a_match():
-    """Fuzz: matches with random rule values (often at the extremes), changed mid-match too."""
+    """Fuzz: matches with random rule values (often at the extremes), changed mid-match too, and
+    random own settings for the players."""
     for seed in range(20):
         rng = random.Random(seed)
 
@@ -848,6 +855,8 @@ def test_random_rules_never_break_a_match():
                     out[p.key] = rng.random() < 0.5
                 elif p.kind == "choice":
                     out[p.key] = rng.choice(p.choices)
+                elif p.kind == "color":
+                    out[p.key] = f"#{rng.randrange(1 << 24):06x}"
                 else:
                     pick = rng.random()
                     v = p.lo if pick < 0.15 else p.hi if pick < 0.3 else rng.uniform(p.lo, p.hi)
@@ -865,6 +874,8 @@ def test_random_rules_never_break_a_match():
             t += 1 / 60
             if i % 300 == 150:
                 g.set_rules(random_values(0.3), t)      # the host fiddles mid-match
+            if i % 200 == 70:                           # ...and gives someone their own settings
+                g.set_player_rules(rng.choice([p.name for p in g.players.values()]), random_values(0.2), t)
             if g.state == "lobby":
                 g.start_match(t)
             if i % 60 == 0:
@@ -873,6 +884,7 @@ def test_random_rules_never_break_a_match():
                 g.events.clear()
         for p in g.players.values():
             assert math.isfinite(p.x) and math.isfinite(p.z) and math.isfinite(p.hp), (seed, p)
+        assert all(0 <= hp <= size and math.isfinite(hp) for hp, size in zip(g.team_hp, g.team_hp_max)), seed
 
 
 def test_match_ends_when_a_team_reaches_the_rounds_to_win():
@@ -1001,6 +1013,419 @@ def test_cash_can_carry_over_while_revive_prices_start_over():
         t = run(g, t, 0.1)
     assert d1.cash == 500 - C.REVIVE_COST                    # the cash carried over...
     assert g.revive_cost(1) == C.REVIVE_COST                 # ...the price started over
+
+
+# ---------------------------------------------------------------- team health
+
+def test_team_health_is_one_bar_and_the_team_falls_together():
+    g, a, (d1, d2), t = start_duel(defenders=2, rules={"TEAM_HEALTH": True})
+    assert g.team_hp == [100, 200] and g.team_hp_max == [100, 200]          # everyone's health added up
+    throw(g, a, d1, t)
+    t = run(g, t + C.CHARGE_TIME, 2.0)
+    hit = events(g, "hit")[0]
+    assert hit["bar"] and not hit["ko"] and g.team_hp[1] == 200 - hit["dmg"]
+    assert d1.alive and d1.hp == C.MAX_HP                                    # it came off the team's bar
+    g.events.clear()
+    g.team_hp[1] = 5
+    throw(g, a, d2, t)
+    t = run(g, t + C.CHARGE_TIME, 2.0)
+    hit = events(g, "hit")[0]
+    assert hit["ko"] and hit["bar"] and not d1.alive and not d2.alive       # the whole team falls at once
+    assert a.stats["kos"] == 2 and d1.stats["outs"] == d2.stats["outs"] == 1
+    assert a.cash == 2 * C.CASH_HIT + C.CASH_KO
+    assert g.state == "over" and g.score == [1, 0]
+    t = run(g, t, C.ROUND_OVER_TIME + 0.2)
+    assert g.state == "count" and g.team_hp == [100, 200] and all(p.alive for p in (a, d1, d2))
+
+
+def test_the_team_bar_is_everyones_health_added_up_or_a_fixed_size():
+    g, host, _, t = lobby(guests=0)
+    say(g, host, t, t="rules", set={"TEAM_HEALTH": True})
+    g.add_player("Big", 0, t)
+    say(g, host, t, t="rules", player="Big", set={"MAX_HP": 150})           # their own health: they bring more
+    g.add_player("D", 1, t)
+    assert g.team_hp_max == [250, 100] and g.team_hp == [250, 100]
+    t = play_now(g, t)
+    g.team_hp[1] = 40
+    late = g.add_player("Late", 1, t)                                         # joining mid-round brings their share
+    assert g.team_hp_max[1] == 200 and g.team_hp[1] == 140
+    g.remove_player(late.id, t)                                               # leaving takes their share of what's left:
+    assert g.team_hp_max[1] == 100 and g.team_hp[1] == 70                    # the bar is as full as before, not healed
+    say(g, host, t, t="rules", set={"TEAM_HEALTH_SIZE": "fixed", "TEAM_HEALTH_FIXED": 500})
+    assert g.team_hp_max == [250, 100]                                        # mid-match: from the next round
+    for p in g.players.values():
+        p.alive = p.team == 0
+    t = run(g, t, C.ROUND_OVER_TIME + 0.2)
+    assert g.state == "count" and g.team_hp_max == [500, 500] and g.team_hp == [500, 500]
+
+
+def test_cash_buys_health_for_the_team_bar():
+    g, a, (d,), t = start_duel(rules={"TEAM_HEALTH": True})
+    say(g, d, t, t="revive")                                                  # R with a full bar: nothing to buy
+    g.team_hp[1], d.cash = 20, C.TEAM_HEAL_COST - 1
+    say(g, d, t, t="revive")
+    assert [e["why"] for e in events(g, "deny")] == ["full", "cash"]
+    d.cash = 500
+    say(g, d, t, t="revive")
+    assert g.team_hp[1] == 20 + C.TEAM_HEAL_AMOUNT and d.cash == 500 - C.TEAM_HEAL_COST
+    assert g.heal_cost(1) == C.TEAM_HEAL_COST + C.TEAM_HEAL_COST_STEP        # the next pack costs more
+    say(g, d, t, t="revive")                                                  # a pack can top the bar up
+    assert g.team_hp[1] == 100 and d.cash == 500 - 2 * C.TEAM_HEAL_COST - C.TEAM_HEAL_COST_STEP
+    assert [(e["hp"], e["cost"]) for e in events(g, "heal")] == [(50, 80), (30, 120)] and not events(g, "revive")
+    a.alive = False                                                           # the round ends: prices start over
+    t = run(g, t, C.ROUND_OVER_TIME + 0.2)
+    assert g.state == "count" and g.heal_cost(1) == C.TEAM_HEAL_COST
+    # All your cash: at a fixed rate, and only what the bar is missing.
+    g, a, (d,), t = start_duel(rules={"TEAM_HEALTH": True, "TEAM_HEAL_MODE": "cash", "TEAM_HEAL_PER_CASH": 0.5})
+    g.team_hp[1], d.cash = 40, 30
+    say(g, d, t, t="revive")
+    assert g.team_hp[1] == 55 and d.cash == 0
+    d.cash = 300
+    say(g, d, t, t="revive")
+    assert g.team_hp[1] == 100 and d.cash == 300 - 90
+    # With shared team cash, the team's pot pays.
+    g, a, (d,), t = start_duel(rules={"TEAM_HEALTH": True, "TEAM_CASH": True})
+    g.team_hp[1], g.team_cash[1] = 10, 100
+    say(g, d, t, t="revive")
+    assert g.team_hp[1] == 10 + C.TEAM_HEAL_AMOUNT and g.team_cash[1] == 100 - C.TEAM_HEAL_COST
+
+
+def test_with_team_health_the_time_limit_goes_to_more_of_the_bar_left():
+    g = Game(seed=7, rules=Rules({"TEAM_HEALTH": True, "ROUND_TIME_LIMIT": 20}))
+    g.bots_each = 0
+    t = 100.0
+    g.add_player("A", 0, t)
+    g.add_player("D1", 1, t)
+    g.add_player("D2", 1, t)
+    t = play_now(g, t)
+    g.team_hp = [90.0, 100.0]       # RED: 90 of 100, BLUE: 100 of 200. BLUE has more standing, RED more left
+    t = run(g, t, 20.1)
+    assert g.state == "over" and g.last_winner == 0
+
+
+def test_bots_play_team_health_matches_and_buy_health():
+    g = Game(seed=11, rules=Rules({"TEAM_HEALTH": True}))
+    g.bots_play_alone = True
+    g.bots_each = 3
+    g._sync_bots(0.0)
+    g.start_match(0.0)
+    t, seen = 0.0, collections.Counter()
+    while g.round_no < 4 and t < 600:
+        g.tick(t, t + 1 / 60)
+        t += 1 / 60
+        for e in g.events:
+            seen[e["k"]] += 1
+            if e["k"] == "hit":
+                assert e["bar"]                                             # every hit drains a bar
+                seen["wipe"] += e["ko"]
+        g.events.clear()
+    assert g.round_no >= 4 and seen["wipe"] >= 2 and seen["heal"] >= 2 and not seen["revive"], dict(seen)
+
+
+# ---------------------------------------------------------------- health regeneration
+
+def test_health_regenerates_after_a_pause_up_to_a_limit():
+    g, a, (d,), t = start_duel(rules={"HEALTH_REGEN": True, "HEALTH_REGEN_RATE": 10, "HEALTH_REGEN_DELAY": 2,
+                                      "HEALTH_REGEN_CAP_SHARE": 60, "HEALTH_REGEN_STILL": "off"})
+    d.hp, d.hurt_at = 20.0, t
+    t = run(g, t, 1.9)
+    assert d.hp == 20                                                       # still in the pause
+    t = run(g, t, 1.0)
+    assert 27 < d.hp < 31                                                   # ~0.9 s at 10 per second
+    t = run(g, t, 10)
+    assert d.hp == 60                                                       # it stops at 60% of 100
+    d.hp = 80.0
+    t = run(g, t, 3)
+    assert d.hp == 80                                                       # and never takes health away
+    d.hp = 60.0                                                             # at the limit: nothing to regain yet
+    throw(g, a, d, t, power=0.0)                                            # a hit starts the pause again
+    t = run(g, t, 1.0)
+    hit = events(g, "hit")[0]
+    after = d.hp
+    assert after == 60 - hit["dmg"] and t - d.hurt_at < 2
+    t = run(g, t, d.hurt_at + 1.9 - t)
+    assert d.hp == after
+    t = run(g, t, 1.0)
+    assert d.hp > after
+    # A fixed amount instead, regeneration with no pause, and a player's own (faster) regeneration.
+    g, a, (d,), t = start_duel(rules={"HEALTH_REGEN": True, "HEALTH_REGEN_CAP_MODE": "amount", "HEALTH_REGEN_CAP_AMOUNT": 35,
+                                      "HEALTH_REGEN_DELAY": 0, "HEALTH_REGEN_STILL": "off"},
+                               players={"D0": {"HEALTH_REGEN_RATE": 50}})
+    a.hp = d.hp = 10.0
+    t = run(g, t, 1.0)
+    assert d.hp == 35 and abs(a.hp - (10 + C.HEALTH_REGEN_RATE)) < 0.1
+    # Off (the default): nothing comes back; with team health, players' own regeneration does nothing.
+    for rules in ({}, {"HEALTH_REGEN": True, "TEAM_HEALTH": True}):
+        g, a, (d,), t = start_duel(rules=rules)
+        d.hp = 10.0
+        t = run(g, t, 8.0)
+        assert d.hp == 10, rules
+
+
+def test_the_team_bar_regenerates_once_nobody_on_the_team_was_hit_for_a_while():
+    g, a, (d1, d2), t = start_duel(defenders=2, rules={"TEAM_HEALTH": True, "TEAM_REGEN": True, "TEAM_REGEN_RATE": 20,
+                                                       "TEAM_REGEN_DELAY": 1, "TEAM_REGEN_CAP_MODE": "amount",
+                                                       "TEAM_REGEN_CAP_AMOUNT": 150, "TEAM_REGEN_STILL": "off"})
+    g.team_hp[1], g.team_hurt_at[1] = 100.0, t
+    t = run(g, t, 0.9)
+    assert g.team_hp[1] == 100                                              # still in the pause
+    t = run(g, t, 0.6)
+    assert 105 < g.team_hp[1] < 112                                         # ~0.5 s at 20 per second
+    t = run(g, t, 5)
+    assert g.team_hp[1] == 150                                              # up to the fixed 150 of the 200 bar
+    throw(g, a, d2, t)                                                      # a hit on either of them pauses it
+    t = run(g, t + C.CHARGE_TIME, 0.6)
+    hit = events(g, "hit")[0]
+    assert hit["bar"] and g.team_hp[1] == 150 - hit["dmg"] and t - g.team_hurt_at[1] < 1
+    t = run(g, t, g.team_hurt_at[1] + 0.9 - t)
+    assert g.team_hp[1] == 150 - hit["dmg"]
+    t = run(g, t, 1.0)
+    assert g.team_hp[1] > 150 - hit["dmg"]
+    # A share of the bar; and a team that fell stays down.
+    g, a, (d,), t = start_duel(rules={"TEAM_HEALTH": True, "TEAM_REGEN": True, "TEAM_REGEN_DELAY": 0,
+                                      "TEAM_REGEN_STILL": "off"})
+    g.team_hp[1] = 10.0
+    t = run(g, t, 20)
+    assert g.team_hp[1] == C.TEAM_REGEN_CAP_SHARE                           # 50% of a bar of 100
+    g, a, (d,), t = start_duel(rules={"TEAM_HEALTH": True})                 # off (the default): nothing comes back
+    g.team_hp[1] = 10.0
+    t = run(g, t, 8.0)
+    assert g.team_hp[1] == 10
+
+
+def _report(g, p, now, dz=0.0):
+    """`p`'s browser reports where they are, moved `dz` along z (it does this 30 times a second)."""
+    g.handle(p.id, {"t": "in", "x": p.x, "z": p.z + dz, "tp": p.tp, "wt": now}, now)
+
+
+def _gained(g, players, t, seconds, walking=()):
+    """Health gained over `seconds` (the first player's own, or with team health their team's bar)
+    while the players in `walking` walk back and forth, reporting every step, and the rest stand still."""
+    first = players[0]
+    health = lambda: g.team_hp[first.team] if g.rules.TEAM_HEALTH else first.hp   # noqa: E731
+
+    def step(now):
+        for p in walking:
+            _report(g, p, now, 0.04 if int(now * 4) % 2 else -0.04)     # about 5 m/s
+    before = health()
+    t = run(g, t, seconds, step if walking else None)
+    return health() - before, t
+
+
+def test_standing_still_makes_regeneration_faster_or_is_needed():
+    base = {"HEALTH_REGEN": True, "HEALTH_REGEN_DELAY": 0, "HEALTH_REGEN_RATE": 2, "HEALTH_REGEN_STILL_TIME": 1,
+            "HEALTH_REGEN_STILL_EXTRA": 8, "HEALTH_REGEN_CAP_SHARE": 100}
+    near = lambda got, want: abs(got - want) < 0.4      # noqa: E731
+    g, a, (d,), t = start_duel(rules=base)              # "makes it faster", with extra health per second
+    d.hp = 20.0
+    got, t = _gained(g, [d], t, 1.0)
+    assert near(got, 10), got                           # standing since the round began: 2 + 8 per second
+    got, t = _gained(g, [d], t, 1.0, walking=[d])
+    assert near(got, 2), got                            # walking: the normal 2
+    got, t = _gained(g, [d], t, 2.0)
+    assert near(got, 2 + 10), got                       # standing again: 1 s to count, then 10 per second
+    g, a, (d,), t = start_duel(rules={**base, "HEALTH_REGEN_STILL_BOOST": "percent", "HEALTH_REGEN_STILL_PERCENT": 200})
+    d.hp = 20.0
+    got, t = _gained(g, [d], t, 1.0)
+    assert near(got, 6), got                            # +200%: three times 2
+    # "Is needed for it": nothing while walking. A dodge's dash isn't walking, as long as the key is let
+    # go before the dash ends; walking on after it is.
+    g, a, (d,), t = start_duel(rules={**base, "HEALTH_REGEN_STILL": "only"})
+    d.hp = 10.0
+    got, t = _gained(g, [d], t, 1.0, walking=[d])
+    assert got == 0, got
+    z0, t0 = d.z, t                                     # creeping (0.25 m/s, a slow charge-walk) is moving too
+    t = run(g, t, 1.5, lambda now: g.handle(d.id, {"t": "in", "x": d.x, "z": z0 + 0.25 * (now - t0), "tp": d.tp,
+                                                  "wt": now}, now))
+    assert d.hp == 10, d.hp
+    got, t = _gained(g, [d], t, 2.0)
+    assert 9.6 < got < 11.2, got                        # 1 s to count (from the last 2 cm crept), then 10 per second
+    g.start_action(d, "dodge", t, t)
+    dash_end = t + C.DODGE_DASH_TIME
+    t = run(g, t, C.DODGE_DASH_TIME, lambda now: _report(g, d, now, 0.12))     # the dash: 14 m/s
+    got, t = _gained(g, [d], t, 1.0)
+    assert near(got, 10), got                           # no restart: still 10 per second
+    assert t > dash_end
+    g.start_action(d, "dodge", t, t)
+    t = run(g, t, C.DODGE_DASH_TIME, lambda now: _report(g, d, now, 0.12))
+    got, t = _gained(g, [d], t, 0.5, walking=[d])       # the direction still held after the dash: walking
+    assert got < 1, got                                 # (the report right after a dash still carries its end)
+    got, t = _gained(g, [d], t, 0.9)
+    assert got == 0, got                                # the second it takes to count again
+    got, t = _gained(g, [d], t, 1.0)
+    assert got > 7, got
+    # "Doesn't matter": the same speed either way.
+    g, a, (d,), t = start_duel(rules={**base, "HEALTH_REGEN_STILL": "off"})
+    d.hp = 20.0
+    got, t = _gained(g, [d], t, 1.0)
+    assert near(got, 2), got
+
+
+def test_each_teammate_standing_still_adds_to_the_team_bars_regeneration():
+    base = {"TEAM_HEALTH": True, "TEAM_REGEN": True, "TEAM_REGEN_DELAY": 0, "TEAM_REGEN_RATE": 2,
+            "TEAM_REGEN_STILL_TIME": 1, "TEAM_REGEN_STILL_EXTRA": 3, "TEAM_REGEN_CAP_SHARE": 100}
+    near = lambda got, want: abs(got - want) < 0.4      # noqa: E731
+    g, a, (d1, d2), t = start_duel(defenders=2, rules=base)
+    g.team_hp[1] = 20.0
+    got, t = _gained(g, [d1, d2], t, 1.0)
+    assert near(got, 2 + 2 * 3), got                    # both standing: +3 each
+    got, t = _gained(g, [d1, d2], t, 1.0, walking=[d1])
+    assert near(got, 2 + 3), got                        # one walking
+    got, t = _gained(g, [d1, d2], t, 1.0, walking=[d1, d2])
+    assert near(got, 2), got                            # both walking: the bar's normal speed
+    g, a, (d1, d2), t = start_duel(defenders=2, rules={**base, "TEAM_REGEN_STILL": "only"})
+    g.team_hp[1] = 20.0
+    got, t = _gained(g, [d1, d2], t, 1.0, walking=[d1, d2])
+    assert got == 0, got                                # needed: nobody standing, nothing comes back
+    got, t = _gained(g, [d1, d2], t, 2.0, walking=[d2])
+    assert near(got, 5), got                            # d1 counts after 1 s: then 2 + 3 per second
+    g, a, (d1, d2), t = start_duel(defenders=2, rules={**base, "TEAM_REGEN_STILL_BOOST": "percent",
+                                                       "TEAM_REGEN_STILL_PERCENT": 50})
+    g.team_hp[1] = 20.0
+    got, t = _gained(g, [d1, d2], t, 1.0)
+    assert near(got, 4), got                            # +50% each: 2 x (1 + 2 x 0.5)
+
+
+def test_hurt_bots_stand_still_to_regenerate():
+    for stands in (True, False):
+        g = Game(seed=4, rules=Rules({"HEALTH_REGEN": True, "BOTS_RED": 2, "BOTS_BLUE": 1,
+                                      "BOT_STAND_TO_REGEN": stands}))
+        g.bots_play_alone = True
+        g._sync_bots(0.0)
+        g.start_match(0.0)
+        t = 0.0
+        while g.state != "play":
+            g.tick(t, t + DT)
+            t += DT
+        hurt, fine = sorted((p for p in g.players.values() if p.team == 0), key=lambda p: p.slot)
+        enemy = next(p for p in g.players.values() if p.team == 1)
+        enemy.brain.next_throw = 1e9                    # nothing comes at them
+        hurt.hp = 20.0
+        start = [(p.x, p.z) for p in (hurt, fine)]
+        t = run(g, t, 4.0)
+        moved = [math.hypot(p.x - x, p.z - z) > 0.05 for p, (x, z) in zip((hurt, fine), start)]
+        if stands:                                      # it stays put, and regains at the standing-still speed
+            assert moved == [False, True] and hurt.hp > 20 + 4 * C.HEALTH_REGEN_RATE, (moved, hurt.hp)
+        else:
+            assert moved == [True, True], moved
+
+
+# ---------------------------------------------------------------- each player's own settings
+
+def test_a_player_can_have_their_own_settings():
+    g, host, (guest,), t = lobby()
+    say(g, guest, t, t="rules", player="Guest0", set={"MAX_HP": 400})       # only the host
+    assert events(g, "deny")[0]["why"] == "host" and not g.rules.players
+    say(g, host, t, t="rules", player="Guest0", set={"MAX_HP": 150, "THROW_SPEED_MAX": 40, "GRAVITY": 1, "WALK_SPEED": "fast"})
+    assert g.rules.players == {"Guest0": {"MAX_HP": 150, "THROW_SPEED_MAX": 40.0}}     # gravity is everyone's
+    assert guest.hp == 150 and host.hp == C.MAX_HP and host.rules is g.rules             # the lobby: at once
+    assert "Guest0 › Health" in events(g, "rules")[-1]["names"]
+    t = play_now(g, t)
+    aim_at(guest, host)
+    g.start_charge(guest, t, t)
+    ball = g.throw(guest, t + C.CHARGE_TIME, t + C.CHARGE_TIME)
+    assert abs(ball.speed - 40) < 1e-6                                        # they play by their own numbers
+    say(g, host, t, t="rules", player="Guest0", set={"MAX_HP": None, "CATCH_WINDOW": 0.5})
+    assert guest.rules.MAX_HP == 150 and sorted(g.pending_changes()) == ["Guest0: CATCH_WINDOW", "Guest0: MAX_HP"]
+    host.alive = False                                                        # mid-match: from the next round
+    t = run(g, t, C.ROUND_OVER_TIME + 0.2)
+    assert g.state == "count" and guest.hp == C.MAX_HP and guest.rules.actions["catch"].window == 0.5
+    say(g, host, t, t="rules", player="Guest0", set={"CATCH_WINDOW": C.CATCH_WINDOW})   # = everyone's: no own setting
+    assert g.next_rules.players == {"Guest0": {"THROW_SPEED_MAX": 40.0}}
+    g.remove_player(guest.id, t)
+    back = g.add_player("Guest0", None, t)                                    # settings go by name: they keep them
+    assert back.rules.THROW_SPEED_MAX == 40
+    # Their own value wins over an ordered pair: a tap speed above everyone's full speed lifts their full speed.
+    r = Rules()
+    r.update_player("Quick", {"THROW_SPEED_MIN": 45})
+    assert r.for_player("Quick").THROW_SPEED_MAX == 45 and r.THROW_SPEED_MAX == C.THROW_SPEED_MAX
+
+
+def test_own_settings_change_hits_and_defences():
+    # The thrower's own damage numbers count for the balls they throw...
+    g, a, (d,), t = start_duel(players={"A": {"DAMAGE_MIN": 70, "DAMAGE_MAX": 70}})
+    throw(g, a, d, t, power=0.0)
+    run(g, t, 2.0)
+    assert events(g, "hit")[0]["dmg"] == 70 and d.hp == C.MAX_HP - 70
+    # ...and the defender's own catch window: 0.45 s early fails with the default, works with their own 0.6 s.
+    tc = contact_time(distance=20.0)
+    for own, caught in (({}, False), ({"D0": {"CATCH_WINDOW": 0.6}}, True)):
+        g, a, (d,), t = start_duel(distance=20.0, players=own)
+        throw(g, a, d, t)
+        pressed = []
+        run(g, t + C.CHARGE_TIME, 2.0, lambda now: pressed or now < tc - 0.45 or pressed.append(
+            g.start_action(d, "catch", now, now)))
+        assert bool(events(g, "catch")) == caught, own
+
+
+def test_bots_keep_their_names_and_own_settings_by_team_slot():
+    g, host, _, t = lobby(guests=0)
+    say(g, host, t, t="rules", set={"BOTS_RED": 3, "BOTS_BLUE": 2})
+
+    def names(team):
+        return [p.name for p in sorted(g.players.values(), key=lambda p: p.slot) if p.bot and p.team == team]
+    assert names(0) == ["Bot Ace", "Bot Comet", "Bot Echo"] and names(1) == ["Bot Blitz", "Bot Dash"]
+    say(g, host, t, t="rules", player="Bot Comet", set={"BOT_SKILL": "hard", "MAX_HP": 250})
+    comet = next(p for p in g.players.values() if p.name == "Bot Comet")
+    assert comet.hp == 250 and comet.rules.bot_profile(comet.rules.BOT_SKILL) == g.rules.bot_profile("hard")
+    say(g, host, t, t="rules", set={"BOTS_RED": 1})                         # the last slots go first...
+    assert names(0) == ["Bot Ace"]
+    say(g, host, t, t="rules", set={"BOTS_RED": 2})                         # ...and the slot brings its bot back
+    comet = next(p for p in g.players.values() if p.name == "Bot Comet")
+    assert names(0) == ["Bot Ace", "Bot Comet"] and comet.hp == 250 and comet.rules.BOT_SKILL == "hard"
+
+
+def test_a_bot_plays_by_its_own_profile():
+    """A bot whose own profile never reacts never defends, while the others still do."""
+    g = Game(seed=5, rules=Rules({"BOTS_RED": 2, "BOTS_BLUE": 2}, {"Bot Blitz": {"BOT_NORMAL_REACT": 0}}))
+    g.bots_play_alone = True
+    g._sync_bots(0.0)
+    g.start_match(0.0)
+    t = 0.0
+    while t < 150:
+        g.tick(t, t + 1 / 60)
+        t += 1 / 60
+        g.events.clear()
+    stats = {p.name: p.stats["catches"] + p.stats["deflects"] + p.stats["perfects"] for p in g.players.values()}
+    assert stats["Bot Blitz"] == 0 and stats["Bot Dash"] > 0, stats
+
+
+def test_a_settings_file_replaces_the_whole_setup():
+    g, host, (guest,), t = lobby()
+    say(g, host, t, t="rules", set={"GRAVITY": 2, "WALK_SPEED": 9})
+    say(g, host, t, t="rules", player="Guest0", set={"MAX_HP": 150})
+    say(g, guest, t, t="rules", **{"import": {"rules": {"GRAVITY": 9}}})    # only the host
+    assert g.rules.GRAVITY == 2
+    file = {"rules": {"GRAVITY": 3, "TEAM_HEALTH": True, "BALL_COLOR_RED": "#ABCDEF", "MAX_HP": "lots", "NOT_A_RULE": 1},
+            "players": {"Bot Ace": {"BOT_SKILL": "hard", "GRAVITY": 0}, "Host": {"WALK_SPEED": 12}, "Nobody": "x"}}
+    say(g, host, t, t="rules", **{"import": file})
+    assert g.rules.GRAVITY == 3 and g.rules.WALK_SPEED == C.WALK_SPEED     # what the file leaves out: the default
+    assert g.rules.TEAM_HEALTH and g.rules.BALL_COLOR_RED == "#abcdef" and g.rules.MAX_HP == C.MAX_HP
+    assert g.rules.players == {"Bot Ace": {"BOT_SKILL": "hard"}, "Host": {"WALK_SPEED": 12.0}}   # Guest0's are gone
+    assert guest.hp == C.MAX_HP and host.rules.WALK_SPEED == 12
+    say(g, host, t, t="rules", player="Host", replace={"CATCH_WINDOW": 0.4})   # one player's file: theirs replaced
+    assert g.rules.players["Host"] == {"CATCH_WINDOW": 0.4}
+    t = play_now(g, t)
+    say(g, host, t, t="rules", **{"import": {"rules": {}}})                 # mid-match: from the next round
+    assert g.rules.GRAVITY == 3 and g.next_rules.GRAVITY == C.GRAVITY and not g.next_rules.players
+    say(g, host, t, t="rules", discard=True)
+    say(g, host, t, t="rules", reset=True)                                    # reset: own settings go too
+    assert g.next_rules.values() == DEFAULTS and not g.next_rules.players
+
+
+def test_ball_colours_are_rules():
+    r = Rules()
+    assert (r.BALL_COLOR_RED, r.BALL_COLOR_RED_BOTS, r.BALL_COLOR_BLUE, r.BALL_COLOR_BLUE_BOTS) == (
+        C.BALL_COLOR_RED, C.BALL_COLOR_RED_BOTS, C.BALL_COLOR_BLUE, C.BALL_COLOR_BLUE_BOTS)
+    assert r.update({"BALL_COLOR_RED": "#00FF7F", "BALL_COLOR_BLUE": "blue", "BALL_COLOR_BLUE_BOTS": "#12345",
+                     "BALL_COLOR_RED_BOTS": 0xFF0000}) == ["BALL_COLOR_RED"]
+    assert r.BALL_COLOR_RED == "#00ff7f"
+    # A person can have their own; so can a bot. Which one a player uses is the browser's business.
+    r.update_player("Alice", {"BALL_COLOR_RED": "#123456"})
+    assert r.for_player("Alice").BALL_COLOR_RED == "#123456" and r.BALL_COLOR_RED == "#00ff7f"
+    who = {p.key: (p.who, p.team) for p in PARAMS if p.kind == "color"}
+    assert who == {"BALL_COLOR_RED": ("people", 0), "BALL_COLOR_RED_BOTS": ("bots", 0),
+                   "BALL_COLOR_BLUE": ("people", 1), "BALL_COLOR_BLUE_BOTS": ("bots", 1)}
 
 
 def run_all():

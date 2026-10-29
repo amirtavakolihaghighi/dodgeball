@@ -9,12 +9,13 @@
 import { Net } from './net.js';
 import { Input } from './input.js';
 import { World } from './world.js';
-import { Hud, TEAM, TEAM_CLASS } from './hud.js';
+import { Hud, TEAM, TEAM_CLASS, regenLimit } from './hud.js';
 import { Sfx } from './sfx.js';
 import { Lobby } from './lobby.js';
 import { RulesEditor } from './rules_ui.js';
 import { launchVelocity } from './physics.js';
 import { Diag } from './diag.js';
+import * as settingsFile from './settings_file.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -24,7 +25,11 @@ const ACT_CODE = { dodge: 1, catch: 2, deflect: 3 };
 const DENY = {
   stamina: 'Not enough stamina', busy: 'Still recovering', noball: 'No ball yet',
   cash: 'Not enough cash', nobody: 'Nobody to revive', round: 'Not now', host: 'Only the host can do that',
+  full: 'Team health is already full',
 };
+// Each team's ball colours, people's and bots' (rules; a player may have their own). Deflected
+// balls show their rally colour instead (world.js).
+const BALL_COLOR_KEYS = [['BALL_COLOR_RED', 'BALL_COLOR_RED_BOTS'], ['BALL_COLOR_BLUE', 'BALL_COLOR_BLUE_BOTS']];
 // Must match sim.py (HAND_FWD, HAND_RIGHT, HAND_UP): balls leave from the right hand.
 const HAND_FWD = 0.3;
 const HAND_RIGHT = 0.32;
@@ -51,7 +56,10 @@ const editor = new RulesEditor(net, () => net.latest?.r.s);
 const lobby = new Lobby(net, {
   onStart: () => { sfx.unlock(); input.lock(); },     // the host's click starts the match and enters it
   openRules: () => editor.open(),
+  openPlayer: (who) => editor.openFor(who),          // one player's (or bot's) own settings
+  exportSettings, importSettings,
 });
+editor.onMessage = (text, cls) => hud.popup(text, cls);
 
 const settings = { sens: 1, volume: 0.6, ring: true, follow: true };
 try {
@@ -64,7 +72,8 @@ sfx.setVolume(settings.volume);
 
 let cfg = null;
 let isHost = false;
-const rules = { defaults: null, active: null, next: null, rv: -1 };     // the lobby's rules, from the server
+// The lobby's rules from the server, live and waiting for the next round, and each player's own settings.
+const rules = { defaults: null, active: null, next: null, rv: -1, players: {}, nextPlayers: null };
 let lastSync = 0;
 let myId = null;
 let myTeam = 0;
@@ -82,6 +91,8 @@ const local = {
   x: 0, z: 0, yaw: Math.PI / 2, pitch: 0, tp: -1,
   action: null, actionAt: -9, busyUntil: 0, dashUntil: 0, dashDir: [0, 0],
   charging: false, chargeAt: 0, throwAt: -9, lastSend: 0, handled: null, ignoredAt: -9,
+  // Standing still, and the latest hits on me and my team: for the regeneration hint (the server decides).
+  stillSince: 0, stillX: 0, stillZ: 0, hurtAt: -99, teamHurtAt: -99,
 };
 // The host's spectator camera: flies freely, or rides behind a player (follow = their id).
 const spec = { x: 0, y: 9, z: -20, yaw: 0, pitch: -0.4, follow: null };
@@ -122,13 +133,20 @@ function applyRules(m) {
   rules.active = m.rules;
   rules.next = m.next;
   rules.rv = m.rv;
+  rules.players = m.players ?? {};
+  rules.nextPlayers = m.nextPlayers ?? null;
   net.interpDelay = cfg.interpDelay;
   net.gravity = cfg.gravity;
   world.setBallRadius(cfg.ballRadius);
   courtKey = '';          // the centre strip may have changed: redraw the court
-  editor.setServer(m.rules, m.next);
+  editor.setServer(m.rules, m.next, rules.players, rules.nextPlayers);
   lobby.dirty();
 }
+
+/** A rule's value for one player: their own setting, or everyone's. */
+const ownValue = (name, key) => rules.players[name]?.[key] ?? rules.active[key];
+/** The colour of a player's balls (p: a snapshot player). */
+const ballColorOf = (p) => (p && p.team >= 0 ? ownValue(p.name, BALL_COLOR_KEYS[p.team][p.bot ? 1 : 0]) : null);
 
 net.on('welcome', (m) => {
   myId = m.id;
@@ -233,6 +251,36 @@ async function downloadAllLogs() {
   } finally {
     button.disabled = false;
   }
+}
+
+/** Anyone: save the whole setup (every rule and each player's own settings) as a file. What waits
+ *  for the next round counts: it's what the host chose. */
+function exportSettings() {
+  if (!rules.active) return;
+  const name = settingsFile.setupFileName();
+  settingsFile.download(name, settingsFile.setupFile(rules.next ?? rules.active, rules.nextPlayers ?? rules.players));
+  hud.popup(`Settings saved to your Downloads folder: ${name}`, 'good');
+}
+
+/** The host: load a settings file. It replaces the whole setup: at once in the lobby, from the
+ *  next round during a match. */
+async function importSettings() {
+  const file = await settingsFile.pickFile();
+  if (file) importSetupText(file.text, file.name);
+}
+
+function importSetupText(text, fileName = 'the file') {
+  let data;
+  try {
+    data = settingsFile.readSetup(text, new Set(Object.keys(rules.defaults)));
+  } catch (e) {
+    hud.popup(e.message, 'bad');
+    return false;
+  }
+  net.send({ t: 'rules', import: data });
+  const now = ['lobby', 'wait'].includes(net.latest?.r.s);
+  hud.popup(`Loaded ${fileName}${now ? '' : ': it applies from the next round'}`, 'good');
+  return true;
 }
 
 /** The device, for the log: what frame rate and timing depend on. */
@@ -430,6 +478,9 @@ function syncSelf() {
     local.dashUntil = 0;
     local.busyUntil = 0;
     local.charging = false;
+    local.stillSince = local.hurtAt = clock();      // the server starts both over at a (re)spawn
+    local.stillX = me.x;
+    local.stillZ = me.z;
   }
   if (me.team !== myTeam || !document.title.startsWith(myName)) {
     if (me.team === -1 && myTeam !== -1) startSpectating();
@@ -503,6 +554,33 @@ function moveLocal(dt, t) {
   }
   [local.x, local.z] = clampToHalf(myTeam, local.x + vx * dt, local.z + vz * dt);
 }
+
+/** Standing still (health regeneration), judged like the server does: moving more than 2 cm from
+ *  where you stopped is walking; a dodge's dash isn't. Only for the hint on the HUD. */
+function trackStill(t) {
+  if (Math.hypot(local.x - local.stillX, local.z - local.stillZ) > 0.02) {
+    if (t > local.dashUntil + 0.06) local.stillSince = t;
+    local.stillX = local.x;
+    local.stillZ = local.z;
+  }
+}
+
+/** What to say about standing still and regeneration, or null: only when standing still matters,
+ *  there's health to regain and the pause after a hit is over. bar: my team's [health, size]. */
+function regenHint(t, bar) {
+  const r = bar ? cfg.teamRegen : cfg.regen;
+  if (!r?.on || r.still === 'off' || !me?.alive || (!bar && cfg.teamHealth)) return null;
+  const [hp, full] = bar ?? [me.hp, cfg.maxHp];
+  if (hp >= regenLimit(r, full) - 0.5 || t - (bar ? local.teamHurtAt : local.hurtAt) < r.delay) return null;
+  const counts = t - local.stillSince >= r.stillTime;
+  return [REGEN_HINTS[`${bar ? 'team' : 'own'}.${r.still}.${counts ? 'still' : 'moving'}`], counts ? 'on' : ''];
+}
+const REGEN_HINTS = {
+  'own.faster.moving': 'Stand still to regenerate faster', 'own.faster.still': 'Standing still: regenerating faster',
+  'own.only.moving': 'Stand still to regenerate', 'own.only.still': 'Standing still: regenerating',
+  'team.faster.moving': "Stand still to speed up the team's bar", 'team.faster.still': "Standing still: speeding up the team's bar",
+  'team.only.moving': "Stand still: the team's bar only fills while someone stands", 'team.only.still': "Standing still: filling the team's bar",
+};
 
 /** Over the right shoulder of someone at (x, z), like Fortnite: the crosshair is the aim. */
 function shoulderCamera(x, z, yaw, pitch) {
@@ -690,6 +768,8 @@ function displayBalls(viewMe) {
       z += oz * w;
     }
     b.pos = { x, y: b.y, z };
+    // The thrower's colour (theirs, or their team's people's or bots'); a thrower who left: their team's.
+    b.color = ballColorOf(net.latest.players.get(b.owner)) ?? rules.active[BALL_COLOR_KEYS[b.team]?.[0]];
     out.push(b);
   }
   return out;
@@ -787,24 +867,36 @@ function onEvent(e) {
         sfx.throw(e.power, volumeFor(e.p) * 0.6);
       }
       break;
-    case 'hit':
+    case 'hit': {
       world.man(e.p)?.flinch();
       if (pos) world.burst(pos.x, 1.2, pos.z, 0xffffff, 1.8);
+      if (mine) local.hurtAt = clock();               // regeneration's pause starts over
+      if (e.bar && net.latest?.players.get(e.p)?.team === myTeam) local.teamHurtAt = clock();
       if (mine) {
         hud.damage();
         // Why it got through: your press had just ended, or you had just stopped another ball.
         const why = e.early ? `TOO EARLY (${e.early.toFixed(2)} s)  ` : e.second ? 'SECOND BALL  ' : '';
-        hud.popup(`${why}${e.ko ? `KNOCKED OUT  −${e.dmg}` : `−${e.dmg} HP`}`, 'bad');
+        // e.bar: team health, it came off the team's bar (and a knockout takes the whole team down)
+        const out = e.bar ? `YOUR TEAM IS OUT  −${e.dmg}` : `KNOCKED OUT  −${e.dmg}`;
+        hud.popup(`${why}${e.ko ? out : `−${e.dmg} ${e.bar ? 'team health' : 'HP'}`}`, 'bad');
         sfx.hit();
         if (e.ko) sfx.ko();
       } else if (e.by === myId) {
-        hud.popup(`${e.bank ? 'RICOCHET ' : ''}${e.ko ? 'KNOCKOUT' : 'HIT'}  +${e.cash}`, 'good');
+        hud.popup(`${e.bank ? 'RICOCHET ' : ''}${e.ko ? (e.bar ? 'TEAM KNOCKOUT' : 'KNOCKOUT') : 'HIT'}  +${e.cash}`, 'good');
         sfx.hit(0.8);
       } else sfx.hit(volumeFor(e.p) * 0.5);
+      const team = net.latest?.players.get(e.p)?.team ?? 0;
+      const victim = e.ko && e.bar ? [`${TEAM[team]}, the whole team`, TEAM_CLASS[team]] : who(e.p);
       hud.feed([
-        who(e.by), [e.ko ? ' knocked out ' : ' hit '], who(e.p), [`  ${Math.round(e.speed)} m/s, ${e.dmg} dmg`],
+        who(e.by), [e.ko ? ' knocked out ' : ' hit '], victim, [`  ${Math.round(e.speed)} m/s, ${e.dmg} dmg`],
         [e.bank ? '  ricochet!' : '', 'gold'], [e.rally ? `  rally ×${e.rally}` : '', 'gold'],
       ]);
+      break;
+    }
+    case 'heal':          // team health: someone spent cash on health for their team's bar
+      hud.feed([who(e.p), [` bought +${e.hp} team health (${e.cost} cash)`]]);
+      if (mine) hud.popup(`+${e.hp} TEAM HEALTH  −${e.cost} cash`, 'good');
+      if (mine || e.team === myTeam) sfx.revive();
       break;
     case 'sidestep':      // it missed: on my screen I had already stepped out of its way
       if (mine) hud.popup('SIDESTEPPED', 'dim');
@@ -907,12 +999,13 @@ function playerStates(t) {
         id: p.id, team: me.team, isMe: true, x: local.x, z: local.z, yaw: local.yaw, alive: me.alive,
         charging: local.charging, charge: local.charging ? chargePower(t) : 0,
         act: local.action && actAge < 0.4 ? ACT_CODE[local.action] : 0, actAge,
-        hasBall: hasBall(), invuln: me.invuln,
+        hasBall: hasBall(), invuln: me.invuln, ballColor: ballColorOf(me),
       });
     } else {
       out.push({
         id: p.id, team: p.team, isMe: false, x: p.x, z: p.z, yaw: p.yaw, alive: p.alive,
         charging: p.charging, charge: p.charge, act: p.act, actAge: p.actAge, hasBall: p.hasBall, invuln: p.invuln,
+        ballColor: ballColorOf(p),
       });
     }
   }
@@ -923,6 +1016,7 @@ function updateHud(t) {
   const r = net.latest.r;
   const players = net.latest.players;
   hud.setRound(r, players, myId);
+  hud.setTeamHealth(r.th, cfg.teamRegen);
   if (r.s === 'count') {
     const n = Math.ceil(r.left);
     if (n !== lastCount && n > 0) {
@@ -963,7 +1057,7 @@ function updateHud(t) {
     const tags = [];
     for (const p of view.players.values()) {
       const s = p.alive && p.team >= 0 ? world.project(p.x, 2.2, p.z) : null;
-      if (s && s.onScreen) tags.push({ id: p.id, name: p.name, team: p.team, x: s.x, y: s.y, hp: (100 * p.hp) / cfg.maxHp, stamina: (100 * p.stamina) / cfg.maxStamina });
+      if (s && s.onScreen) tags.push(tagFor(p, s));
     }
     hud.setTags(tags);
     hud.setAssist(null, '');
@@ -973,24 +1067,31 @@ function updateHud(t) {
   }
 
   const power = local.charging ? chargePower(t) : 0;
-  hud.setVitals(me, cfg, local.charging ? throwCost(power) : 0);
+  const bar = r.th?.[myTeam] ?? null;         // team health: my team's bar, [health, size]
+  hud.setVitals(me, cfg, local.charging ? throwCost(power) : 0, bar);
+  hud.setRegenHint(regenHint(t, bar));
   hud.setThrow({
     alive: me.alive, charging: local.charging, power, cost: throwCost(power),
     speed: throwSpeed(power), damage: damageFor(throwSpeed(power)),
     hasBall: hasBall(), cooldown: Math.max(0, me.cooldown), cooldownMax: cfg.cooldown,
   });
+  // R: a revive's price, or with team health a health pack's (0: all your cash).
   const reviveCost = r.rc?.[myTeam] ?? cfg.reviveCost;
-  const fallen = [...players.values()].some((p) => p.team === myTeam && !p.alive);
+  let canSpend;
+  if (cfg.teamHealth) {
+    canSpend = me.alive && r.s === 'play' && !!bar && bar[0] < bar[1] && (cfg.teamHeal.mode === 'pack' ? me.cash >= reviveCost : me.cash > 0);
+  } else {
+    const fallen = [...players.values()].some((p) => p.team === myTeam && !p.alive);
+    canSpend = me.alive && fallen && me.cash >= reviveCost && r.s === 'play';
+  }
   const active = local.action && t < local.actionAt + cfg.actions[local.action].window ? local.action : null;
-  hud.setActions(me, cfg, reviveCost, me.alive && fallen && me.cash >= reviveCost && r.s === 'play', active);
+  hud.setActions(me, cfg, reviveCost, canSpend, active);
 
   const tags = [];
   for (const p of view.players.values()) {
     if (p.id === myId || !p.alive) continue;
     const s = world.project(p.x, 2.2, p.z);
-    if (s && s.onScreen) {
-      tags.push({ id: p.id, name: p.name, team: p.team, x: s.x, y: s.y, hp: (100 * p.hp) / cfg.maxHp, stamina: (100 * p.stamina) / cfg.maxStamina });
-    }
+    if (s && s.onScreen) tags.push(tagFor(p, s));
   }
   hud.setTags(tags);
 
@@ -1005,6 +1106,12 @@ function updateHud(t) {
   hud.setAssist(marker, kind);
   showThreat();
   hud.setDead(me.alive || r.s !== 'play' ? null : `You're out. A teammate can revive you (${reviveCost} ${cfg.teamCash ? 'team cash' : 'cash'}). Move the mouse to look around.`);
+}
+
+/** A name tag: health and stamina as a share of that player's own (team health: no health, it's the team's). */
+function tagFor(p, s) {
+  const hp = cfg.teamHealth ? null : (100 * p.hp) / ownValue(p.name, 'MAX_HP');
+  return { id: p.id, name: p.name, team: p.team, x: s.x, y: s.y, hp, stamina: (100 * p.stamina) / ownValue(p.name, 'MAX_STAMINA') };
 }
 
 /** Guests: show what the host is doing in the menus, and (if they follow) open the same rules. */
@@ -1071,7 +1178,10 @@ function drawFrame(tMs) {
   if (me) {
     syncSelf();
     if (watching()) moveSpectator(dt);
-    else moveLocal(dt, t);
+    else {
+      moveLocal(dt, t);
+      trackStill(t);
+    }
     // A catch/deflect frees your hands the moment it lands (the server does the same), so a
     // second ball right behind the first can be answered before the confirmation arrives.
     const h = local.handled;
@@ -1111,6 +1221,7 @@ requestAnimationFrame(frame);
 // Handle for automated tests and console poking.
 window.dp = {
   net, input, local, aim, world, lobby, editor, rules, diag, showMenu, spec, followNext,
+  exportSettings, importSetupText, settingsFile, ownValue, ballColorOf,
   get hostView() { return hostView; },
   get me() { return me; }, get threat() { return threat; }, get view() { return view; }, get cfg() { return cfg; }, get isHost() { return isHost; },
 };

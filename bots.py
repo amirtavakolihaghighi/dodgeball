@@ -2,7 +2,8 @@
 
 They wander their half, throw at enemies with some aim error, and react to incoming balls
 with human-like, imperfect timing, so one person can play and tune the game alone. Their
-skill numbers are rules (game.rules.bot_profile), so the host can tune them from the lobby.
+skill numbers are rules (p.rules.bot_profile), so the host can tune them from the lobby, for
+all bots or (a bot's own settings) for one.
 """
 from __future__ import annotations
 
@@ -36,7 +37,7 @@ def update(game, p, now, dt):
         brain.plans.clear()
         brain.release_at = None
         return
-    prof = game.rules.bot_profile(game.bot_skill)
+    prof = p.rules.bot_profile(p.rules.BOT_SKILL)     # its own skill, if the host gave it one
     threat = _defend(game, p, brain, prof, now)
     _throw(game, p, brain, prof, now, threat)
     _walk(game, p, brain, now, dt)
@@ -64,7 +65,7 @@ def time_to_impact(ball, p, rules):
 
 
 def _defend(game, p, brain, prof, now):
-    R = game.rules
+    R = p.rules
     soonest = None
     for ball in game.balls.values():
         if ball.state != "live" or ball.team == p.team or p.id in ball.ignore:
@@ -89,10 +90,10 @@ def _defend(game, p, brain, prof, now):
 
 def _plan(game, p, brain, ball, prof, tti, now):
     rng = game.rng
-    actions = game.rules.actions
+    actions = p.rules.actions
     if rng.random() > prof["react"]:
         return [None, 0.0, True]            # didn't react in time
-    if ball.speed < 20 and tti > 0.55 and rng.random() < 0.35:
+    if ball.speed < 20 and tti > 0.55 and rng.random() < 0.35 and not resting(game, p):
         _sidestep(game, p, brain, ball, now)    # slow ball: just walk out of the way
         return [None, 0.0, True]
     mix = {"dodge": prof["mix_dodge"], "catch": prof["mix_catch"], "deflect": prof["mix_deflect"]}
@@ -111,7 +112,7 @@ def _act(game, p, kind, ball, now, prof):
         if target is None or not target.alive or target.team == p.team:
             target = _pick_target(game, p)
         if target is not None:
-            p.aim = _aim_point(game, p, target, ball.speed * game.rules.DEFLECT_SPEEDUP, prof)
+            p.aim = _aim_point(game, p, target, ball.speed * p.rules.DEFLECT_SPEEDUP, prof)
             p.aim_target = target.id
     elif kind == "dodge":
         px, pz = -ball.vz, ball.vx          # sideways to the ball, toward the roomier side
@@ -124,7 +125,7 @@ def _act(game, p, kind, ball, now, prof):
 
 
 def _throw(game, p, brain, prof, now, threat):
-    R = game.rules
+    R = p.rules
     rng = game.rng
     if brain.release_at is not None:
         if not p.charging:                  # interrupted by a defence or the round ending
@@ -166,13 +167,12 @@ def _pick_target(game, p):
     enemies = [e for e in game.players.values() if e.alive and e.team != p.team]
     if not enemies:
         return None
-    tired, hurt = game.rules.MAX_STAMINA * 0.4, game.rules.MAX_HP * 0.4
     weights = []
     for e in enemies:
         w = 1.0 / (1.0 + math.hypot(e.x - p.x, e.z - p.z) / 10.0)
-        if e.stamina < tired:
+        if e.stamina < e.rules.MAX_STAMINA * 0.4:
             w *= 1.6        # tired players can't defend
-        if e.hp < hurt:
+        if game.health_share(e) < 0.4:
             w *= 1.3
         weights.append(w)
     return game.rng.choices(enemies, weights)[0]
@@ -207,9 +207,16 @@ def _bank_point(game, p, target):
 
 
 def _walk(game, p, brain, now, dt):
-    R = game.rules
+    R = p.rules
     if p.action == "dodge" and now < p.action_start + R.DODGE_DASH_TIME:
         return                              # the dash is moving us
+    if resting(game, p):                    # standing still to regenerate: only turn to face them
+        look = game.players.get(brain.throw_target) if p.charging else None
+        enemies = [e for e in game.players.values() if e.alive and e.team != p.team]
+        look = look or min(enemies, key=lambda e: math.hypot(e.x - p.x, e.z - p.z), default=None)
+        if look is not None:
+            p.yaw = math.atan2(look.x - p.x, look.z - p.z)
+        return
     rng = game.rng
     side = -1.0 if p.team == 0 else 1.0
     goal = brain.goal
@@ -235,6 +242,19 @@ def _walk(game, p, brain, now, dt):
         p.yaw = math.atan2(look.x - p.x, look.z - p.z)
 
 
+def resting(game, p):
+    """Standing still would bring this bot's health (or its team's bar) back faster, or at all, and
+    it's below the regeneration limit: it stays where it is (BOT_STAND_TO_REGEN)."""
+    if not p.rules.BOT_STAND_TO_REGEN:
+        return False
+    G = game.rules
+    if G.TEAM_HEALTH:
+        return (G.TEAM_REGEN and G.TEAM_REGEN_STILL != "off"
+                and game.team_hp[p.team] < G.regen_limit(game.team_hp_max[p.team], team=True))
+    R = p.rules
+    return R.HEALTH_REGEN and R.HEALTH_REGEN_STILL != "off" and p.hp < R.regen_limit(R.MAX_HP)
+
+
 def _sidestep(game, p, brain, ball, now):
     px, pz = -ball.vz, ball.vx
     length = math.hypot(px, pz) or 1.0
@@ -244,12 +264,31 @@ def _sidestep(game, p, brain, ball, now):
 
 
 def _revive(game, p, brain, now):
-    can = (game.state == "play" and game.cash_of(p) >= game.revive_cost(p.team)
-           and any(q.team == p.team and not q.alive for q in game.players.values()))
+    """Spend cash (R) after a human-like pause: revive a fallen teammate, or with team health buy
+    health for the team's bar."""
+    if game.rules.TEAM_HEALTH:
+        can = game.state == "play" and _heal_worth_it(game, p)
+    else:
+        can = (game.state == "play" and game.cash_of(p) >= game.revive_cost(p.team)
+               and any(q.team == p.team and not q.alive for q in game.players.values()))
     if not can:
         brain.revive_at = None
     elif brain.revive_at is None:
         brain.revive_at = now + game.rng.uniform(0.8, 2.5)
     elif now >= brain.revive_at:
-        game.revive(p, now)
+        if game.rules.TEAM_HEALTH:
+            game.heal(p, now)
+        else:
+            game.revive(p, now)
         brain.revive_at = None
+
+
+def _heal_worth_it(game, p):
+    """A pack the bar has room for and we can afford; or, spending all our cash, a bar missing at
+    least what our cash buys (or a quarter of itself)."""
+    R = game.rules
+    missing = game.team_hp_max[p.team] - game.team_hp[p.team]
+    cash = game.cash_of(p)
+    if R.TEAM_HEAL_MODE == "pack":
+        return missing >= R.TEAM_HEAL_AMOUNT and cash >= game.heal_cost(p.team)
+    return cash > 0 and missing >= min(cash * R.TEAM_HEAL_PER_CASH, game.team_hp_max[p.team] * 0.25)

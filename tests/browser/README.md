@@ -45,15 +45,73 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_ho
 - **The host:**
   - sets 20 s rounds and one bot per team;
   - opens the rules on Ricochets, focuses "Curve kept after a bounce" and drafts 0.3 without applying, then closes the editor;
+  - opens Bot Ace's own settings (⚙), drafts Health 250 without applying, then closes them;
   - moves the guest to the other team, and starts the match;
   - changes gravity mid-match, and checks it stays 6 until round 2, then becomes 9;
   - ends the match and checks the lobby menu comes back.
 - **The guest (`?guest`)**, checked in its own output:
   - sees no host controls (no bot buttons, no Spectate) and a read-only rules editor;
   - follows the host's screen: its editor opens on the same page by itself, outlines the host's rule, shows the host's 0.30 as "not applied yet" (`lobby_guest_follow.png`), and closes (dropping the 0.30) when the host closes theirs;
+  - follows the host onto Bot Ace's own settings too: the page, the host's unapplied Health 250 next to "everyone: 100 HP", only an Export button for the guest (`lobby_guest_follow_player.png`), closing when the host's closes;
   - gets "deny: host" for its own change attempts (rules, start, spectate);
   - sees the pending change as "next round (now 6.0 m/s²)" and a pending notice;
   - gets gravity 9 when round 2 starts.
+
+## Team health
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\team_health.json
+```
+
+`team_health.json` switches team health on (free health packs, three hard BLUE bots, 20 s rounds) and checks:
+
+- the bars: everyone's health added up (RED 200, BLUE 300), under the scores and in place of your own health;
+- R buying a pack once the bar is down by 50 ("+50 TEAM HEALTH", `team_health.png`), and the name tags without health;
+- round 1 running out of time: the team with more of its bar left wins;
+- round 2 with a fixed bar of 60 (set during round 1, so it waits): RED's bar empties, and both RED players fall at once (`team_wipe.png`, "knocked out RED, the whole team").
+
+## Health regeneration and the round-time buttons
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\regen.json
+```
+
+`regen.json` (+ `regen.js`):
+
+- the lobby's Round time − / + (3:00 → 4:00 → 3:00 → 2:00, down to 0:20, then up to 0:30), with rapid clicks;
+- the previews of both kinds of regeneration (`rules_regen.png`, `rules_team_regen.png`);
+- round 1, own health, +12/s after 1.5 s up to 70%, against one easy BLUE bot: the marker at 70%, and health sampled ten times a second: after each hit it starts rising about 1.4 s later (samples are 0.1 s apart) at about 12/s, and stops at 70 (`regen_own.png`);
+- round 2, team health with the same numbers for the bar: the markers at 70% on both team bars (BLUE's from its right end), and the bar doing the same (`regen_team.png`).
+
+## Standing still and regeneration
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\still.json
+```
+
+`still.json` (+ `still.js`) sets own-health regeneration to "only while standing still" (1 s to count, 1 + 3 = 4 per second, up to 90%) and gives one BLUE bot its own settings so it hits for 40 every 20 s, dead on. After its hit, `still.js` holds keys like a player and reports the health gained in each part, and the HUD's hint:
+
+- standing: about 4 per second ("Standing still: regenerating");
+- walking (W held): nothing ("Stand still to regenerate");
+- standing again: nothing in its first second, then 4 per second;
+- a dodge with S held, let go 0.12 s in (before the 0.22 s dash ends): it keeps going, no restart;
+- a dodge with W held on after it: only what came during the dash, then nothing until a second of standing.
+
+Round 2 does the same for the team bar ("Standing still: filling the team's bar"; `still_own.png`, `still_team.png`). Measured: 0 while walking and in each first second, 6 in each 1.5 s after it, 6–7 after the early-release dodge, 1–2 for the held one.
+
+## Players' own settings, ball colours, settings files
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\own_settings.json
+```
+
+`own_settings.json` (+ `own_settings.js`):
+
+- opens Bot Ace's ⚙: only the rules a bot may have its own of, and the Hard profile's numbers once its skill is set to hard; Health 300 against "everyone: 100 HP" (`own_settings.png`); applied, Bot Ace has 300 health and an "own settings: 3" tag;
+- the host's own ⚙: a run speed of 11 reaches their browser while everyone else's stays 6;
+- the ball colours editor with BLUE bots' balls drafted green (`rules_colors.png`), then applied;
+- Export settings, reset everything, Import the saved file: every rule and both players' own settings come back; Bot Ace's profile exported and imported onto Bot Blitz; wrong files refused with a message;
+- a round: everyone's health as set, and the colour each ball in flight is drawn in (a RED person's orange, a RED bot's peach, BLUE bots' green), plus the ball in your hand (`ball_colors.png`).
 
 ## A computer clock that runs fast
 

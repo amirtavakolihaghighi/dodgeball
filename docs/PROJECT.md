@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0).
+Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate).
 
 ## Contents
 
@@ -36,8 +36,10 @@ Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules edito
 - **Elimination:** 0 HP knocks you out, and teammates can spend cash to revive you.
 - **Hosting:** one PC runs the game server (Python, or the packaged `Dodgeball.exe`). Everyone on the same Wi-Fi opens a web page.
 - **The lobby:** the server starts in a lobby. The host, who plays in the browser on that PC, sets up the teams, the bots and **every rule of the game**, then starts the match. Others can join at any time, but only the host changes anything. Changes made during a match apply from the next round.
-- **The rules editor:** each of the 117 numbers has a name, a description and an animated preview that runs the default next to the lobby's value.
-- **Looks:** an over-the-shoulder, Fortnite-style camera, with stick figures for characters.
+- **The rules editor:** each of the 152 numbers has a name, a description and an animated preview that runs the default next to the lobby's value.
+- **One player's own settings:** the host can give any person or bot their own values for the rules about a player (health, throws, defences, a bot's skill...). The whole setup saves to a file and loads back.
+- **Team health (optional):** one shared health bar per team; the whole team falls together, and cash buys health for it.
+- **Looks:** an over-the-shoulder, Fortnite-style camera, with stick figures for characters, and each team's balls in its own colours.
 - **Bots:** the host puts any number on either team, so it also works solo.
 - **Spectating and the host's screen:** the host can watch instead of playing, and everyone else sees the host's menus and rule edits live while they set things up.
 
@@ -52,7 +54,7 @@ Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules edito
   - The PC runs VPN/proxy tools, whose tunnel adapters show up in the join-address list.
 - **Wants simple but genuinely working prototypes.** They were burned by a ChatGPT prototype that looked polished but didn't work, with fake UI, mechanics that could never trigger and a broken renderer. No fake or decorative features: everything shown must work.
 - **Wants blunt, evidence-based judgment**, backed by screenshots, simulations and measurements, not opinion.
-- **Wants to be asked about genuine design forks** (multiple-choice questions with a recommendation), but not about things with an obvious default.
+- **Wants to be asked about genuine design forks** (multiple-choice questions with a recommendation), but not about things with an obvious default. Asked to choose between two reasonable ways (team health's bar size, what R buys), they answered "both kinds, the host decides, the recommended one as the default": alternatives become host settings.
 - **Tests solo** by opening several browser tabs or windows as different players, plus bots.
 - **Platform:** desktop/laptop only for now (keyboard and mouse). Phones/touch were explicitly deferred.
 - **Shares builds with friends.** They first sent a RAR of the source folder, which broke, and now send the standalone Windows app.
@@ -100,8 +102,9 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── style.css
 │   ├── js\main.js             glue: join flow, rules, local player, camera, aim, preview, threat ring, events, HUD
 │   ├── js\lobby.js            the lobby / pause menu: teams, each team's bots, match settings, host controls, spectate
-│   ├── js\rules_ui.js         the rules editor (list, search, draft, apply, reset; following the host's screen)
-│   ├── js\previews.js         the rules editor's animated previews (20 scenes, the game's own formulas)
+│   ├── js\rules_ui.js         the rules editor (list, search, draft, apply, reset; following the host's screen; one player's own settings)
+│   ├── js\settings_file.js    settings files: the whole setup or one player's own settings, saved and read back
+│   ├── js\previews.js         the rules editor's animated previews (24 scenes, the game's own formulas)
 │   ├── js\physics.js          launchVelocity and curveShare, shared by the game client and the rules previews
 │   ├── js\diag.js             this browser's diagnostics log: per-second numbers, moments, L marks; sent to the host
 │   ├── js\net.js              WebSocket, server-clock estimate, snapshot interpolation, event queue
@@ -111,17 +114,17 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── js\sfx.js              synthesized sounds (WebAudio)
 │   └── vendor\                three.js 0.185.1: three.module.min.js + three.core.min.js
 ├── tests\
-│   ├── test_sim.py            53 rule tests: python tests\test_sim.py (or pytest)
-│   ├── test_server.py         6 server tests (lobby protocol, the host's screen, saved rules, session logs, the log report)
+│   ├── test_sim.py            69 rule tests: python tests\test_sim.py (or pytest)
+│   ├── test_server.py         7 server tests (lobby protocol, players' own settings and files, the host's screen, saved rules, session logs, the log report)
 │   └── browser\               headless-Chrome end-to-end tests (cdp.js driver + step files, freeze_server.py)
 ├── logs\                      (made at runtime) one folder of session logs per server run; the 30 newest are kept
-├── saved_rules.json           (made at runtime) the host's rules, reloaded at the next start
+├── saved_rules.json           (made at runtime) the host's rules and players' own settings, reloaded at the next start
 ├── testlog\                   the user's collected session logs from office tests (git-ignored: names and IPs)
 ├── .venv\                     local Python environment (made by run.bat; never share it)
 └── dist\                      build output: Dodgeball\ (app) + Dodgeball-windows.zip
 ```
 
-The code is about 10,000 lines in total. The biggest files are `previews.js` (~1,390), `sim.py` (~1,170), `main.js` (~1,110), `test_sim.py` (~900), `world.js` (~790), `rules.py` (~470), `log_report.py` (~450) and `diag.py` (~440).
+The code is about 12,000 lines in total. The biggest files are `previews.js` (~1,580), `sim.py` (~1,400), `test_sim.py` (~1,260), `main.js` (~1,190), `world.js` (~800), `rules.py` (~660), `rules_ui.js` (~580), `server.py` (~510), `log_report.py` (~490) and `diag.py` (~450).
 
 ## 4. History: the path from idea to now
 
@@ -529,6 +532,113 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 
 **Also:** the user deleted the old private repository, and every local backup of the old history was deleted and pruned. The old DodgeAndParry build was removed. Released as **v2.1.0**.
 
+### Phase 11: ball colours, team health, each player's own settings, settings files (2026-10-29)
+
+**The request**, four changes, in the user's words (lightly condensed):
+
+1. "The ball color for 2 teams to be different from each other, and the color of bots of each team in the same family of color of that team but different from the user ball color. Reflect colors stay the same. All new values related to this feature customizable in the lobby."
+2. "Team health: similar to team cash, 1 big bar of health for the whole team; if it is fully depleted, the whole team dies at once. Players can use earned cash to get health. The values related to this feature, plus an on/off switch for the feature itself, customizable in the lobby."
+3. "Per character and bot setting: to be able to customize settings for a specific character or bot to be different from the others."
+4. "Export and import global and per character settings."
+
+They also asked for questions wherever it was ambiguous, "so that the definition of done and expected behaviour are as transparent as possible".
+
+**Questions asked, and the user's answers:**
+
+| Question | Options offered | User chose |
+| --- | --- | --- |
+| Default ball colours (plain red and blue clash with the 3× red and 1× cyan rally colours) | **orange & peach / royal blue & periwinkle, clear of the rally colours** / the exact team colours | **Orange & blue, no clash** |
+| Team health: how big is a team's bar? | **everyone's health added up** / one fixed size for both teams | **Both, as a host setting**, default added up |
+| Team health: what does R buy? | **a pack per press at a rising price** / all your cash at a fixed rate | **Both, as a host setting**, default the pack |
+| What do settings files cover? | **the whole setup + one-player files** / the whole setup only | **Whole setup + one-player files** |
+
+**What got built:**
+
+- **Ball colours** (four rules under Game rules › Ball colours, a new `color` kind with a colour picker): RED people `#ff8a2a` (orange), RED bots `#ffc48f` (peach), BLUE people `#4f6dff` (royal blue), BLUE bots `#aab8ff` (periwinkle).
+  - A ball nobody has deflected is drawn in its thrower's colour, and so is the ball in a player's hand. Deflected balls keep the rally colours; dead balls stay grey.
+  - Browsers work the colour out themselves, from the thrower's team, people or bot, and own settings.
+  - A preview scene ("Ball colours") runs the four next to the rally colours.
+- **Team health** (eight rules under Game rules › Team health):
+  - `TEAM_HEALTH` (off by default): one bar per team. Every hit drains it (`hit` events carry `bar`), nobody falls alone, and an empty bar takes the whole team down. Each member counts as a knockout for the thrower and an out for themselves; the knockout bonus is paid once. The round ends like any wipe.
+  - **Bar size:** `TEAM_HEALTH_SIZE` "sum" (everyone's health added up, own settings included) or "fixed" (`TEAM_HEALTH_FIXED`, 300). Someone joining brings their share (bar and fill grow by it). Someone leaving takes their share of what's left: the fill keeps its proportion, so leaving never heals a team.
+  - **R buys health** (`Game.heal`; no revives while it's on): `TEAM_HEAL_MODE` "pack" (`TEAM_HEAL_AMOUNT` 50 for `TEAM_HEAL_COST` 80, plus `TEAM_HEAL_COST_STEP` 40 per pack, per team per round) or "cash" (all your cash, or the team's pot, at `TEAM_HEAL_PER_CASH` 0.5 health each, never more than the bar is missing). A full bar refuses (`deny: full`).
+  - **The time limit** goes to the larger share of the bar left. In the warm-up a fallen team stands up after the warm-up respawn with a full bar.
+  - **Bots buy too:** a pack when the bar has room for it and they can afford it; all their cash when the bar misses at least what it would buy, or a quarter of itself. With team health they no longer prefer hurt targets (everyone shares the bar).
+  - **On screen:** each team's bar under its score (`r.th` in snapshots); your health bar reads "TEAM 240 / 300"; the R tile reads "Team health +50 · 80 cash"; name tags drop their health bar; the feed says "X knocked out RED, the whole team". A preview scene ("Team health") hits three teammates every half second: without it they fall one by one, with it together, with R buying health when the cash allows.
+- **Each player's own settings:**
+  - The rule set holds `players: {name: {key: value}}`. `Param.who` marks the 90 rules that may differ per player (`all`, `people` or `bots`; the colour rules also carry their team). `Rules.for_player(name)` is the set a player plays by: everyone's values with theirs on top, ordered pairs and caps kept, their own value winning.
+  - The game reads a player's numbers from `p.rules` and a ball's (damage, curve, ricochet range) from `b.rules`, its thrower's or deflector's; `game.rules` only for what's the same for everyone: ball flight and ricochets, bodies and ball size, the court, rounds, revive prices, cash rules, team cash and team health, bot counts, the server's rates.
+  - Host messages: `rules {player, set}` (null: everyone's value again) and `rules {player, replace}`. They apply like any rule change: at once in free play, from the next round in a match (`next_rules` carries them). A value equal to everyone's is no own setting.
+  - Each browser gets its own `cfg` (its player's movement, throws, defence windows, view delay...) and everyone's own settings (`players`, `nextPlayers`), for the lobby, the editor, other players' name tags and ball colours.
+  - Settings go by name. Bots are named by their slot on the team (RED: Ace, Comet, Echo...; BLUE: Blitz, Dash, Flick...) and lose their last slots first, so a bot keeps its name and settings when the count goes down and back up, across restarts and in files.
+  - **The page:** a ⚙ next to every person and bot opens the editor for just them: only the rules that may differ for them (a bot sees the numbers of the skill it plays at), each "same as everyone" or "everyone: X", **All the same as everyone**, and previews comparing EVERYONE with them. An "own settings: N" tag in the team lists. Guests open it read-only, and following the host they see the host's page and unapplied edits (hostview `pl`).
+  - `saved_rules.json` became `{"rules": {changed}, "players": {...}}`; the old flat file still loads.
+- **Settings files** (`settings_file.js`):
+  - **Export settings** (lobby, anyone) saves `dodgeball-settings-<date>.json`: `{dodgeball: "settings", version: 1, rules: {every value}, players}`.
+  - **Import settings…** (host) sends one as `rules {import}`, and the server's `Rules.replace` makes it the whole setup: rules it leaves out go back to their defaults, only its players keep own settings, every value is checked like an edit. An old `saved_rules.json` (flat, or the new `{rules, players}`) loads too.
+  - On a player's page, **Export** saves `dodgeball-player-<name>-<date>.json` (`{dodgeball: "player", name, settings}`) and **Import…** loads one onto that player (`rules {player, replace}`). Wrong files get a clear message.
+- **Also:** `rules {reset}` clears players' own settings too. The rules editor fits short windows (a 200 px preview below 640 px height), and on narrow windows nothing covers its footer any more (an old overflow the guests' new Export button showed).
+
+**Evidence:**
+
+- 64 rule tests (11 new) and 7 server tests (1 new) pass. Each new rule test was run against a deliberately broken copy of its feature (team health off in hits, leaving capping the bar, flat pack prices, the time limit ignoring the bars, bots not buying, no own settings, bots named in order, bots ignoring their own profile, an import merging): every break made its tests fail.
+- Bots-only 3v3 matches, 5–8 rounds each: without team health rounds averaged 92–97 s; with it (packs) 67–70 s, with 8 wipes and 20 packs in 8 rounds. With all your cash at 1 health per cash every round ran to the 3-minute limit (787 purchases); at 0.5 rounds took 89 s on average (none capped), at 0.35 79 s, at 0.25 54 s, so the default became 0.5.
+- Uneven teams (2 bots against 4, 30 rounds each) lose either way: RED won 1 round without team health, 0 with the bar added up and 2 with a fixed bar.
+- Browser runs, with no page errors:
+  - `team_health.json`: bars of 200 and 300, R buying +50, the time limit going to 100% against 61%, and a wipe with both RED players down;
+  - `own_settings.json`: a bot's page, own settings applied and tagged, a person's own run speed in their browser, the colours editor, export then reset then import restoring everything, a profile moved from one bot to another, wrong files refused, and the colours balls are really drawn in (RED person `#ff8a2a`, RED bot `#ffc48f`, BLUE bot `#33dd66` as set);
+  - the two-browser test, with the guest following the host onto Bot Ace's page;
+  - the auto-defender (deflect at 150 ms lag 16 of 17, catch 15 of 15, dodge 5 of 7; 0 hits), sidestep (on: 10 of 23 sidestepped, 0 hits while clear; off: 11 of 13 hits while clear), why-hit (8 too early and 1 second ball, the same popups), logs (the report as before) and the lobby controls.
+
+**Found along the way:** with the bar added up, capping the fill at the new size when someone left would have healed a damaged team (140 / 200 → 100 / 100); the leaver now takes their share of what's left (70 / 100). A bot's own skill also picks which profile's numbers its page shows, since it only plays by that one.
+
+### Phase 12: health regeneration, and round time in the lobby (2026-10-29)
+
+**The request:** "Is the round time configurable in the lobby? If not, add it. Also a health regeneration mechanic: x amount over time, up to y or z%, every other value of it configurable in the lobby by the host, for both player health and team health."
+
+**The answer and what got built:**
+
+- **Round time** already was a rule (Game rules › Rounds & match › Round time limit, 20–900 s), just not among the lobby's quick controls. It now has **Round time − / +** next to Match length, stepping 20 s, 30 s, 45 s, 1, 1:30, 2, 3, 4, 5, 7, 10 and 15 min; anything else can still be typed in the editor.
+- **Health regeneration** (six rules, Damage & health › Health regeneration; a player can have their own): `HEALTH_REGEN` (off by default), `HEALTH_REGEN_RATE` (2 HP per second), `HEALTH_REGEN_DELAY` (4 s after the last hit, or after coming back in; every hit starts it again; 0 = no pause), `HEALTH_REGEN_CAP_MODE` "share" (of full health, `HEALTH_REGEN_CAP_SHARE` 50%) or "amount" (`HEALTH_REGEN_CAP_AMOUNT` 50 HP, never above full). It only fills up to the limit, never takes health away above it, and runs whenever combat is open (warm-up included). With team health on it does nothing.
+- **The team bar's regeneration** (six rules, Team health › Bar regeneration): `TEAM_REGEN` (off), `TEAM_REGEN_RATE` (5 HP per second for the whole bar), `TEAM_REGEN_DELAY` (4 s after anyone on the team was hit), `TEAM_REGEN_CAP_MODE` share (`TEAM_REGEN_CAP_SHARE` 50% of the bar) or amount (`TEAM_REGEN_CAP_AMOUNT` 150 HP). A team that fell stays down.
+- `Rules.regen_limit(full, team)` is where it stops; `hud.js regenLimit` is its twin, for a white marker on your health bar and on both team bars (BLUE's measured from its outer end). A preview scene ("Health regeneration") draws health over 30 s: hits, the pause, the climb and the limit line, everyone's values next to the lobby's.
+- **Fixed along the way:** the lobby's − / + buttons stepped from the copy of the rules the menu keeps per frame, so a click right after a rules update (before the next frame) stepped from an older value: in the test, + from 20 s gave 3:00. They now read the latest values at the click (`Lobby.chosen`).
+
+**Evidence:**
+
+- 66 rule tests (2 new) and 7 server tests pass; each of eight deliberately broken versions of regeneration (no pause, no limit, filling down to the limit, a hit not restarting the pause, the amount ignored, the team bar never or always regenerating, players' regeneration running with team health on) made the new tests fail.
+- Bots-only 3v3 matches, 20 rounds each: own health, rounds averaged 94 s without regeneration and 114 s with the defaults (2 of 20 reached the 3-minute limit); with no pause 128 s; at 5 per second up to 100%, 19 of 20 ran to the limit. Team health: 64 s without, 94 s with the bar's defaults (1 of 20 at the limit), 141 s with no pause, every round at the limit at 15 per second up to 100%. The pause is what keeps regeneration from stretching rounds.
+- `regen.json` in the browser: the round-time buttons; health sampled ten times a second rose 1.4 s after each hit (the pause 1.5 s, samples 0.1 s apart) at 11.7–12.2 per second and stopped at 70 of 100 (the 70% limit), for a player and for a team bar; the markers at 70%. The lobby controls and team-health tests pass as before.
+
+### Phase 13: standing still to regenerate (2026-10-29)
+
+**The request:** "If a player stands still for x (time), they regenerate faster (or at all: regeneration only kicks in if you stand still). Movement from a dodge doesn't count (you keep regenerating even if the movement button is held during the dodge's movement; if you release the button before the dodge's movement ends, you keep regenerating). The same for team health: each player standing still adds to its regeneration. All values, amounts, limits, rates and percentages configurable in the lobby."
+
+**Questions asked, and the user's answers:**
+
+| Question | Options offered | User chose |
+| --- | --- | --- |
+| How is "faster" set (also what each teammate standing still adds)? | **extra health per second** / a percentage faster / both, the host picks | **Both, the host picks** (default extra health per second) |
+| Does standing still change the limit too? | **the same limit** / its own limit | **The same limit** |
+| Should bots stand still to regenerate? | **yes, when hurt** / no, they keep moving | **Yes, when hurt** (with a setting to turn it off) |
+
+**What got built:**
+
+- **Five rules for players' own regeneration** (Damage & health › Health regeneration; a player can have their own) and **five for the team bar** (Team health › Bar regeneration):
+  - `*_STILL` "faster" (default) / "only" / "off": standing still makes it faster, is needed for it, or doesn't matter;
+  - `*_STILL_TIME` (2 s): how long you stand still before it counts;
+  - `*_STILL_BOOST` "extra" (default) / "percent", with `*_STILL_EXTRA` (+4 HP/s; for the bar, per teammate standing still) and `*_STILL_PERCENT` (+200% for a player, +50% per teammate for the bar).
+  `Rules.regen_speed(standing, team)` combines them: the normal speed (nothing while moving with "only"), plus the extra for each player standing still, or times one plus the percentage for each. The limit and the pause after a hit work as before.
+- **What counts as standing still** (`Game._track_still`): staying within 2 cm of where you stopped. People's steps are judged as their position reports arrive, bots' each tick. A dodge's dash isn't walking: a report in the player's own timeline up to 0.06 s after the dash ended (it may carry the end of the dash) moves the "where you stopped" point without starting the time over; walking on after that does. So holding a direction through a dash and letting go before it ends keeps you standing; holding on is walking from when the dash ends. Turning, throwing and defending don't count. Measuring from where you stopped (not step by step) catches slow creeping too: a 0.25 m/s charge-walk counts as moving.
+- **Bots** (`BOT_STAND_TO_REGEN`, on; a bot can have its own): while standing still would bring its health (with team health, its team's bar) back faster or at all and it's below the regeneration limit, a bot stops wandering and doesn't sidestep slow balls, but still turns, throws, catches, deflects and dodges.
+- **On screen:** a line under your bars, only when standing still matters, there's health to regain and the pause is over: "Stand still to regenerate faster" → "Standing still: regenerating faster" (green), and the team versions ("Standing still: filling the team's bar"). The browser judges standing still the same way (`trackStill`), as a hint; the server decides. The regeneration preview now has them move until 8 s and stand still after (two of three for the bar).
+
+**Evidence:**
+
+- 69 rule tests (3 new) and 7 server tests pass; seven deliberately broken versions (the dash counting as walking, standing never counting, "only" regenerating while walking, the percentage ignored, one teammate standing counting for all, bots never standing still, bots standing still whatever the setting) each made the new tests fail.
+- Bots-only 3v3 matches, 20 rounds each: the standing-still rules alone change nothing for bots (wandering bots never stand still for 2 s: 114 s rounds as before). With hurt bots standing still, own-health rounds went 114 → 106 s (4 of 20 at the 3-minute limit, bots standing still 15% of the time) and team-health rounds 94 → 69 s (30% of the time): a bot standing still is an easier target, so the trade-off is real. "Needed" and "faster" came out the same for bots: a hurt bot stops at once, and the 4 s pause outlasts the 2 s it needs to count.
+- `still.json` in the browser, for a player and for a team bar ("only while standing still", 4 per second): 0 while walking and in the first second after, 6 in the next 1.5 s, 6–7 after a dodge whose key was let go during the dash (no restart), 1–2 for a dodge with the key held on (what came during the dash), and the hints matching each part.
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -608,6 +718,33 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 | 71 | At startup the server waits at most 2 s for the lookup of the computer's own name before printing the join addresses; the 15 s watcher adds late ones | C | On macOS the lookup can stall: CI's first macOS run timed out waiting for the console's host link |
 | 72 | A hit says why it got through: "TOO EARLY (x s)" when the player's last press, which met no ball, had ended up to 0.5 s before the ball came; "SECOND BALL" when they had stopped another ball up to 0.5 s before | U | Option A, chosen over a deflect that covers its whole window. The 0.5 s limits and the wording: C. Labels only: who gets hit is unchanged |
 | 73 | This is version 2.1.0 (minor) | C | It adds something players see, and nothing they rely on changes |
+| 74 | Each team's balls have their own colour, in two shades: people's, and a paler one for bots'; deflected balls keep the rally colours | U | Request 1 of phase 11. The ball in a player's hand shows it too (C) |
+| 75 | Default ball colours: RED orange `#ff8a2a` / peach `#ffc48f`, BLUE royal blue `#4f6dff` / periwinkle `#aab8ff`, clear of the rally colours | U | Chosen over the exact team colours, which clash with the 3× (red) and 1× (cyan) rally colours |
+| 76 | The four colours are lobby rules; a player may have their own (the one for their team, people or bots) | U | "All new values customizable in the lobby". Own colours: C |
+| 77 | Team health: an on/off rule; one bar per team, every hit drains it, nobody falls alone, an empty bar takes the whole team down; cash buys health with R (no revives while it's on) | U | Request 2. Off by default and R as the key: C |
+| 78 | The bar's size is a host setting: everyone's health added up (default) or a fixed size (300) | U | "Both kinds, the host decides, the recommended one as the default". 300: C |
+| 79 | What R buys is a host setting: a pack at a rising price (default: +50 for 80, +40 per pack, per team per round) or all your cash at a rate | U | Same answer. The numbers: C, the same as revives |
+| 80 | All your cash buys 0.5 health per cash by default | C | Measured: at 1, every 3v3 bot round ran to the 3-minute limit; at 0.5 about 90 s, like without team health |
+| 81 | Team health details: joining brings your share, leaving takes your share of what's left; the time limit goes to the larger share of the bar left; a fallen warm-up team stands up with a full bar; the knockout bonus is paid once, each fallen member counts as a knockout and an out; bots buy too | C | Leaving must never heal a team (found while writing the tests) |
+| 82 | Each player (or bot) can have their own settings | U | Request 3 |
+| 83 | What may differ per player: everything about that one player (health, stamina, movement, throwing, their throws' damage, aim assist, defences, the cash they earn, how a revive treats them, ball colour; network fairness for people; skill and its numbers for bots). Body and ball sizes, the court, flight, ricochets, rounds, revive prices and team-wide switches stay shared | C | Every other screen draws and aims at bodies and balls. Open to change |
+| 84 | Own settings apply like any rule (at once in free play, next round in a match); a value equal to everyone's is no own setting; they go by name; everyone can see them (a tag, a read-only page, the host's page followed live) | C | Consistent with #27 and #46 |
+| 85 | Bots are named by their team slot (RED: Ace, Comet...; BLUE: Blitz, Dash...), and fewer bots takes the last slots away first | C | So a bot's own settings stay with the same bot across count changes, restarts and files |
+| 86 | Settings files: the whole setup (every rule and everyone's own settings), plus one-player files (profiles) | U | Request 4: "Whole setup + one-player files" |
+| 87 | Anyone may export, only the host imports; an import replaces the whole setup (rules left out go back to their defaults); old `saved_rules.json` files load too; reset clears own settings too; at most 64 players with own settings | C | Replace, so a file reproduces a setup exactly |
+| 88 | `saved_rules.json` keeps the changed rules plus players' own settings; exported files carry every value | C | A saved file picks up improved defaults after an update; an export reproduces a setup exactly |
+| 89 | Round time gets quick − / + buttons in the lobby (it already was a rule) | U | "Is the round time configurable in the lobby? If not, add it". The steps: C |
+| 90 | Health regeneration: x per second up to a limit, the limit a share of full health or a fixed amount (the host picks; default a share), every value a lobby rule, for players' health and for the team bar | U | "x amount over time up to y or z%, configurable, for both player health and team health" |
+| 91 | Regeneration waits for a pause after the last hit (every hit restarts it; 0 = none), only fills up to the limit and never takes health away; the team bar has its own settings (its pause restarts on a hit on anyone on the team); both off by default; players' regeneration can be a player's own setting | C | The pause keeps it from stretching rounds (measured); separate team settings because a bar's size differs from one player's |
+| 92 | Defaults: players 2 HP/s after 4 s up to 50%; the team bar 5 HP/s after 4 s up to 50% (or 50 / 150 HP as amounts) | C | Bot rounds 94 → 114 s (players), 64 → 94 s (team bar) |
+| 93 | The lobby's − / + buttons step from the latest rules at the click, not the menu's per-frame copy | C | A click right after a rules update stepped from an older value |
+| 94 | Standing still for x seconds makes regeneration faster, or is needed for it (or doesn't matter): the host picks, for players' health and for the team bar; every value a rule | U | Phase 13 request. "Faster" by default (C) |
+| 95 | "Faster" is either extra health per second or a percentage: the host picks, default extra | U | "Both, the host picks". The numbers (+4/s, +200%, +50% per teammate, 2 s): C |
+| 96 | Each teammate standing still adds to the team bar's regeneration (the extra or the percentage, once per teammate); with "needed", the bar regenerates only while at least one stands | U | "Each player standing still adds to regenerations". The "at least one" reading: C |
+| 97 | Standing still keeps the same regeneration limit | U | Chosen over its own limit |
+| 98 | A dodge's dash doesn't count as walking, even with a direction held, as long as the key is let go before the dash ends; walking on after it does | U | The request's own rule. Judged in the player's timeline, a report up to 0.06 s after the dash still counting as the dash (C) |
+| 99 | Standing still = within 2 cm of where you stopped; turning, throwing and defending don't count | C | Measured from where you stopped, so slow creeping counts as moving |
+| 100 | Hurt bots stand still to regenerate (a Bots rule, on by default; a bot can have its own) | U | "Yes, when hurt". How (stop wandering, no sidesteps, still defend and throw): C |
 
 ## 6. Current features
 
@@ -620,20 +757,24 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 - Escalating rallies.
 - HP and Souls-style stamina (regenerates after a short pause).
 - Knockouts; cash (optionally one shared pot per team, and optionally carried over between rounds); revives with escalating cost.
+- Optional team health: one shared bar per team that the whole team falls with; cash buys health for it (packs at a rising price, or all your cash).
+- Optional health regeneration, for players' own health and for the team bar: back by itself after a pause without being hit, up to a limit; faster (or only) while standing still, each teammate standing still adding to the bar.
 - Rounds with a countdown and a winner banner.
 - A dynamic arena size; bots (three skill levels) with bank shots.
 
 **Lobby and host:**
 
 - **The lobby:** the server starts in a lobby warm-up. The host starts the match; a match ends when a team reaches "rounds to win", or when the host ends it. Then everyone is back in the lobby with the result.
-- **Host-only controls:** start/end, move players (⇄), shuffle teams, each team's bots (0–12) and their skill, match length, the rules editor, cancelling waiting changes, and spectating. Guests see the same panel read-only.
+- **Host-only controls:** start/end, move players (⇄), shuffle teams, each team's bots (0–12) and their skill, match length, round time, the rules editor, cancelling waiting changes, and spectating. Guests see the same panel read-only.
 - **Spectating (host):** watch instead of playing, with a free camera or riding behind any player.
 - **The host's screen, live:** everyone else sees which menu and rule the host is on and the edits they haven't applied yet; with "Follow the host", their rules editor follows along.
 - **The rules editor:**
-  - 111 rules in 16 groups: search, sliders and number boxes, per-rule reset, reset all, undo, apply.
+  - 152 rules in 18 groups: search, sliders, number boxes and colour pickers, per-rule reset, reset all, undo, apply.
   - Animated previews compare the default with this lobby's value.
   - Mid-match edits are marked "next round (now X)".
-- **Saved rules:** the host's rules survive restarts (`saved_rules.json`).
+- **Each player's own settings:** a ⚙ next to every person and bot opens the editor for just them (the 90 rules that may differ per player). Everyone sees who has their own settings.
+- **Settings files:** export the whole setup (anyone) and import it (the host); each player's page exports and imports just their settings.
+- **Saved rules:** the host's rules and players' own settings survive restarts (`saved_rules.json`).
 
 **Fairness and network:**
 
@@ -645,11 +786,11 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 
 - three.js scene: the court with a 1 m grid, glass walls, bleachers and blob shadows.
 - Procedurally animated stick figures: walk, wind-up, throw, catch, swat, dodge, perfect-dodge spin with afterimages, flinch, knockout fall and fade.
-- Balls: rally colors, ribbon trails, ghost afterimages, glow.
+- Balls: each team's colour (people's and bots' shades) until deflected, then the rally colours; ribbon trails, ghost afterimages, glow.
 - **HUD:**
   - HP and stamina bars, with a cost preview on the stamina bar while charging.
   - A throw box (ball ready, cooldown, or speed/damage/cost while charging).
-  - Action costs; team scores with alive pips; round timer; kill feed.
+  - Action costs; team scores with alive pips (and, with team health, each team's bar); round timer; kill feed.
   - Name tags with HP and stamina; the aim-assist marker; the timing ring with a direction arrow.
   - Popups (including "Still recovering" when a press comes during a recovery, and why a hit got through: "TOO EARLY (0.05 s)" or "SECOND BALL"); gold and red screen flashes; a Tab scoreboard; a hint line in the lobby; a line saying what the host is doing.
   - An Esc menu that doubles as the lobby: teams, match settings, the rules editor, your own settings (sensitivity, volume, ring), controls and join addresses.
@@ -680,9 +821,22 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 - The player hit capsule is the vertical segment y 0.25–1.45 with radius 0.42.
 - Ball radius 0.2. Chest height (the aim and assist target) 1.15.
 
+**Ball colours:** RED people `#ff8a2a`, RED bots `#ffc48f`, BLUE people `#4f6dff`, BLUE bots `#aab8ff`. Deflected: cyan `#3ff2ff` → magenta `#ff4bd8` → red `#ff3b3b` → white. Dead balls grey.
+
 **Movement:** walking 6.0 m/s, while charging 4.0, while a catch/deflect window is active 2.5.
 
 **HP and stamina:** HP 100. Stamina 100, regenerating 30/s after a 0.6 s pause following any spend. No regen while charging or during a defence window.
+
+**Health regeneration** (`HEALTH_REGEN`, off by default): `HEALTH_REGEN_RATE` 2 HP/s from `HEALTH_REGEN_DELAY` 4 s after the last hit (or coming back in), up to `HEALTH_REGEN_CAP_SHARE` 50% of full health ("share") or `HEALTH_REGEN_CAP_AMOUNT` 50 HP ("amount"); only below the limit, only while combat is open, not with team health. The team bar's own: `TEAM_REGEN` (off), 5 HP/s, 4 s after a hit on anyone on the team, up to 50% of the bar or 150 HP.
+
+**Standing still** (2 s, `*_STILL_TIME`): `*_STILL` "faster" (default), "only" or "off"; faster by `*_STILL_EXTRA` +4 HP/s (for the bar: per teammate standing still) or, with `*_STILL_BOOST` "percent", `*_STILL_PERCENT` +200% (the bar: +50% per teammate). So a player regains 2/s moving and 6/s standing; a team of three, 5/s with nobody standing and 17/s with all three. Standing still = within 2 cm of where they stopped; a dodge's dash doesn't count. Hurt bots stand still (`BOT_STAND_TO_REGEN`).
+
+**Team health** (`TEAM_HEALTH`, off by default):
+
+- One bar per team: everyone's health added up (`TEAM_HEALTH_SIZE` "sum", own settings included) or `TEAM_HEALTH_FIXED` (300) for every team ("fixed"). A newcomer brings their share; someone leaving takes their share of what's left.
+- Every hit drains it; at 0 the whole team falls (each member: a knockout for the thrower, an out for them; the knockout bonus once).
+- R buys health instead of revives: "pack" (`TEAM_HEAL_AMOUNT` 50 for `TEAM_HEAL_COST` 80, then +`TEAM_HEAL_COST_STEP` 40 per pack, per team per round) or "cash" (all your cash at `TEAM_HEAL_PER_CASH` 0.5 health each, only what the bar is missing). Only while a round is on.
+- The time limit goes to the larger share of the bar left. In the warm-up a fallen team stands up after `WARMUP_RESPAWN` with a full bar.
 
 **Throwing:**
 
@@ -750,7 +904,9 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 - **Spectating:** the host can switch to watching (team −1: never hit, never revived, not counted) and back, at once in free play, otherwise from the next round.
 - **Host changes** (rules, bots, match length) apply at once in the lobby or while waiting; during a match, at the next round's countdown.
 
-**Bots:** the host sets each team's bots (`BOTS_RED` 1, `BOTS_BLUE` 2 by default; 0–12 each), and nothing changes them but the host; with no human connected there are none. Skill can be easy, normal or hard; the profiles (section 12) are rules too. Bots keep 30 stamina for defending (`BOT_STAMINA_RESERVE`).
+**Bots:** the host sets each team's bots (`BOTS_RED` 1, `BOTS_BLUE` 2 by default; 0–12 each), and nothing changes them but the host; with no human connected there are none. Skill can be easy, normal or hard; the profiles (section 12) are rules too. Bots keep 30 stamina for defending (`BOT_STAMINA_RESERVE`). Their names go by their slot on the team: RED Ace, Comet, Echo, Gale, Ion, Kite, Mako, Onyx, Quill, Sable, Umbra, Wisp; BLUE Blitz, Dash, Flick, Hex, Jinx, Lux, Nova, Pike, Rook, Tango, Vex, Zed. Fewer bots takes the last slots away first.
+
+**Players' own settings:** 102 of the 152 rules may differ per player (`Param.who`: `all`, `people` or `bots`): the throwing, damage and health, aim assist, dodge, catch, deflect, stamina and movement rules, the cash earned, revived health and protection, health regeneration, each team's colour for its people or bots, the network fairness rules for people (view delay, lag compensation, press grace, sidestep compensation), the lockout for everyone, and the skill rules for bots. A player plays by `Rules.for_player(name)`; none of the rest can differ.
 
 **Network fairness:** browsers render the world 0.10 s in the past (`INTERP_DELAY`). Lag compensation is capped at 0.25 s (`MAX_LAG_COMP`). A person's defence counts from 0.02 s before the press (`PRESS_GRACE`). Sidestep compensation is on (`SIDESTEP_COMP`). After a defence that meets no ball you can press another after its window plus recovery × `LOCKOUT_SCALE` (1 = normal, 0 = at once).
 
@@ -779,8 +935,9 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - `game.rules` (a `rules.Rules`) holds every number the game reads.
   - `game.next_rules` holds changes made during a match until the next countdown (`_start_countdown` → `_activate`).
   - In free play (`lobby`, `wait`) changes activate at once.
+  - `game.rules.players` holds each player's own settings, by name. `p.rules` is the set that player plays by (`for_player`, refreshed when rules activate and when they join); a ball carries its thrower's or deflector's (`b.rules`) for its damage, curve and ricochet range.
 - **How changes spread:** `game.rules_version` bumps on every change. The server loop then:
-  - sends every client a `rules` message (the client config plus the live and next values);
+  - sends every client a `rules` message (its own player's client config, the live and next values, and everyone's own settings);
   - saves the host's choice to `saved_rules.json` on a background thread.
   Snapshots carry the version (`r.rv`), so a client that missed an update asks again with `sync`.
 - **Who is host:** `server.py` marks a joining player `host` when either is true:
@@ -789,6 +946,7 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   `sim.Game.handle` refuses host-only messages from anyone else.
 - **States:** `lobby` → `count` → `play` → `over` → `count` … → `lobby`, plus `wait` when a team is empty mid-match.
 - **Spectating:** a spectating host is a player on team `WATCHING` (−1), not alive. Everything that loops over teams 0 and 1 skips them; the warm-up respawn skips them too.
+- **Team health:** `game.team_hp` and `team_hp_max` per team, filled at every line-up (and in free play on any rule change), resized when someone joins or leaves (`_resize_team_health`), drained by `_hit`, refilled by `heal`; snapshots carry `r.th`.
 - **The host's screen:** the host's browser sends `hostview` when its screen changes (at most every 0.12 s). `server.py` checks it (`clean_host_view`: known screens, groups and rules only, values cleaned like rule edits), keeps the latest, and passes it to everyone but the sender, including people who join later. When the last host leaves, everyone gets `{m: null}`.
 
 **Session logs** (`diag.py` on the server, `static/js/diag.js` in each browser):
@@ -869,14 +1027,14 @@ JSON over one WebSocket at `/ws`. Snapshot entries are **arrays**, to keep messa
 | `throw` | `wt, aim, tg` | Power = (`wt` − charge `wt`) / 0.9 |
 | `cancel` | none | Cancel the wind-up (tab lost focus) |
 | `act` | `a` (dodge/catch/deflect), `wt, dir:[dx,dz]` or null, `aim, tg` | `dir` = dash direction for dodge |
-| `revive` | none | Revives the longest-down teammate |
-| `rules` | `set: {KEY: value}`, or `reset: true`, or `discard: true` | **Host only.** Edit rules (at once in free play, else from the next round), back to all defaults, or drop the waiting changes |
+| `revive` | none | R: revives the longest-down teammate; with team health, buys health for the team's bar |
+| `rules` | `set: {KEY: value}`, or `reset: true`, or `discard: true`; `player: NAME` with `set: {KEY: value or null}` or `replace: {...}`; `import: {rules, players}` | **Host only.** Edit rules (at once in free play, else from the next round), back to all defaults (players' own settings too), or drop the waiting changes. With `player`: that player's own settings (null: everyone's value again; `replace`: all of theirs). `import`: a settings file replaces the whole setup |
 | `start` | none | **Host only.** Lobby → the match's first countdown |
 | `end` | none | **Host only.** End the match: back to the lobby |
 | `move` | `p` (player id) | **Host only.** Move that human to the other team (again before it applies = cancel) |
 | `shuffle` | none | **Host only.** Deal the humans into random, even teams (a spectator keeps watching; bots stay put) |
 | `spectate` | `on` (true/false) | **Host only.** Watch instead of playing, or come back (to the team they had, else the one with fewer people). At once in free play, otherwise next round; asking the other way before then cancels |
-| `hostview` | `m` (game/menu/rules), `g?` (rules group), `q?` (search), `f?` (rule in focus), `d?` ({KEY: unapplied value}) | **Host's browser only** (others are ignored, no deny). Relayed to everyone else |
+| `hostview` | `m` (game/menu/rules), `g?` (rules group), `q?` (search), `f?` (rule in focus), `d?` ({KEY: unapplied value}), `pl?` ({n, t, b}: whose own settings, their team, a bot) | **Host's browser only** (others are ignored, no deny). Relayed to everyone else |
 
 Host-only messages from anyone else get a `deny` with `why: host`. The old `team` (players switching themselves) and `cfg` (anyone changing bots) messages are gone.
 
@@ -884,20 +1042,24 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 
 - **`welcome {id, host, cfg, rules, next, rv, defaults, schema, logging, version, logDir?}`:**
   - `logging`: whether the server keeps logs (then the browser sends its own). `version`: `{commit, built?}` of the server. `logDir`: where the logs are, for the host only.
-  - `cfg` holds what the client needs, derived from the live rules (`Rules.for_client`):
+  - `cfg` holds what the client needs, derived from the live rules as this player plays by them (`Rules.for_player(name).for_client`):
     - `centerGap`, `gravity`, `ricochet{normalKeep, tangentKeep, minSpeed, max}`, `damage{min, perSpeed, max}`
     - `playerRadius`, `ballRadius`, `chestHeight`, `walk`, `chargeWalk`, `defendWalk`, `maxHp`, `maxStamina`
     - `chargeTime`, `throwCost[min,max]`, `throwSpeed[min,max]`, `cooldown`
     - `actions{dodge|catch|deflect: {cost, perfect_cost, window, perfect, recovery}}`, `dash{time, speed}`
     - `assistCone`, `deflectCone`, `assistRange`, `reviveCost`, `interpDelay`, `pressGrace`, `sidestepComp`, `lockoutScale`, `teamCash`, `botsMax`, `joinUrls[]`
+    - `teamHealth`, `teamHeal{mode, amount, perCash}`, `regen` and `teamRegen` (`{on, mode, share, amount, delay, still, stillTime}`: where regeneration stops and when standing still matters, for the bars' markers and the hint)
   - `rules` / `next`: flat `{KEY: value}` dicts, live and waiting for the next round (`next` is null when nothing waits). `rv` is the rules version. `defaults` uses the same shape.
+  - `players` / `nextPlayers`: everyone's own settings, `{name: {KEY: value}}`, live and from the next round (null when nothing waits). Browsers use them for other players' ball colours and name tags, the lobby's tags and the editor's player pages.
   - `schema` (sent once): `{groups: [{id, title, blurb}], params: [{key, group, label, desc, lo, hi, step, unit, kind, choices, preview, sub}], pairs, caps}`.
-- **`rules {cfg, rules, next, rv}`:** sent to everyone after any change.
+- **`rules {cfg, rules, players, next, nextPlayers, rv}`:** sent to everyone after any change, each with its own `cfg`.
 - **`logack {run, seq}`:** that log chunk (and everything before it) is stored.
 - **`hostview {m, g?, q?, f?, d?}`:** the host's screen (the cleaned copy of the host's own message), sent to everyone but the host when it changes and to each newcomer after `welcome`. `{m: null}`: no host is connected any more.
 - **HTTP `GET /logs/download`:** the host's zip of the last 24 h of sessions. It answers 403 to anyone else (allowed: this computer, or `?key=` with the host key) and 404 when the server isn't logging. The filename comes in `X-Filename`, not `Content-Disposition` (see section 14).
 - **`s` (snapshot, 30 Hz):** `{st, r, p, b, e}`:
-  - `r` (round): `{s: lobby|wait|count|play|over, n, left, score:[red,blue], w, bots:[red, blue], skill, rc:[reviveCostRed, reviveCostBlue], court:[halfLength, halfWidth], win, res, pend, rv}`.
+  - `r` (round): `{s: lobby|wait|count|play|over, n, left, score:[red,blue], w, bots:[red, blue], skill, rc:[red, blue], court:[halfLength, halfWidth], win, res, pend, rv, th}`.
+    - `rc`: what R costs each team now: a revive, or with team health the next health pack (0: all your cash).
+    - `th`: team health, `[[health, size], [health, size]]`, or null when it's off.
     - `win`: rounds to win (0 = endless).
     - `res`: the last match's result, `[winner or null if ended by the host, red, blue]`.
     - `pend`: how many rule changes wait for the next round.
@@ -918,7 +1080,8 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 | Event | Fields |
 | --- | --- |
 | `throw` | `p, b, power, speed` |
-| `hit` | `p, by, b, dmg, ko, rally, cash, speed, bank, early?, second?, gap?` (bank = it had ricocheted; early = their last press, which met no ball, had ended this many s before the ball came, up to 0.5; second = they had stopped another ball up to 0.5 s before; gap = how far clear of the ball they were on their own screen, m, negative = touching; people only) |
+| `hit` | `p, by, b, dmg, ko, rally, cash, speed, bank, early?, second?, gap?, bar?` (bank = it had ricocheted; early = their last press, which met no ball, had ended this many s before the ball came, up to 0.5; second = they had stopped another ball up to 0.5 s before; gap = how far clear of the ball they were on their own screen, m, negative = touching; people only; bar = team health: it came off the team's bar, and with ko the whole team fell) |
+| `heal` | `p, team, hp, cost`: team health bought with R |
 | `sidestep` | `p, b`: the ball missed p because they had stepped clear on their own screen |
 | `catch` | `p, by, perfect, rally, cash` |
 | `deflect` | `p, perfect, rally, cash, speed` |
@@ -926,10 +1089,10 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 | `bounce` | `b, x, y, z` |
 | (catch, deflect, dodge) | also `graced: true` when the defence counted only thanks to the press grace |
 | `revive` | `p, by, cost` |
-| `deny` | `p, why`: stamina, busy, noball, cash, nobody, round or host |
+| `deny` | `p, why`: stamina, busy, noball, cash, nobody, round, host or full (team health is full) |
 | `round` | `s, n, w?, m?` (m = the team that just won the match) |
 | `match` | `s`: start or end; at the end `w` (winner, or null when the host ended it) and `score` |
-| `rules` | `n` (how many changed), `names` (up to 3), `next` (waits for the next round), `discard?` |
+| `rules` | `n` (how many changed), `names` (up to 3; a player's own setting as "Bot Comet › Health"), `next` (waits for the next round), `discard?` |
 | `join` | `p, name, team` |
 | `leave` | `p, name` |
 | `team` | `p, team, now, cancel?`: the host moved p (now = at once, else next round) |
@@ -953,7 +1116,8 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
   - `lan_addresses(wait)`: UDP-connect trick plus hostname lookup; the lookup runs on a thread, and startup waits at most 2 s for it (it can stall on macOS). It drops `127.x` and `169.254.x` and lists `192.168.x`, then `10.x`, first.
   - `watch_addresses()`: refreshes `own_ips` every 15 s on a thread (a hotspot or cable may appear mid-session).
   - `client_config()`, `rules_message()`.
-  - `load_saved_rules()` and `save_current_rules()`: `saved_rules.json` next to the exe or script, written on a thread, atomically.
+  - `load_saved_rules()` and `save_current_rules()`: `saved_rules.json` next to the exe or script (`{rules: {changed}, players}`; the older flat file still loads), written on a thread, atomically.
+  - `rules_message(name)` (a client's `rules` message, with its player's own `cfg`) and `send_rules()` (one per client).
   - `first_free_port()`; `open_browser_when_ready()` (a thread that polls the port, then calls `webbrowser.open`); Windows `timeBeginPeriod(1)` for a steady loop.
   - `HOST_KEY`: a random key per run, printed in the console's host link.
 - **Flags:** `--port`, `--host`, `--no-browser`, and `--fresh` (default rules, nothing saved; for tests).
@@ -977,12 +1141,13 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 
 **`rules.py`:**
 
-- **`Param`:** one rule (key, group, label, desc, lo/hi/step, unit, kind, choices, preview, sub). `clean()` turns untrusted input into a valid value or None.
+- **`Param`:** one rule (key, group, label, desc, lo/hi/step, unit, kind (float, int, bool, choice, color), choices, preview, sub, `who` (who may have their own value), `team` (a team's own rule), `labels` (how choices read)). `clean()` turns untrusted input into a valid value or None.
 - **`PARAMS`:** filled by `_define()`, in editor order, with per-skill bot rules generated from `BOT_FIELDS`.
 - **Lookups and limits:** `DEFAULTS` (from `config.py`), `BY_KEY`, `ORDERED_PAIRS` and `CAPPED_BY` (the consistency limits), `display_name()`, and `schema()` (what the editor gets).
 - **`Rules`:**
   - attribute access (`rules.GRAVITY`);
   - `update()` (validate, keep pairs and caps, derive the `actions` specs), `values()`, `copy()`, `differences()`;
+  - players' own settings: `players`, `update_player()` (validated like edits; null or everyone's value removes one), `set_player()`, `set_players()`, `replace()` (a whole file), `for_player()` (the set a player plays by, cached), `player_differences()`;
   - the formulas `throw_cost`, `throw_speed`, `damage_for` and `curve_share`, plus `bots_for()`, `bot_profile()` and `for_client()`.
 
 **`sim.py`, the `Game` class** (`Game(seed, rules)`; every number via `self.rules`). `tick(t0, t1)` runs:
@@ -1005,9 +1170,11 @@ Key methods:
   - `_defend` → `_dodged`, `_caught` or `_deflected` (each records `press_met` and `defended_at`); `_hit` (marks `early` or `second`: why it got through).
 - **Player actions:** `throw`, `_aimed_velocity`, `_assist_target` (with the `_is_bank_shot` rule), `start_action`, `revive`.
 - **Cash:** `cash_of` (own cash or the team's pot), `_earn` (in or, negative, out), `_regroup_cash` (team cash switched on or off), `revive_cost`.
-- **Players, bots and the court:** `_sync_bots` (exactly the host's count per team), `_fit_court`, `_spawn`, `_line_up` (everyone fresh in a row), `_remember_team`.
+- **Team health:** `heal` and `heal_cost` (R with team health), `health_share` (own health or the team's bar, 0–1), `_team_health_size`, `_fill_team_health`, `_resize_team_health`; `_knock_out`.
+- **Health regeneration:** in `_update_player` (a player's, from `p.hurt_at`) and `_regen_team_health` (each bar, from `team_hurt_at`), both up to `Rules.regen_limit` at `Rules.regen_speed`; `_hit` and `_spawn` restart the pause. `_track_still` keeps `still_since` (and where they stopped, `still_x/z`): `_on_input` for people (a dash, `dash_until`, in their own timeline), `_update_player` for bots.
+- **Players, bots and the court:** `_sync_bots` (exactly the host's count per team, filling slots in order), `bot_name` (by team and slot), `_fit_court`, `_spawn`, `_line_up` (everyone fresh in a row), `_remember_team`.
 - **The lobby and the host:**
-  - `start_match`, `end_match`, `set_rules` (now or next round), `_host_rules` (set/reset/discard), `_activate`, `pending_changes`;
+  - `start_match`, `end_match`, `set_rules`, `set_player_rules` and `import_rules` (all through `_change_rules`: now or next round), `_host_rules` (set/reset/discard, a player's own settings, an import), `_activate` (also refreshes every `p.rules`), `pending_changes`;
   - `move_player`, `shuffle_teams`, `spectate`, `_assign` (a team or `WATCHING`, now or next round), `_apply_team_moves`, `_stand_down`;
   - the properties `bots_each` (both teams' bots, for tests) and `bot_skill` map to the rules.
 - **`handle(pid, msg, now)`:** the only entry point for client messages. It refuses host-only messages from non-hosts and sanitizes every input (`_num`, `_int`, `_vec3`, name cleaning).
@@ -1050,7 +1217,11 @@ Other parts of `main.js`:
   - `applyRules()` runs on `welcome` and on every `rules` message. It sets `cfg`, the net's interpolation delay and gravity, and the ball size, redraws the court, and refreshes the editor and the lobby.
   - `updateHud` sends `sync` when a snapshot's `rv` stays ahead for over 1 s.
 - **The menu:** `showMenu()` opens the lobby panel. The match-end event drops everyone back into it.
-- **The debug handle `window.dp`** exposes `net`, `input`, `local`, `aim`, `world`, `lobby`, `editor`, `rules`, `diag`, `showMenu`, `spec`, `followNext`, `hostView`, `me`, `threat`, `view`, `cfg` and `isHost`.
+- **Players' own settings and colours:** `rules.players` / `rules.nextPlayers` from the server; `ownValue(name, key)` (theirs or everyone's), `ballColorOf(player)` (`BALL_COLOR_KEYS` by team and people/bots); each ball's `color` is set in `displayBalls`, each figure's held ball in `playerStates`; `tagFor` sizes name tags by their own health and stamina (no health with team health).
+- **Team health:** `hud.setTeamHealth(r.th)`, your bar from `r.th`, the R tile from `r.rc` and `cfg.teamHeal`, the `heal` event, "team" wording in hit popups and the feed.
+- **Standing still:** `trackStill` (the server's rule, for the hint) and `regenHint` → `hud.setRegenHint`; `local.hurtAt` / `teamHurtAt` from the hit events, for the pause.
+- **Settings files:** `exportSettings()`, `importSettings()` and `importSetupText()` (the lobby's buttons).
+- **The debug handle `window.dp`** exposes `net`, `input`, `local`, `aim`, `world`, `lobby`, `editor`, `rules`, `diag`, `showMenu`, `spec`, `followNext`, `exportSettings`, `importSetupText`, `settingsFile`, `ownValue`, `ballColorOf`, `hostView`, `me`, `threat`, `view`, `cfg` and `isHost`.
 
 **`lobby.js`:** the lobby / pause menu.
 
@@ -1060,6 +1231,8 @@ Other parts of `main.js`:
 - Quick controls for each team's bots (in its column), bot skill and match length. They send `rules` edits, count rapid clicks from the value asked for, and show "next round (now X)".
 - The host's Spectate / Join a team button, and the "Spectating: …" line.
 - The pending-changes notice, with Cancel.
+- A ⚙ on every row (a player's own settings: `openPlayer`), an "own settings: N" tag, and Export settings / Import settings….
+- Round time − / + (`stepThrough` over fixed steps). Every − / + steps from `chosen(key)`: the value just asked for, else the latest rules at the click.
 
 **`rules_ui.js`:** the rules editor.
 
@@ -1067,19 +1240,23 @@ Other parts of `main.js`:
 - A **draft**: Apply sends only the edits; "Undo my edits" and "Reset all" change the draft.
 - `enforce()` mirrors the server's pair and cap limits while dragging.
 - Read-only for guests. Esc or a click outside closes it.
-- **Following the host:** `follow(view)` shows the host's page, rule in focus (outlined) and draft; `unfollow()`; `describe(view)` puts the host's screen in words; `hostView()` is what the host's browser reports. A guest who closes a followed editor stops following.
+- **Following the host:** `follow(view)` shows the host's page (one player's own settings too, `view.pl`), rule in focus (outlined) and draft; `unfollow()`; `describe(view)` puts the host's screen in words; `hostView()` is what the host's browser reports. A guest who closes a followed editor stops following.
+- **A player's page:** `openFor({name, team, bot})`; `who`, `applies(p)` (the rules that may differ for them; a bot's own skill profile only), `shared()` / `ownOf()` / `effective()` / `base()` / `reference()` (everyone's values, theirs, and what they make together), Apply sending null for "same as everyone", `exportPlayer()` and `importPlayerText()`. `keepConsistent()` mirrors `Rules._fix` for both the draft and a player's own settings.
+- Colour rows get a colour picker and a swatch; choices read by their `labels`; `%` units sit right after the number.
 
-**`previews.js`:** the editor's animated previews. 21 scenes, each tied to its rules through `preview` in `rules.py`:
+**`previews.js`:** the editor's animated previews. 24 scenes, each tied to its rules through `preview` in `rules.py`:
 
 - **Side views:** throw, arc, ricochet.
 - **Top views:** wall ricochet, assist, slow balls curve less, stepping out of the way (sidestep compensation), dash.
 - **Timelines:** defence windows (with the press grace and the lockout marker), rounds, cooldown, network, durations.
 - **Charts:** damage, rally, stamina, cash, court.
-- **Other:** body/reach, movement, bots.
+- **Other:** body/reach, movement, bots, ball colours (the four next to the rally colours), team health (three teammates falling one by one, or together, with R buying health), health regeneration (health over 30 s: hits, the pause, the climb to the limit).
 
-Two-lane scenes run the default rules next to the lobby's (or the host's draft) in real time. Side views may stretch distances up to 1.5× to fill the lane; the readouts give exact numbers. Simulations are memoised by the values they depend on.
+Two-lane scenes run the default rules next to the lobby's (or the host's draft) in real time; on a player's page, everyone's values next to theirs (`show()` takes the lanes' titles and the names charts use). Side views may stretch distances up to 1.5× to fill the lane; the readouts give exact numbers. Simulations are memoised by the values they depend on.
 
 **`physics.js`:** `launchVelocity(from, to, speed, gravity, reachMax)`, the JS twin of `sim.launch_velocity`, and `curveShare(R, speed)`, the twin of `rules.Rules.curve_share`.
+
+**`settings_file.js`:** settings files: `setupFile()` and `playerFile()` (what Export saves), `readSetup()` and `readPlayer()` (what Import accepts, with plain-language errors; older `saved_rules.json` files too), `download()` (`last` keeps the latest for tests) and `pickFile()`.
 
 **`diag.js`:** the browser's diagnostics log.
 
@@ -1099,7 +1276,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
   - Poses: walk cycle, dodge, deflect swat, catch, throw follow-through, wind-up, flinch, knockout fall, invulnerability flicker, fading near the camera.
   - The perfect-dodge spin lasts 0.38 s with ghosts every 0.065 s (your own at 0.22 opacity, others at 0.45).
 - **`Trail`:** a camera-facing ribbon with vertex alpha. Life is 0.09 s for normal balls and 0.35 + 0.12 × rally s for deflected ones; old trails keep fading after their ball is gone.
-- **`BallView`:** rally colors, glow, trail, ghosts every 0.035 s when rally ≥ 1, and a height-scaled shadow.
+- **`BallView`:** its thrower's colour (`b.color`) until deflected, then the rally colours; glow, trail, ghosts every 0.035 s when rally ≥ 1, and a height-scaled shadow. A figure's held ball takes its `ballColor`.
 
 **`hud.js`:** DOM updates only when values change; names always go in via `textContent`. The timing ring radius is 26 + 150 × time-to-impact px, with "near" at ≤ 0.3 s and "now" at ≤ 0.1 s.
 
@@ -1141,6 +1318,10 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **`_walk`:** wanders to random points in its own half every 1.5–4 s and faces its target or the nearest enemy.
 - **`_revive`:** when affordable (from the team's pot with shared team cash), revives after a 0.8–2.5 s delay.
 
+- **With team health** `_revive` buys health instead (`_heal_worth_it`): a pack when the bar has room for one and the price is affordable; all their cash when the bar misses at least what it buys, or a quarter of itself.
+- **A bot's own settings:** every number a bot reads comes from `p.rules`, so its own skill (and its own profile numbers, stamina reserve and the rest) count for it alone.
+- **Standing still to regenerate** (`resting`, `BOT_STAND_TO_REGEN`): below the regeneration limit, when standing still would make it faster or is needed, `_walk` keeps the bot where it is (it only turns), and `_plan` skips the sidestep; it still throws, catches, deflects and dodges.
+
 **Profiles** (defaults in `config.BOT_PROFILES`; each number is a rule, `BOT_<SKILL>_<FIELD>`, in the editor's Bots group):
 
 | Skill | React chance | Timing spread | Aim error | Extra throw pause | Mix (dodge/catch/deflect) | Bank shots |
@@ -1162,7 +1343,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **A test server remembers rules** that tests changed until it restarts, so restart it between test suites.
 - **Hosting from the test PC:** the browser on the server's PC is the host. Add `?guest` to a tab's URL to see the guest view.
 
-**Rule tests** (all 53 must pass) and **server tests** (all 6 must pass):
+**Rule tests** (all 69 must pass) and **server tests** (all 7 must pass):
 
 ```powershell
 .venv\Scripts\python tests\test_sim.py
@@ -1172,8 +1353,9 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 `test_server.py` covers:
 
 - **over real WebSockets:** host detection, guest refusals, lobby edits applied at once, mid-match edits announced as pending, `sync`, the host key, and End applying the waiting changes;
-- **the host's screen:** relayed only from the host, cleaned (bad rules and values dropped, numbers clamped), sent to latecomers, and cleared when the host leaves;
-- **saved rules:** saving, loading, and ignoring a damaged `saved_rules.json`;
+- **the host's screen:** relayed only from the host, cleaned (bad rules and values dropped, numbers clamped; whose page it is), sent to latecomers, and cleared when the host leaves;
+- **players' own settings:** only the host sets them, each browser gets its own numbers, the server plays by them, and a settings file replaces the whole setup (team health on, bars added up);
+- **saved rules:** saving and loading the rules and players' own settings, an older flat file, and ignoring a damaged `saved_rules.json`;
 - **the session log:** server and browser records reaching the host's zip, a resent chunk stored once, and inputs counted per player;
 - **the detectors:** stalls, late presses (and early ones that aren't), and console prints held up;
 - **the report:** it blames a freeze during a server stall on the host and a player's own freezes on them, and gives each L mark the right cause.
@@ -1193,6 +1375,11 @@ The rule tests cover:
 - court growth and shrinking; the center line; knockout, revive and round end;
 - each team's bots set by the host, untouched by people joining or leaving, changed mid-match from the next round, gone with the last person; a full bots-only match;
 - the host spectating (only the host; never hit or revived; back from the next round; cancelling); shared team cash (earning, a teammate reviving from the pot, switching it off and on); cash carrying over while revive prices start over;
+- team health: one bar that the whole team falls with (knockouts, outs and cash counted), its size (added up with someone's own health, people joining and leaving, fixed from the next round), buying health (a pack at a rising price that starts over each round, all your cash at a rate, the team's pot, a full bar refused), the time limit going to more of the bar left, and a bots-only match with wipes and bots buying;
+- players' own settings: only the host sets them, rules shared by everyone are ignored, at once in the lobby and from the next round in a match, kept on reconnecting, their own value winning over an ordered pair, a thrower's own damage and a defender's own catch window; bots keeping their names and settings by slot, and a bot playing by its own profile;
+- health regeneration: the pause (and a hit restarting it), the speed, a share and a fixed amount as limits, never taking health away, a player's own regeneration, nothing with it off or with team health on; the team bar's (a hit on either teammate pausing it, a share of the bar, off by default);
+- standing still: faster by extra health and by a percentage, needed (nothing while walking or creeping), a dodge's dash not starting it over unless the key is held on after it, not mattering; each teammate standing still adding to the bar (extra, percentage, needed); hurt bots standing still and regenerating, and moving with the setting off;
+- settings files: an import replacing the whole setup (bad values and unknown rules ignored, mid-match from the next round), one player's file replacing theirs, and reset clearing own settings; the ball colours as rules;
 - **the lobby and host:**
   - the server starts in the lobby and only the host starts the match;
   - guests can't change rules, bots, teams or the match;
@@ -1220,6 +1407,10 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 - **The clock test** (`clock.json`) makes the page's clock run fast (+300 ms over 10 s, like an OS time correction) and prints the frozen time per second. Healthy: the picture recovers as soon as the clock settles. Re-run it after touching the clock estimate in `net.js`.
 - **The sidestep test** (`sidestep.json` + `sidestep.js`, with `&lag=150`, and `&comp=0` for compensation off) walks out of every incoming ball's path and counts balls sidestepped, hits, and hits while clear on screen. Re-run it after touching sidestep compensation, position reports or the pending logic.
 - **The why-hit test** (`why_hit.json` + `why_hit.js`) plays against three hard bots and deflects every other ball about 0.27 s too early. Healthy: the hits marked `early` or `second` and the TOO EARLY and SECOND BALL popups on screen match one for one. Re-run it after touching the hit marks or the hit popup.
+- **The team-health test** (`team_health.json`): the bars, R buying a pack, the time limit by share of the bar, and a team wipe. Re-run it after touching team health.
+- **The regeneration test** (`regen.json` + `regen.js`): the round-time buttons, both regeneration previews, and a player's health and a team bar sampled ten times a second (the pause after each hit, the speed, where it stops) with the limit markers. Re-run it after touching regeneration or the round-time buttons.
+- **The standing-still test** (`still.json` + `still.js`): with a bot that hits for 40 every 20 s, holds keys like a player through standing, walking and two kinds of dodge, and checks what each part regains and the hint, for a player and a team bar. Re-run it after touching standing still.
+- **The own-settings test** (`own_settings.json` + `own_settings.js`): a bot's and a person's own settings through the ⚙ pages, the ball colours editor, export → reset → import, a profile moved between bots, wrong files, and the colour every ball in flight is drawn in. Re-run it after touching players' own settings, the ball colours or the settings files.
 
 **CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`; any page error fails it).
 
@@ -1257,7 +1448,7 @@ print(lengths, g.score, dict(counts))
 - **People without Python:** send the zip, or the link to the latest GitHub release. They unzip it and run `Dodgeball.exe`. SmartScreen may say "Windows protected your PC" (the app is unsigned): **More info → Run anyway**.
 - **Friends can't connect (firewall):** the host double-clicks `Allow friends to connect.bat` next to the exe once (it asks for admin; `... check` shows what it would do, `... undo` removes the rule). Or set the Wi-Fi to Private and allow the prompt. Never turn the firewall off.
 - **Playing together on one Wi-Fi:** only the host runs it; others open the address shown in its window. The host sets up the lobby in the browser that opens on their PC and presses Start match.
-- **Passing on tuned rules:** copy `saved_rules.json` next to another host's `Dodgeball.exe`, or `server.py`.
+- **Passing on tuned rules:** Export settings in the lobby and give them the file (they Import it), or copy `saved_rules.json` next to another host's `Dodgeball.exe`, or `server.py`.
 - **Sharing the source:** exclude `.venv`, `build`, `dist`. A copied `.venv` is auto-repaired by `run.bat`.
 - **Mac/Linux:** run from source with Python. There's no Mac build; it would have to be built on a Mac.
 
@@ -1324,6 +1515,9 @@ print(lengths, g.score, dict(counts))
 - **Lag:** analysed (`LAG_ANALYSIS.md`, with three office sessions of logs). The game-side fixes are settings now (view delay 0.10, press grace, sidestep compensation, the ricochet curve, the adjustable lockout). The worst cases were players' own Wi-Fi (mostly Linux laptops), which the game can't fix. QuickEdit is measured, not fixed.
 - **Sidestep compensation favours the person dodging:** a thrower can see a ball pass through someone who had already stepped clear on their own screen, and a sidestepped ball hangs at the contact point for up to ~0.15 s before flying on.
 - **Only the host can spectate**, and nobody can choose their own team.
+- **Own settings go by name:** two people with the same name share them, and a person who takes a bot's name ("Bot Comet") gets that bot's.
+- **Uneven teams stay uneven:** 2 bots against 4 lose nearly every round, and team health with a fixed bar hardly changes that (the bigger team throws twice as many balls). Players' own settings (more health, say) are the tool for it.
+- **The README's gameplay screenshot** still shows the yellow ball from before the team colours.
 - **Untested on a real GPU:** visual tuning (afterimage density, trail lengths, ring sizes) was judged from headless screenshots.
 - **The standalone app is Windows-only and unsigned**, so SmartScreen warns and antivirus may flag it.
 - **Phones/touch:** none yet. The user deferred them.
@@ -1331,7 +1525,7 @@ print(lengths, g.score, dict(counts))
 **Ideas, not started:**
 
 - **The lag plan:** the next office session's logs will show what the new settings do (the report's FAIRNESS section). Still open: a per-player "your Wi-Fi is dropping out" notice; buffering a press made just before a lockout ends.
-- Named rule presets (save/load several rule sets, e.g. "office lag-friendly").
+- A list of saved setups in the lobby to pick from (settings files exist; today you pick the file yourself).
 - Kicking a player from the lobby.
 - Touch controls for phones.
 - Obstacles and cover.
@@ -1370,10 +1564,17 @@ print(lengths, g.score, dict(counts))
 | **Spectating / WATCHING** | The host watching instead of playing: team −1, not alive, free or follow camera |
 | **The host's screen (hostview)** | What the host's browser shows (menu, rules page, rule in focus, unapplied edits), relayed live to everyone else |
 | **Team cash** | With `TEAM_CASH`, one pot per team that everyone earns into and revives from |
+| **Team health / team bar** | With `TEAM_HEALTH`, one health bar per team that every hit drains; when it's empty the whole team falls. R buys health for it (`heal`) |
+| **Health regeneration** | Health (`HEALTH_REGEN`) or a team's bar (`TEAM_REGEN`) coming back by itself after a pause without being hit, up to a limit (`Rules.regen_limit`) |
+| **Standing still** | Not walking for `*_STILL_TIME`: within 2 cm of where you stopped (a dodge's dash doesn't count). Makes regeneration faster, or is needed for it (`*_STILL`) |
+| **Health pack** | What R buys with team health in "pack" mode: `TEAM_HEAL_AMOUNT` health at a price that rises with each pack the team buys in a round |
+| **Own settings** | A player's (or bot's) own values for the rules that may differ per player (`Param.who`); `p.rules` is what they play by |
+| **Settings file** | An exported `.json`: the whole setup (every rule and everyone's own settings), or one player's own settings (a profile) |
+| **Slot (bot)** | A bot's place on its team (0 = first); it gives the bot its name, so its own settings stay with it |
 | **Lobby / wait / count / play / over** | States: before a match (warm-up) / a match waiting for an empty team / countdown / playing / round result |
 | **Free play** | `lobby` or `wait`: no round running; the downed stand up, and host changes apply at once |
 | **Host** | The player who sets up the lobby: a browser on the server's PC, or anyone with the console's host link |
-| **Rules** | The 117 host-editable numbers (`rules.py`); `game.rules` is the live set |
+| **Rules** | The 141 host-editable numbers (`rules.py`); `game.rules` is the live set |
 | **Pending / next rules** | Changes made during a match, waiting for the next round's countdown (`game.next_rules`) |
 | **rv** | Rules version: bumps on every change; in snapshots, so a browser that missed an update asks again |
 | **Draft** | The editor's unapplied edits; Apply sends them |

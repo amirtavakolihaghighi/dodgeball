@@ -23,9 +23,17 @@ rallies get frantic, and because stamina limits everything, mashing buttons gets
   little, bend gently toward the player you aim at, and can bank off the floor or a side wall.
 - **Bots** on either team, in three skill levels, so you can play alone or fill out a small group.
 - **The host runs the show.** The game starts in a lobby where the host sets up the teams and the
-  bots and can change every number in the game (117 of them, from throw speed to the dodge
+  bots and can change every number in the game (152 of them, from throw speed to the dodge
   window). Each comes with a plain description and an animated preview of what the change does.
   Everyone else sees what the host is doing, live.
+- **Settings for one player:** give a beginner more health and a wider catch window, or one bot
+  hard skill, without changing anyone else. Save the whole setup to a file and load it next time.
+- **Team health, if you like:** one shared health bar per team instead of everyone's own; the
+  whole team falls together, and cash buys health for the bar.
+- **Health regeneration, if you like:** health (or the team's bar) comes back by itself after a
+  pause without being hit, up to a limit the host sets, faster (or only) while you stand still.
+- **Each team's balls have their own colour** (the bots' a paler shade of it), so you can tell
+  who threw what at a glance.
 - **Fair on ordinary Wi-Fi:** a dodge, catch or deflect is judged against what your screen
   showed, so a parry that looked right counts, and so does stepping out of a ball's way on your
   screen. The host can tune both.
@@ -78,7 +86,8 @@ time. On macOS and Linux, use `python3` if `python` isn't found. `--port 8080` p
    host picked, or forever. People can join at any time, and changes the host makes during a
    match apply from the next round.
 3. **Knocked out?** Teammates earn cash by hitting, catching and deflecting, and can spend it to
-   revive you.
+   revive you. With team health on, the team shares one health bar and spends cash on health
+   for it instead.
 
 <p align="center">
   <img src="docs/images/lobby.png" width="49%" alt="The lobby as the host sees it: RED has the host, Alex, and two bots; BLUE has three bots. Each team has its own plus and minus buttons for bots. Next to them are the bot skill, the match length set to first to 3, the Game rules button, and the controls.">
@@ -94,7 +103,7 @@ time. On macOS and Linux, use `python3` if `python` isn't found. `--port 8080` p
 | Space or Shift | **dodge**: a quick dash you can't be hit during |
 | Right mouse or F | **catch**: the ball becomes yours |
 | E | **deflect**: tighter timing, sends the ball straight back, faster |
-| R | revive a teammate (costs cash) |
+| R | revive a teammate, or with team health buy health for the team (costs cash) |
 | Tab / H / Esc | scores / timing ring on or off / the lobby menu |
 | L | "this feels laggy": marks the moment in the session log |
 
@@ -116,10 +125,11 @@ You need a keyboard and mouse: there are no touch controls yet.
   host's controls. Don't share it.
 - **Nothing goes to the internet.** The game makes no internet connections, and three.js is
   bundled with it.
-- **What it writes to disk**, next to the app: the host's rules (`saved_rules.json`) and session
-  logs (`logs/`, the 30 newest sessions). The logs contain player names, LAN addresses and device
-  details (browser, graphics card, screen) and stay on the host's computer unless you send them to
-  someone. `--no-log` turns logging off.
+- **What it writes to disk**, next to the app: the host's rules and each player's own settings,
+  by player name (`saved_rules.json`), and session logs (`logs/`, the 30 newest sessions). The
+  logs contain player names, LAN addresses and device details (browser, graphics card, screen)
+  and stay on the host's computer unless you send them to someone. `--no-log` turns logging off.
+  An exported settings file holds the rules and the names of players with their own settings.
 - **Each browser moves its own player** within the court's limits, so a player could cheat by
   editing their browser's code. It's a game for friends, not strangers.
 

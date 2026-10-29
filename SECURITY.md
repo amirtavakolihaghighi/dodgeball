@@ -28,7 +28,7 @@ Fixes go into the next release; only the latest release is supported.
 - Traffic is **plain HTTP and WebSocket, not encrypted**. Anyone on the same network can read
   it: player names, inputs and the game state.
 - **Files it writes**, next to the app (or `server.py`):
-  - `saved_rules.json`: the host's game rules;
+  - `saved_rules.json`: the host's game rules, and each player's own settings by player name;
   - `logs/`: one folder per run (the 30 newest are kept) with the server's numbers and every
     browser's own log. These contain **player names, LAN IP addresses, browser and device
     details** (graphics card, CPU cores, screen size), and the host computer's CPU, memory, power,
@@ -47,6 +47,10 @@ Fixes go into the next release; only the latest release is supported.
   A modified browser can therefore **cheat** (move faster, for example). Fine among friends,
   not for strangers.
 - Player names are always shown as plain text, never as HTML.
+- **Export settings** saves a `.json` file in that browser's Downloads folder: every rule and the
+  own settings of players by name. **Import settings** (host only) sends such a file to the
+  server, which checks every value like any rule edit: unknown rules are ignored, numbers are
+  clamped to their range, and at most 64 players' settings are kept.
 
 **`Allow friends to connect.bat` (Windows, optional):** after asking for administrator
 permission it adds **one inbound Windows Firewall rule**: TCP ports 8000-8019, from the **local
