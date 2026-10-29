@@ -786,6 +786,12 @@ This is the short version, kept on `main` while internet mode waits on its branc
 - Before any art is built, two or three style samples show different directions, and the user picks one.
 - The details are in `docs/LOOK_AND_FEEL.md`.
 
+**Style samples, round 1, and the user's pick** (decisions 124–126):
+
+- **The round:** three directions (a night arena, a daylight court and a sports hall), each rendered from the game's own camera and as a close-up. The pictures and descriptions are in `docs/LOOK_AND_FEEL.md`.
+- **The pick:** the sports hall is the setting. Its colours should become like Genshin Impact's landscapes: vibrant and full of light, never pale. The characters should move towards Fortnite-like humanoids.
+- **The tension:** Fortnite-like humanoids have faces and hair, which is where Claude's results are weakest. So round 2 shows both a sports helmet with a visor and a stylised face, and the user judges.
+
 **Next, in order:** the plan in `docs/LOOK_AND_FEEL.md`:
 
 1. Style samples.
@@ -917,6 +923,9 @@ This is the short version, kept on `main` while internet mode waits on its branc
 | 121 | How Blender is connected: the server pinned to `mcp-for-blender==2.2.6` to match the add-on (protocol 15); its telemetry off (`DISABLE_TELEMETRY=true`); safe mode on (`BLENDER_MCP_SAFE_MODE=1`); Sketchfab and the generators off | C | Unpinned, the add-on and the server can drift apart. Without the switch the server sends anonymous usage events. Safe mode stops text from downloaded assets steering Claude into harmful code |
 | 122 | The branch is checked out in its own folder next to the main one (a git worktree) | C | The user works on internet mode in the main folder; switching branches there would swap files under that work |
 | 123 | Style samples come before any art is built: two or three rendered directions, and the user picks one | C | The style is the user's (decision 115), and it's easier to choose from pictures than from words |
+| 124 | The setting is the sports hall | U | "I think the sport hall is the proper setting for the game." Picked from style samples round 1 (night arena, daylight court, sports hall) |
+| 125 | Colours and light like the landscapes of Genshin Impact: vibrant, alive, cheerful, with beautiful light. Never pale | U | "I like the colors from the hall. It's vibrant and alive and cheerful… I want the colors to look like Genshin Impact lands… I don't like pale." A reference for the style, not something to copy |
+| 126 | Characters towards Fortnite-like humanoids: stylised human proportions | U | "I'm looking forward for them to look something like Fortnite humanoid characters." A reference for the style, not something to copy. Round 1's characters were a first draft |
 
 ## 6. Current features
 

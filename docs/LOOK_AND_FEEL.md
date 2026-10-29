@@ -1,6 +1,6 @@
 # The look and feel: the working plan
 
-This is the working plan for the branch `look-and-feel`. Why the branch exists, the analysis behind it and every decision are in phase 15 and decisions 112–123 of [PROJECT.md](PROJECT.md). This file holds:
+This is the working plan for the branch `look-and-feel`. Why the branch exists, the analysis behind it and every decision are in phase 15 and decisions 112–126 of [PROJECT.md](PROJECT.md). This file holds:
 
 - the goal;
 - the plan and where each step stands;
@@ -37,12 +37,18 @@ The game should look and feel professionally made: juice and good art, both. We 
 - **What Claude makes well:** hard-surface shapes, lighting, materials and effects.
 - **What Claude makes badly:** faces, hands, hair and cloth. So the proposal is characters in sleek suits, armour and helmets with visors.
 - **How it's chosen:** from rendered style samples (decision 123; [the samples](#the-style-samples) below).
+- **Chosen after round 1:**
+  - **The setting:** the sports hall (decision 124).
+  - **Colours and light:** like Genshin Impact's landscapes: vibrant and full of light, never pale (decision 125).
+  - **The characters:** towards Fortnite-like humanoids (decision 126).
+
+  The two games are references for the style, not something to copy.
 
 ## The plan
 
 | # | Step | Status |
 | --- | --- | --- |
-| 1 | **Style samples:** two or three directions, rendered; the user picks | Round 1 rendered, waiting for the user's pick |
+| 1 | **Style samples:** two or three directions, rendered; the user picks | Round 1 done: the sports hall (decisions 124–126). Round 2 next: the hall in vibrant colour and light, and characters towards Fortnite-like humanoids |
 | 2 | **Smooth and fair:** a graphics setting that scales itself down when the frame rate drops (D1); a warning when Chrome draws without the graphics card (D2); presses timed from the key event (B4); every effect prepared in the lobby; the host's tab on a lower setting by default | To do |
 | 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | To do |
 | 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | To do |
@@ -134,7 +140,25 @@ These are starting targets, to be checked on an office laptop and adjusted:
   - The floor reflection costs a second render of the scene, so it would be a setting, or faked.
 - So the night arena loses the most in the move to a browser, but its darkness also hides simple geometry, and that helps.
 
-**Waiting for:** the user's pick, or a mix of the three, and their notes on the characters.
+**The user's pick:**
+
+- The sports hall is the setting (decision 124): "vibrant and alive and cheerful".
+- The colours and light should become like Genshin Impact's landscapes (decision 125), and "I don't like pale" rules out the daylight court's softness.
+- The characters were accepted as a first draft. They should move towards Fortnite-like humanoids (decision 126).
+
+### Round 2 (planned)
+
+- **The hall in vibrant colour and light:**
+  - **Warm, low sun** pouring through big windows or a glass roof, in visible beams, with cool sky light filling the shadows. Warm light against cool shade is what makes such landscapes glow.
+  - **Rich, saturated paint** that stays harmonious, warm wood, some greenery, and a bright sky with clouds outside.
+  - **Bloom and a warm/cool colour grade.**
+  - All of these carry over to the browser cheaply: baked light, bloom, a colour grade, faked light beams.
+- **Characters towards Fortnite-like humanoids:**
+  - athletic, slightly heroic proportions (larger hands, feet and head than real life);
+  - sports kit in the team colours;
+  - real hands, not mittens;
+  - livelier poses.
+- **Faces, shown side by side:** a sports helmet with a visor, and a stylised face with hair. Faces and hair are Claude's weakest area, so the user judges whether the face version is good enough.
 
 ## The log
 
@@ -145,3 +169,4 @@ These are starting targets, to be checked on an office laptop and adjusted:
   - Style samples, round 1: three directions, each in a gameplay view and a close-up, also loaded into the user's Blender.
     - Five rounds of fixes along the way: a black daylight scene (world haze blocks the sun), a lamp mirrored as a blob in the floor, a crowd that took 100 s to build, an overexposed hall, and frilly shorts.
     - The lessons are in section 14 of `PROJECT.md`.
+  - The user picked the sports hall, with Genshin-like colour and light and Fortnite-like characters (decisions 124–126). Round 2 is planned.
