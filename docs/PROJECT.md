@@ -48,7 +48,7 @@ Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules edito
   - Python 3.14 (python.org install).
   - Node 24, Chrome and Edge, uv, git, GitHub CLI.
   - Edited in VS Code with Claude Code (PowerShell, with Git Bash also available).
-  - **Git:** the folder is a git repository, published as the **public** GitHub repo `amirtavakolihaghighi/dodgeball` (MIT) with a history rebuilt for publishing (phase 9); the user's old private repo `dodge-and-parry` holds the original history until they delete it. `main` holds the releases, **v1.0.0** and **v2.0.0** (tags, each with a GitHub release carrying the Windows zip built by GitHub Actions). Commits use GitHub's noreply address. Commit or push only when the user asks.
+  - **Git:** the folder is a git repository, published as the **public** GitHub repo `amirtavakolihaghighi/dodgeball` (MIT) with a history rebuilt for publishing (phase 9). The original history is gone: the user deleted the old private repo `dodge-and-parry`, and every local backup of it was deleted too. `main` holds the releases, **v1.0.0** and **v2.0.0** (tags, each with a GitHub release carrying the Windows zip built by GitHub Actions). Commits use GitHub's noreply address. Commit or push only when the user asks.
   - The PC runs VPN/proxy tools, whose tunnel adapters show up in the join-address list.
 - **Wants simple but genuinely working prototypes.** They were burned by a ChatGPT prototype that looked polished but didn't work, with fake UI, mechanics that could never trigger and a broken renderer. No fake or decorative features: everything shown must work.
 - **Wants blunt, evidence-based judgment**, backed by screenshots, simulations and measurements, not opinion.
@@ -484,7 +484,7 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 **The request:** check the user's standard for publishing projects on GitHub and suggest improvements (then work them into it), prepare the project, and publish it following the standard. The user's choices:
 
 - a **public** repository under the **MIT** licence, with commits under GitHub's **noreply** address;
-- the name **Dodgeball** for the project, wherever it's needed (it was Dodge & Parry), in a new repository `dodgeball`; the old private `dodge-and-parry` stays untouched until the user deletes it;
+- the name **Dodgeball** for the project, wherever it's needed (it was Dodge & Parry), in a new repository `dodgeball`; the user deleted the old private `dodge-and-parry` afterwards, and every local backup of the old history went with it;
 - the idea transcript (`Chat.md`) and ChatGPT's attempt left out of the repository, then deleted from disk altogether;
 - the game's files moved out of `prototype/` to the repository root.
 
@@ -572,7 +572,7 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 | 60 | Publish as a public GitHub repository under the MIT licence | U | Following the user's publishing standard; MIT was the recommendation |
 | 61 | Commits use GitHub's noreply address, and the published history was rebuilt without personal data | U | The old commits carried a personal email, the docs a local path and coworkers' names. How the history was rebuilt: C |
 | 62 | The idea transcript (`Chat.md`) and ChatGPT's first attempt are left out of the published history, then deleted from disk | U | "Drop both", then "delete the folder of the failed prototype altogether, and Chat.md" |
-| 63 | The clean history goes to a new repository, `dodgeball`; the old private `dodge-and-parry` stays untouched until the user deletes it | U | A new repository: C (force-pushing over the old one would leave the old commits reachable by id and in its Activity view). "Leave the old repo, I delete it myself": U |
+| 63 | The clean history goes to a new repository, `dodgeball`; the user deletes the old private `dodge-and-parry` themselves, and every local backup of the old history is deleted | U | A new repository: C (force-pushing over the old one would leave the old commits reachable by id and in its Activity view). "Leave the old repo, I delete it myself", then "delete every backup of old history": U |
 | 64 | Windows release builds are made by GitHub Actions from the tag, with a SHA-256 checksum | C | Anyone can see what the app was built from; no local paths end up in the build |
 | 65 | `requirements.txt` is a lockfile (uv, every OS, Python 3.10+) generated from `requirements.in`; PyInstaller is pinned too | C | A fresh clone installs exactly what CI tested |
 | 66 | CI runs the Python tests on Windows, macOS and Linux with Python 3.10–3.14, and a headless-Chrome match on Linux | C | The README says the game runs from source on all three; CI proves it |
@@ -1281,7 +1281,7 @@ print(lengths, g.score, dict(counts))
 
 **Known limitations, by design or accepted for now:**
 
-- **Volleys:** one catch holds one ball. Two balls arriving within a few hundredths of a second can't both be caught; dodge through volleys instead.
+- **Volleys:** one catch holds one ball, and a deflect is spent on the ball it meets. A second ball a fraction of a second behind still hits, and to the player it looks as if the defence failed: the red flash comes right after the CATCH or DEFLECT popup. In the office logs, 8–9% of successful catches and deflects were followed within 0.3 s by another ball's hit, at the same rate before and after the lag settings (25, 27 and 28 Oct). A dodge covers every ball during its dash, so dodge through volleys instead.
 - **Close ricochets:** a ricochet bouncing right at someone's feet can be unreactable. Tune with `RICOCHET_CURVE_KEEP`, `RICOCHET_MIN_SPEED` and `RICOCHET_CONE_DEG` if it feels unfair.
 - **The perfect-dodge spin** starts when the server confirms it, about 0.1 s after the press, not instantly.
 - **Movement is trusted** to each browser within the court limits: fine among friends, not for strangers.
