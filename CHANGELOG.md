@@ -8,6 +8,12 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-29
+
+Each team's balls get their own colours, and the host gets new ways to set up a match: one health
+bar shared by each team, health that comes back by itself (faster while you stand still), settings
+for single players and bots, and settings files.
+
 ### Added
 
 - **Team ball colours.** A ball shows its thrower's colour until someone deflects it: RED's people
@@ -151,7 +157,8 @@ The first stable version, released as Dodge & Parry: real-time 3D dodgeball for 
 - A standalone Windows app (`build_exe.bat`), `run.bat`, and 30 rule tests plus headless-browser
   tests.
 
-[Unreleased]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/amirtavakolihaghighi/dodgeball/releases/tag/v1.0.0

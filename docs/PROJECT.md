@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate).
+Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0).
 
 ## Contents
 
@@ -50,7 +50,7 @@ Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules edito
   - Python 3.14 (python.org install).
   - Node 24, Chrome and Edge, uv, git, GitHub CLI.
   - Edited in VS Code with Claude Code (PowerShell, with Git Bash also available).
-  - **Git:** the folder is a git repository, published as the **public** GitHub repo `amirtavakolihaghighi/dodgeball` (MIT) with a history rebuilt for publishing (phase 9). The original history is gone: the user deleted the old private repo `dodge-and-parry`, and every local backup of it was deleted too. `main` holds the releases, **v1.0.0** and **v2.0.0** (tags, each with a GitHub release carrying the Windows zip built by GitHub Actions). Commits use GitHub's noreply address. Commit or push only when the user asks.
+  - **Git:** the folder is a git repository, published as the **public** GitHub repo `amirtavakolihaghighi/dodgeball` (MIT) with a history rebuilt for publishing (phase 9). The original history is gone: the user deleted the old private repo `dodge-and-parry`, and every local backup of it was deleted too. `main` holds the releases, **v1.0.0**, **v2.0.0**, **v2.1.0** and **v2.2.0** (tags, each with a GitHub release carrying the Windows zip built by GitHub Actions). Commits use GitHub's noreply address. Commit or push only when the user asks.
   - The PC runs VPN/proxy tools, whose tunnel adapters show up in the join-address list.
 - **Wants simple but genuinely working prototypes.** They were burned by a ChatGPT prototype that looked polished but didn't work, with fake UI, mechanics that could never trigger and a broken renderer. No fake or decorative features: everything shown must work.
 - **Wants blunt, evidence-based judgment**, backed by screenshots, simulations and measurements, not opinion.
@@ -639,6 +639,8 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 - Bots-only 3v3 matches, 20 rounds each: the standing-still rules alone change nothing for bots (wandering bots never stand still for 2 s: 114 s rounds as before). With hurt bots standing still, own-health rounds went 114 → 106 s (4 of 20 at the 3-minute limit, bots standing still 15% of the time) and team-health rounds 94 → 69 s (30% of the time): a bot standing still is an easier target, so the trade-off is real. "Needed" and "faster" came out the same for bots: a hurt bot stops at once, and the 4 s pause outlasts the 2 s it needs to count.
 - `still.json` in the browser, for a player and for a team bar ("only while standing still", 4 per second): 0 while walking and in the first second after, 6 in the next 1.5 s, 6–7 after a dodge whose key was let go during the dash (no restart), 1–2 for a dodge with the key held on (what came during the dash), and the hints matching each part.
 
+**Released as v2.2.0**, with phases 11 and 12, after the user had tested it all ("everything okay").
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -745,6 +747,7 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 | 98 | A dodge's dash doesn't count as walking, even with a direction held, as long as the key is let go before the dash ends; walking on after it does | U | The request's own rule. Judged in the player's timeline, a report up to 0.06 s after the dash still counting as the dash (C) |
 | 99 | Standing still = within 2 cm of where you stopped; turning, throwing and defending don't count | C | Measured from where you stopped, so slow creeping counts as moving |
 | 100 | Hurt bots stand still to regenerate (a Bots rule, on by default; a bot can have its own) | U | "Yes, when hurt". How (stop wandering, no sidesteps, still defend and throw): C |
+| 101 | Phases 11–13 are version 2.2.0 (minor) | C | They add features; settings saved by older versions still load, and nothing players rely on changes (bots' new names aside) |
 
 ## 6. Current features
 

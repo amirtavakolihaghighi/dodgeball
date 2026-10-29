@@ -10,7 +10,7 @@ Quick facts:
   - `testlog/` holds the session logs the user collected (git-ignored: coworkers' names and IPs). Run `tools/log_report.py` on a session folder first.
 - **Git and GitHub:**
   - **Public** repo `github.com/amirtavakolihaghighi/dodgeball` (MIT). Never commit personal data: names, email addresses, local paths with the Windows user name, IP addresses, anything from `testlog/`. Anonymise examples taken from logs or conversations.
-  - `main` holds the releases (tags `v1.0.0`, `v2.0.0`). Commits use GitHub's noreply address (set in the repo's git config).
+  - `main` holds the releases (tags `v1.0.0`, `v2.0.0`, `v2.1.0`, `v2.2.0`). Commits use GitHub's noreply address (set in the repo's git config).
   - The history from before publishing was deleted everywhere on 2026-10-29: the user's old private repo `dodge-and-parry` and every local backup. Push `main` and explicit tags only (never `--all`, `--tags` or `--mirror`).
   - Commit or push only when the user asks.
   - CI (`.github/workflows/ci.yml`) runs the Python tests on Windows, macOS and Linux with Python 3.10–3.14, plus a headless-Chrome match. Pushing a `vX.Y.Z` tag builds the Windows zip in GitHub Actions (`release.yml`); the release routine is in `CONTRIBUTING.md`.
