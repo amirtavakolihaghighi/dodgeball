@@ -8,7 +8,8 @@
 **A dodgeball game for a room full of people, with nothing for the players to install.** One
 computer hosts; everyone else on the same Wi-Fi opens a web page and plays. No accounts, no
 internet connection, no app store. It was made for office breaks and game nights, and has been
-played by groups of around ten on an office Wi-Fi.
+played by groups of around ten on an office Wi-Fi. For friends who aren't in the room, it also
+runs on a cloud server in **internet mode**, behind a password.
 
 It's a game of timing. Hold the mouse to charge a throw: harder throws fly faster, hit harder
 and cost more stamina. When a ball comes at you, press at the last moment to **dodge**,
@@ -39,6 +40,8 @@ rallies get frantic, and because stamina limits everything, mashing buttons gets
   screen. The host can tune both.
 - **Session logs** for when something feels laggy: press **L** at that moment. Afterwards the host
   downloads everyone's logs as one zip, and `tools/log_report.py` explains what happened.
+- **Internet mode,** for a server on the internet: friends join with a password, the host types
+  the host password, and limits keep strangers from wearing the server down.
 
 ## Play it
 
@@ -76,6 +79,19 @@ python -m venv .venv
 On Windows you can double-click `run.bat` instead: it sets everything up the first
 time. On macOS and Linux, use `python3` if `python` isn't found. `--port 8080` picks the port
 (the default is 8000, or the next free one), and `--no-browser` doesn't open a browser.
+
+### Over the internet
+
+Run it on a small cloud server in internet mode, with HTTPS in front:
+
+```bash
+python server.py --internet --password orange-tiger-42 --host-password my-long-host-password
+```
+
+Use your own two passwords: friends open your `https://` address and type the first; you type
+the second, the host password, and get the host's controls. [docs/INTERNET.md](docs/INTERNET.md) walks through it step by step: renting
+a server, a name for it, HTTPS with Caddy, running it as a service, and checking the lag after
+the first game night.
 
 ## How a game goes
 
@@ -118,9 +134,13 @@ You need a keyboard and mouse: there are no touch controls yet.
 
 ## Safety and privacy
 
-- **For your local network only.** The game listens on TCP port 8000 (up to 8019 if that's busy)
-  on all of the computer's network connections. There are no passwords: anyone who can reach that
-  address can join. Don't expose it to the internet or run it on a network you don't trust.
+- **Normally, for your local network only.** The game listens on TCP port 8000 (up to 8019 if
+  that's busy) on all of the computer's network connections. There are no passwords: anyone who
+  can reach that address can join. Don't expose it to the internet like that, or run it on a
+  network you don't trust.
+- **On the internet, use internet mode** ([docs/INTERNET.md](docs/INTERNET.md)): a password to
+  join, a host password for the host's controls, limits against abuse, and HTTPS in front. The
+  logs then keep players' addresses only in part (`203.0.x.x`).
 - **The host link** printed in the game's window (`...?host=...`) gives whoever opens it the
   host's controls. Don't share it.
 - **Nothing goes to the internet.** The game makes no internet connections, and three.js is
@@ -139,6 +159,8 @@ The full threat model, and how to report a vulnerability privately, is in [SECUR
 
 - [docs/MANUAL.md](docs/MANUAL.md): the full manual: every rule and its default, the
   lobby, sharing the game, the session logs.
+- [docs/INTERNET.md](docs/INTERNET.md): playing over the internet: internet mode, and setting
+  up a cloud server step by step.
 - [docs/PROJECT.md](docs/PROJECT.md): the design history, every decision and who made it, the
   architecture and the network protocol.
 - [docs/LAG_ANALYSIS.md](docs/LAG_ANALYSIS.md): what the office sessions' logs showed about lag,

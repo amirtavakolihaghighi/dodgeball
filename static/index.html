@@ -189,14 +189,18 @@
   <div class="panel">
     <div class="logo">DODGE<span>BALL</span></div>
     <p class="tag">Schoolyard dodgeball with Souls-style stamina. Throw hard, read the ball, then dodge, catch or deflect at the last moment.</p>
-    <label class="field">Name <input id="nameInput" maxlength="16" autocomplete="off"></label>
-    <button id="playBtn" class="primary">Join game</button>
-    <p class="note">The host (whoever runs the game on their computer) sets up the teams and the rules, and starts the match. Testing alone? Open more tabs or windows, and add bots to either team in the lobby.</p>
+    <form id="joinForm">
+      <label class="field">Name <input id="nameInput" maxlength="16" autocomplete="off"></label>
+      <label class="field" id="passwordField" hidden>Password <input id="passwordInput" type="password" maxlength="64" autocomplete="current-password"></label>
+      <p class="joinError" id="joinError" role="alert" hidden></p>
+      <button id="playBtn" class="primary">Join game</button>
+    </form>
+    <p class="note" id="joinNote">The host (whoever runs the game on their computer) sets up the teams and the rules, and starts the match. Testing alone? Open more tabs or windows, and add bots to either team in the lobby.</p>
   </div>
 </div>
 
 <div id="disconnected" hidden>
-  <div class="panel"><h2>Disconnected</h2><p>Lost the connection to the server.</p><button class="primary" id="reconnectBtn">Reconnect</button></div>
+  <div class="panel"><h2>Disconnected</h2><p id="disconnectedText">Lost the connection to the server.</p><button class="primary" id="reconnectBtn">Reconnect</button></div>
 </div>
 
 <script type="module" src="/static/js/main.js"></script>

@@ -8,6 +8,34 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 
 ## [Unreleased]
 
+### Added
+
+- **Internet mode** (`server.py --internet`), for friends who aren't on the same Wi-Fi: run the
+  game on a cloud server with HTTPS in front of it.
+  - The join screen asks for a password. Friends type the password; the host types the host
+    password in the same box and gets the host's controls. Nobody is the host because of where
+    they connect from: behind a proxy, every player seems to connect from the server itself.
+  - Limits that friends never notice: at most 16 people (`--max-players`; bots don't count, the
+    host always gets in), a minute's wait after 5 wrong passwords from one address, at most 10
+    connections per address, and a connection that doesn't join within 5 seconds or sends far
+    more than the game ever does is closed. A refused player is told why on the join screen.
+  - It listens on `127.0.0.1:8000` only, behind HTTPS, and opens no browser.
+  - Logs: a folder per game night (it starts when the first person joins and ends once nobody
+    has been on for 30 minutes); players' addresses only in part (`203.0.x.x`); never the
+    passwords. Only the host password gets everyone's logs.
+  - The lobby shows the address to send friends: the one the page was opened with.
+- **[docs/INTERNET.md](docs/INTERNET.md):** setting up a cloud server step by step (Ubuntu,
+  Caddy for HTTPS, the game as a service), and checking the lag after the first game night.
+  `deploy/` has the service file and the Caddy configuration.
+
+### Changed
+
+- No message may be bigger than 1 MiB (a whole settings file is about 150 KB), on a LAN too.
+- Browsers' logs have a limit per session as well as per page: 200 page loads and 300 MB in
+  all. A browser can no longer fill the disk by claiming new page loads.
+- The join fields are a form: Enter in either box joins, and browsers can offer to save the
+  password.
+
 ## [2.2.0] - 2026-10-29
 
 Each team's balls get their own colours, and the host gets new ways to set up a match: one health

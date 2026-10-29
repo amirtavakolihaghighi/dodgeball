@@ -34,8 +34,10 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-KEEP_SESSIONS = 30              # older session folders are deleted when the server starts
-MAX_CLIENT_BYTES = 30_000_000   # per browser page per session, so a runaway tab can't fill the disk
+KEEP_SESSIONS = 30              # older session folders are deleted when a new one starts
+MAX_CLIENT_BYTES = 30_000_000   # per browser page per session, so a runaway tab can't fill the disk...
+MAX_CLIENT_FILES = 200          # ...nor a browser that keeps claiming new pages...
+MAX_CLIENTS_BYTES = 300_000_000 # ...nor every browser's log together
 STALL_MS = 100                  # game-loop gaps longer than this are logged one by one
 PRINT_BLOCK_MS = 100            # so are console prints held up this long (a QuickEdit selection)
 HOST_POLL = 30                  # seconds between Wi-Fi / power readings
@@ -53,19 +55,37 @@ def ms(seconds):
 
 
 class SessionLog:
-    """This server run's log folder. write() never blocks: a background thread does the disk work."""
+    """The session log folders. write() never blocks: a background thread does the disk work.
+    A server on a LAN keeps one session for its whole run. In internet mode the server runs for
+    weeks, so it starts one per game night (start(), stop()); in between, writes are dropped."""
 
-    def __init__(self, root):
+    def __init__(self, root, start=True):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
-        self._prune()
-        self.dir = self.root / datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.dir.mkdir(exist_ok=True)
+        self.dir = None             # the current session's folder (or the last one's)
+        self.active = False         # is a session open?
         self._queue = queue.SimpleQueue()
         self._runs = {}             # browser page (run id) -> [file name, last chunk stored, bytes]
+        self._clients_bytes = 0     # every browser's log in this session together
         self._files = {}
         self.failed = None
         threading.Thread(target=self._writer, daemon=True, name="session-log").start()
+        if start:
+            self.start()
+
+    def start(self):
+        """A new session folder: everything written from now on goes there."""
+        self._prune()
+        folder = self.root / datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        folder.mkdir(exist_ok=True)
+        self._runs, self._clients_bytes = {}, 0
+        self._queue.put((None, folder))         # the writer closes the old session's files and moves on
+        self.dir, self.active = folder, True
+
+    def stop(self):
+        """Close the session's files. Nothing is written until the next start()."""
+        self.active = False
+        self._queue.put((None, None))
 
     def _prune(self):
         sessions = sorted(p for p in self.root.iterdir() if p.is_dir() and SESSION_NAME.fullmatch(p.name))
@@ -73,16 +93,22 @@ class SessionLog:
             shutil.rmtree(old, ignore_errors=True)
 
     def write(self, record, file="server"):
-        self._queue.put((file, json.dumps(record, separators=(",", ":"), default=str)))
+        if self.active:
+            self._queue.put((file, json.dumps(record, separators=(",", ":"), default=str)))
 
     def client(self, run, name, tab, seq, lines):
         """A chunk of a browser's log. False if it's malformed, True once stored (or if it was
-        already: the browser resends chunks whose acknowledgement it never got)."""
+        already: the browser resends chunks whose acknowledgement it never got). Past the
+        session's limits it's taken and dropped, so the browser doesn't send it forever."""
         run = UNSAFE.sub("", str(run))[:24]
         if not run or isinstance(seq, bool) or not isinstance(seq, int) or not isinstance(lines, list):
             return False
+        if not self.active:
+            return True
         entry = self._runs.get(run)
         if entry is None:
+            if len(self._runs) >= MAX_CLIENT_FILES:
+                return True
             label = UNSAFE.sub("_", str(name or ""))[:24].strip("_") or "player"
             entry = self._runs[run] = [f"client-{run}-{label}", 0, 0]
             self.write({"ty": "file", "run": run, "tab": UNSAFE.sub("", str(tab))[:24], "name": str(name)[:32],
@@ -93,14 +119,17 @@ class SessionLog:
             if not isinstance(line, dict):
                 continue
             text = json.dumps(line, separators=(",", ":"))
-            entry[2] += len(text) + 1
-            if entry[2] > MAX_CLIENT_BYTES:
+            size = len(text) + 1
+            if entry[2] + size > MAX_CLIENT_BYTES or self._clients_bytes + size > MAX_CLIENTS_BYTES:
                 break
+            entry[2] += size
+            self._clients_bytes += size
             self._queue.put((entry[0], text))
         entry[1] = seq
         return True
 
     def _writer(self):
+        folder = None
         while True:
             batch = [self._queue.get()]
             with contextlib.suppress(queue.Empty):
@@ -108,15 +137,22 @@ class SessionLog:
                     batch.append(self._queue.get_nowait())
             touched, waiting = set(), []
             for name, text in batch:
-                if name is None:                # a flush request: text is the Event to set
-                    waiting.append(text)
+                if name is None:
+                    if isinstance(text, threading.Event):   # a flush request
+                        waiting.append(text)
+                    else:                                   # a new session's folder, or None: no session
+                        for f in self._files.values():
+                            with contextlib.suppress(OSError):
+                                f.close()
+                        self._files, folder, self.failed = {}, text, None
+                        touched.clear()
                     continue
-                if self.failed:
+                if self.failed or folder is None:
                     continue
                 try:
                     f = self._files.get(name)
                     if f is None:
-                        f = self._files[name] = open(self.dir / f"{name}.jsonl", "a", encoding="utf-8")
+                        f = self._files[name] = open(folder / f"{name}.jsonl", "a", encoding="utf-8")
                     f.write(text + "\n")
                     touched.add(f)
                 except OSError as e:
@@ -304,14 +340,20 @@ def route_ip(target):
     return None
 
 
+def describe_host(log, host):
+    """The host computer's network adapters (a VPN shows up here), routes, console and power,
+    once per session. Slow on Windows (ipconfig): call it on its own thread."""
+    log.write({"ty": "host", "wall": wall_ms(), "adapters": adapters(), "route_lan": route_ip("10.255.255.255"),
+               "route_internet": route_ip("8.8.8.8"), "quick_edit": host.quick_edit(), **host.power()})
+
+
 def watch_host(log, host):
-    """Background thread: the host's adapters once, then Wi-Fi and power every HOST_POLL s."""
+    """Background thread: Wi-Fi and power every HOST_POLL s, while a session is open."""
     def loop():
-        log.write({"ty": "host", "wall": wall_ms(), "adapters": adapters(), "route_lan": route_ip("10.255.255.255"),
-                   "route_internet": route_ip("8.8.8.8"), "quick_edit": host.quick_edit(), **host.power()})
         while True:
-            log.write({"ty": "poll", "st": round(time.perf_counter(), 3), "wall": wall_ms(), "wifi": wifi_status() if WIN else None,
-                       **host.power()})
+            if log.active:
+                log.write({"ty": "poll", "st": round(time.perf_counter(), 3), "wall": wall_ms(),
+                           "wifi": wifi_status() if WIN else None, **host.power()})
             time.sleep(HOST_POLL)
     threading.Thread(target=loop, daemon=True, name="host-watch").start()
 

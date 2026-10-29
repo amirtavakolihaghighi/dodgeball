@@ -68,6 +68,16 @@ If other devices can't connect, it's almost always Windows Firewall. **Don't tur
 - double-click **`Allow friends to connect.bat`** (next to `Dodgeball.exe`, or in the project folder) once. It asks for administrator permission, then lets computers on your local network (never the internet) reach the game's ports 8000–8019, whether Windows calls the Wi-Fi Public or Private, and removes the old "block" rules Windows made when its "allow access" prompt was answered for private networks only. `Allow friends to connect.bat check` shows what it would do; `... undo` removes the rule; or
 - set the Wi-Fi network to **Private** in Windows settings, and allow the app when Windows asks.
 
+## Play over the internet
+
+For friends who aren't on the same Wi-Fi, run the game on a small cloud server in **internet mode**, with HTTPS in front of it: [INTERNET.md](INTERNET.md) walks through it step by step.
+
+- The join screen asks for a **password**. Friends type the password; the host types the **host password** in the same box, and gets the host's controls. Nobody is the host because of where they connect from.
+- Limits keep strangers from wearing the server down: at most 16 people (bots don't count; `--max-players` changes it), a minute's wait after 5 wrong passwords from one address, and a connection that sends far more than the game ever does is closed.
+- The lobby shows the address to send your friends, and the logs go to the server: one folder per game night.
+
+To try it on one computer: `.venv\Scripts\python server.py --internet --password orange-tiger-42 --host-password my-long-host-password` (with your own two passwords), then open `http://localhost:8000`.
+
 ## Testing alone
 
 - **Bots:** by default RED gets 1 and BLUE 2. Set each team's count (0–12) and the skill (easy/normal/hard) in the lobby. In the lobby that happens at once; during a match, from the next round.
@@ -90,8 +100,8 @@ Every session writes a diagnostics log, so lag can be traced to its cause instea
   - the graphics card, CPU cores and screen.
 - **Press L** in the game the moment something feels laggy. The log marks it, so the numbers around that moment can be read later.
 - **After the session** the host opens the menu (Esc) and clicks **Download all logs (zip)**, then sends that zip. If someone's connection dropped, they can click **Save my log** to keep their own copy (it goes to their Downloads folder).
-- **What's in it:** player names, LAN addresses, device details (browser, graphics card, CPU cores, screen) and performance numbers. Nothing else.
-- **Housekeeping:** the 30 newest sessions are kept. `--no-log` turns logging off.
+- **What's in it:** player names, LAN addresses, device details (browser, graphics card, CPU cores, screen) and performance numbers. Nothing else. In internet mode, players' addresses only in part (`203.0.x.x`), and never the passwords.
+- **Housekeeping:** the 30 newest sessions are kept. `--no-log` turns logging off. In internet mode a session is a game night: it starts when the first person joins and ends once nobody has been on for 30 minutes.
 
 To read a session: `python tools\log_report.py <the zip or a session folder>`. It prints:
 
@@ -190,7 +200,7 @@ These are the **defaults** (they live in `config.py`). The host can change every
 
 ```powershell
 .venv\Scripts\python tests\test_sim.py       # 69 rule tests
-.venv\Scripts\python tests\test_server.py    # 7 server tests: real WebSockets, players' own settings, the host's screen, the session logs, the log report
+.venv\Scripts\python tests\test_server.py    # 11 server tests: real WebSockets, players' own settings, the host's screen, the session logs, the log report, internet mode
 ```
 
 End-to-end browser tests (headless Chrome) are in `tests\browser\`; see its README. The full project history and technical reference is [PROJECT.md](PROJECT.md).
@@ -227,11 +237,13 @@ The tests cover:
 - the logs: the server and a browser's log end up in the host's zip, without duplicates
 - the logs' detectors: server stalls, presses that arrived after the hit, and console prints held up by a click
 - the log report: it blames a freeze during a server stall on the host, a player's own freezes on their connection, and gives each lag mark the right cause
+- internet mode: only the password lets people in and only the host password makes the host (not this computer, not a forged address); the player cap; the wait after wrong passwords; a connection that never joins, sends too much or holds too many connections from one address; logs that need the host password, keep addresses only in part and never hold a password; a log folder per game night, and the limits on every browser's log together
 
 ## Known limits
 
 - Laptop/desktop only (keyboard and mouse), no touch controls yet.
-- Movement is trusted to each browser, within the court limits. That's fine for friends on a LAN, not for strangers on the internet.
+- Movement is trusted to each browser, within the court limits. That's fine for friends, on a LAN or with internet mode's password, not for strangers.
+- Internet mode has no accounts and no kick button: anyone with the password can join, and keeping someone out means changing the password and restarting the server.
 - No obstacles yet, and no sound files: the effects are synthesized.
 - One catch holds one ball. Against two balls arriving together, dodge instead (you can't be hit during the dash).
 - Players' own settings go by name, so two people with the same name share them.

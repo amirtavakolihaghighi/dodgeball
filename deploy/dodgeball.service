@@ -1,0 +1,30 @@
+# Dodgeball as a service on a Linux server, in internet mode: it starts with the server and
+# comes back if it crashes. Setup, step by step: docs/INTERNET.md.
+#
+# The game lives in /opt/dodgeball and runs as the user "dodgeball". The two passwords are in
+# /etc/dodgeball.env, readable by root only:
+#   DODGEBALL_PASSWORD=...         what players type
+#   DODGEBALL_HOST_PASSWORD=...    what the host types
+[Unit]
+Description=Dodgeball game server (internet mode)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=dodgeball
+Group=dodgeball
+WorkingDirectory=/opt/dodgeball
+EnvironmentFile=/etc/dodgeball.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/dodgeball/.venv/bin/python server.py --internet --port 8000
+Restart=on-failure
+RestartSec=3
+# The game needs nothing outside its own folder.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/dodgeball
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+# Caddy in front of Dodgeball (internet mode): HTTPS with a free certificate that Caddy gets and
+# renews by itself, and the game's connection passed on to the game on this server. Caddy also
+# tells the game each player's own address (X-Forwarded-For), which its limits per address need.
+#
+# Put your own name in place of game.example.com. Setup, step by step: docs/INTERNET.md.
+
+game.example.com {
+	reverse_proxy 127.0.0.1:8000
+}

@@ -61,7 +61,9 @@ export class Net {
     return this;
   }
 
-  /** extra: {guest: true} to join without host powers, {hostKey} from the console's host link. */
+  /** extra: {guest: true} to join without host powers, {hostKey} from the console's host link,
+   *  {password} in internet mode. The close handler gets the code and reason: a server that
+   *  doesn't let this tab in closes with 4001 and says why. */
   connect(name, extra = {}) {
     const ws = (this.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`));
     ws.onopen = () => {
@@ -75,9 +77,10 @@ export class Net {
       this.nextArrival = at;
       setTimeout(() => this.receive(JSON.parse(e.data)), at - now);
     };
-    ws.onclose = () => {
+    ws.onclose = (e) => {
+      if (this.ws !== ws) return;     // an earlier connection, already replaced by a new one
       clearInterval(this.pinger);
-      this.handlers.close?.();
+      this.handlers.close?.(e.code, e.reason);
     };
   }
 

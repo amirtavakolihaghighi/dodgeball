@@ -69,9 +69,11 @@ export class Lobby {
     }
   }
 
-  setHost(isHost, maxBots) {
+  /** internet: the server is in internet mode, where the host is whoever typed the host password. */
+  setHost(isHost, maxBots, internet = false) {
     this.isHost = isHost;
     this.maxBots = maxBots;
+    this.internet = internet;
     for (const e of document.querySelectorAll('.hostCtl')) e.disabled = !isHost;
     $('rulesBtn').textContent = isHost ? 'Game rules…' : 'View the game rules…';
     $('importBtn').hidden = !isHost;
@@ -178,7 +180,11 @@ export class Lobby {
       : '';
     if (lobby) {
       if (this.isHost) return `You're the host: set up the teams and the rules, then press Start match. Everyone can warm up meanwhile.${last}`;
-      if (!host) return `Waiting for the host. The host is whoever plays on the computer running the game.${last}`;
+      if (!host) {
+        return this.internet
+          ? `Waiting for the host: whoever joins with the host password.${last}`
+          : `Waiting for the host. The host is whoever plays on the computer running the game.${last}`;
+      }
       return `Waiting for ${host.id === myId ? 'you' : host.name} to start the match. Warm up meanwhile.${last}`;
     }
     const goal = r.win ? ` · first to ${r.win}` : '';

@@ -39,7 +39,7 @@ The game keeps two things between runs, next to `server.py`: the host's rules
 
 ```bash
 python tests/test_sim.py       # the rules: 69 tests, about two minutes
-python tests/test_server.py    # the server over real WebSockets, the session logs, the log report
+python tests/test_server.py    # the server over real WebSockets, the session logs, the log report, internet mode
 ```
 
 Browser tests drive the real client in headless Chrome: see

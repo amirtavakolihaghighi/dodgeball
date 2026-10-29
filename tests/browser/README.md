@@ -18,7 +18,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock&mode=deflect&lag=150" t
 node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_controls.json
 ```
 
-The browser on the server's PC is the host, so these tests run as the host.
+The browser on the server's PC is the host, so these tests run as the host. (Not in internet mode: see "Internet mode" below.)
 
 - **`smoke.json`:** joins, checks the lobby and the host's Start button, starts the match, and prints the state. It saves `smoke_lobby.png` and `smoke.png` and fails loudly on any page error.
 - **`autodefend.json` + `autodefend.js`:**
@@ -160,6 +160,25 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock&jitter=200" tests\brows
 - in the report: one server stall of that length;
 - the player's freezes split into "host side" (during the stall) and their own (the jitter);
 - the L mark attributed to the network if it came before the freeze.
+
+## Internet mode
+
+Start the server in internet mode with these two passwords (the test types them), and a log folder for the host's download:
+
+```powershell
+.venv\Scripts\python server.py --port 8123 --no-browser --fresh --internet --password "let me in" --host-password "the boss 42" --log-dir tests\browser\out\logs
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\internet.json
+```
+
+**What `internet.json` does** (each step checks its own result and throws, printed as `eval EXCEPTION`, when something's off):
+
+- The join screen shows the password box and says to ask the host for it.
+- A wrong password: "Wrong password." on the join screen, with the password box selected, and a reload wouldn't retry it (`internet_wrong_password.png`).
+- The right password: a player, without the host's controls; the lobby says "Waiting for the host: whoever joins with the host password." and shows the page's own address to send friends; everyone's logs are refused to them (403) (`internet_player_lobby.png`).
+- A reload: the tab joins again by itself, with the password it had.
+- The host password: the host's controls, everyone's logs (a zip), and a match that starts (`internet_host_match.png`).
+
+CI runs it on every push.
 
 ## Notes
 

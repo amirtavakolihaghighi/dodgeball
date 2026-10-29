@@ -2,7 +2,8 @@
 
 Dodgeball is a party game for people on the same local network. One computer runs a small
 web server, and everyone else plays in a browser. It was built to be played among friends, and
-this page says plainly what that means for security.
+this page says plainly what that means for security. For friends elsewhere it has an internet
+mode, behind a password (below).
 
 ## Reporting a problem
 
@@ -20,7 +21,8 @@ Fixes go into the next release; only the latest release is supported.
 
 - It listens on **TCP port 8000** (or the next free port up to 8019) on **every network
   interface**, so anyone who can reach that computer on the network can open the game.
-- There are **no accounts and no passwords**. Anyone who connects can join and play.
+- There are **no accounts and no passwords** (except in internet mode, below). Anyone who
+  connects can join and play.
 - **Host powers** (rules, teams, bots, starting and ending matches, downloading the session
   logs) go to browsers on the host's own computer, and to anyone who opens the **host link**
   shown in the server window (`...?host=KEY`; the key is random for every run). Treat that link
@@ -34,8 +36,11 @@ Fixes go into the next release; only the latest release is supported.
     details** (graphics card, CPU cores, screen size), and the host computer's CPU, memory, power,
     network adapters (names and IPv4 addresses, so a VPN shows up) and Wi-Fi signal (network
     names and hardware addresses are left out).
-- Every browser that joins can make the server store log data, up to 30 MB per page load, so a
-  hostile player could fill some disk space.
+- Every browser that joins can make the server store log data: up to 30 MB per page load, 200
+  page loads and 300 MB for all browsers together per session (a session is one server run; in
+  internet mode, one game night). So a hostile player could fill some disk space, within those
+  limits.
+- No message may be bigger than 1 MiB (a whole settings file is about 150 KB).
 - On Windows it runs `netsh wlan show interfaces` and `ipconfig` (read-only, fixed arguments)
   to record the host's network state in the log.
 - It **never contacts the internet**: three.js is bundled, and there are no update checks,
@@ -63,11 +68,38 @@ not restored. `... check` only shows what it would do.
 made by GitHub Actions from the tagged source (`.github/workflows/release.yml`), and every
 release lists the SHA-256 checksum of its zip.
 
+## Internet mode
+
+`server.py --internet` ([docs/INTERNET.md](docs/INTERNET.md)) is for a server on the internet,
+with HTTPS in front of it (the guide uses Caddy).
+
+- **Passwords:** a connection must join with the players' password within 5 seconds. The host's
+  controls, and everyone's logs, need the host password. Nobody is the host because of the
+  address they connect from. The passwords come from the command line or the environment
+  (`DODGEBALL_PASSWORD`, `DODGEBALL_HOST_PASSWORD`), must differ, are compared in constant time,
+  and are never written to the logs.
+- **Guessing:** after 5 wrong passwords from one address within a minute, that address waits.
+- **Limits:** at most 16 people (bots don't count; the host always gets in), 10 open
+  connections per address and 64 in all (or the people allowed plus 16, if that's more), and per connection about 512 KB/s and 300 messages a
+  second after a burst (a browser resending its stored log). A connection over them is closed.
+- **Listening:** on `127.0.0.1:8000` only, unless `--host` says otherwise (then the server warns
+  that nothing is encrypted).
+- **Players' addresses** come from uvicorn: the connecting address, or the `X-Forwarded-For`
+  header when the connection comes from this computer (a proxy such as Caddy). A proxy must pass
+  players' addresses on, or the limits count everyone as one address; the server notes it when a
+  player seems to connect from the server itself. Whatever the address, it never makes anyone
+  the host.
+- **Logs:** a folder per game night; players' addresses only in part (`203.0.x.x`); refused
+  connections (wrong passwords, floods) are noted with that partial address.
+
 ## What it cannot protect you from
 
-- Hostile people on the same network: there is no authentication and no encryption.
+- On a LAN: hostile people on the same network. There is no authentication and no encryption.
+- In internet mode: anyone who has the password can join and play; a flood from many addresses
+  at once (that's for the cloud provider's network to stop).
 - Cheating with a modified browser.
-- Anyone who gets the host link, or who can use the host's computer (and read its log folder).
+- Anyone who gets the host link or the host password, or who can use the host's computer or the
+  server (and read its log folder).
 
-**Don't expose the game to the internet** (no port forwarding, no public cloud server). It is
-made for a room full of people you know.
+**Don't expose the game to the internet without internet mode** (no port forwarding, no public
+cloud server). It is made for people you know: in internet mode, give the password only to them.

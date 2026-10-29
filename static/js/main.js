@@ -6,6 +6,7 @@
 // The host (whoever plays on the computer running the server) also runs the lobby: teams,
 // bots, the rules and the start and end of the match, and may spectate instead of playing.
 // Everyone else sees it read-only, and can follow the host's screen while they set things up.
+// A server in internet mode asks for a password, and the host is whoever types the host password.
 import { Net } from './net.js';
 import { Input } from './input.js';
 import { World } from './world.js';
@@ -26,6 +27,15 @@ const DENY = {
   stamina: 'Not enough stamina', busy: 'Still recovering', noball: 'No ball yet',
   cash: 'Not enough cash', nobody: 'Nobody to revive', round: 'Not now', host: 'Only the host can do that',
   full: 'Team health is already full',
+};
+// A server in internet mode that doesn't let this tab in closes the connection with this code,
+// and the reason says why (server.py refuse, internet.Door).
+const REFUSED = 4001;
+const REFUSAL = {
+  password: (typed) => (typed ? 'Wrong password.' : 'This game needs a password: ask the host for it.'),
+  wait: () => 'Too many wrong passwords from your network. Wait a minute, then try again.',
+  full: () => 'The game is full.',
+  busy: () => 'Too many connections from your network right now. Close other game tabs, then try again.',
 };
 // Each team's ball colours, people's and bots' (rules; a player may have their own). Deflected
 // balls show their rally colour instead (world.js).
@@ -105,26 +115,56 @@ world.buildCourt(13, 7, 1);
 // ------------------------------------------------------------------ join & menu
 
 let saved = null;
+let joinPassword = '';      // internet mode: what this tab typed (the host password makes it the host)
 try { saved = JSON.parse(sessionStorage.getItem('dp.join') || 'null'); } catch { /* ignore */ }
 $('nameInput').value = saved?.name || `Player-${100 + Math.floor(Math.random() * 900)}`;
-$('playBtn').addEventListener('click', join);
-$('nameInput').addEventListener('keydown', (e) => e.key === 'Enter' && join());
+$('passwordInput').value = saved?.password || '';
+$('joinForm').addEventListener('submit', (e) => {      // the button, or Enter in either box
+  e.preventDefault();
+  join();
+});
+// A server in internet mode asks for a password. A reloaded tab sends the one it joined with.
+fetch('/join-info').then((r) => r.json()).then((info) => {
+  if (!info.password) return;
+  $('passwordField').hidden = false;
+  $('joinNote').textContent = 'Ask the host for the password. The host types the host password here instead, '
+    + 'then sets up the teams and the rules, and starts the match.';
+}).catch(() => { /* an older server: no password */ });
 if (saved?.joined) join();     // a reloaded tab rejoins under the same name (sessionStorage is per tab); the server gives back its team
 
 function join() {
   myName = $('nameInput').value.trim().slice(0, 16) || 'Player';
+  joinPassword = $('passwordInput').value.trim();
   try {
-    sessionStorage.setItem('dp.join', JSON.stringify({ name: myName, joined: true }));
+    sessionStorage.setItem('dp.join', JSON.stringify({ name: myName, joined: true, password: joinPassword || undefined }));
   } catch { /* ignore */ }
   $('join').hidden = true;
+  $('joinError').hidden = true;
   sfx.unlock();
   diag.name = myName;
   // ?guest: join without host powers (to see what others see); ?host=KEY: the console's host link
   const extra = { tab: diag.tab, run: diag.run };
   if (params.has('guest')) extra.guest = true;
   if (params.get('host')) extra.hostKey = params.get('host');
+  if (joinPassword) extra.password = joinPassword;
   net.connect(myName, extra);
   showMenu();
+}
+
+/** The server didn't let this tab in (internet mode): back to the join screen, saying why. */
+function refused(why) {
+  try {
+    sessionStorage.setItem('dp.join', JSON.stringify({ name: myName, joined: false }));    // a reload won't retry
+  } catch { /* ignore */ }
+  $('overlay').hidden = true;
+  $('join').hidden = false;
+  $('joinError').textContent = REFUSAL[why](joinPassword);
+  $('joinError').hidden = false;
+  if (why === 'password') {
+    $('passwordField').hidden = false;
+    $('passwordInput').focus();
+    $('passwordInput').select();
+  }
 }
 
 /** The rules changed (or arrived): everything derived from them follows. */
@@ -153,12 +193,12 @@ net.on('welcome', (m) => {
   isHost = m.host;
   rules.defaults = m.defaults;
   editor.setup(m.schema, m.defaults, isHost);
-  lobby.setHost(isHost, m.cfg.botsMax);
+  lobby.setHost(isHost, m.cfg.botsMax, m.internet);
   applyRules(m);
   hud.show(true);
   const box = $('joinInfo');
   const h = document.createElement('h3');
-  h.textContent = 'Others on the same Wi-Fi open';
+  h.textContent = m.internet ? 'Friends open this address and type the password' : 'Others on the same Wi-Fi open';
   box.replaceChildren(h);
   for (const url of cfg.joinUrls.length ? cfg.joinUrls : [location.origin]) {
     const code = document.createElement('code');
@@ -174,19 +214,23 @@ net.on('welcome', (m) => {
   }).catch(() => { /* not available on this page */ });
   if (m.logging) diag.connect((msg) => net.send(msg));
   $('diagText').textContent = m.logging
-    ? 'This game records a log to find the cause of lag: frame rate, connection timing and device info (graphics card, CPU cores, screen). It goes to the host\'s computer by itself. In the game, press L the moment something feels laggy.'
+    ? `This game records a log to find the cause of lag: frame rate, connection timing and device info (graphics card, CPU cores, screen). It goes to ${m.internet ? 'the game\'s server' : 'the host\'s computer'} by itself. In the game, press L the moment something feels laggy.`
     : 'This server isn\'t saving logs, but you can still save your own.';
   $('hostLogsBtn').hidden = !(isHost && m.logging);
-  $('diagWhere').textContent = isHost && m.logDir ? `On this computer the logs are in ${m.logDir}` : '';
+  $('diagWhere').textContent = isHost && m.logDir ? `On ${m.internet ? 'the server' : 'this computer'} the logs are in ${m.logDir}` : '';
 });
 net.on('rules', applyRules);
 net.on('logack', (m) => diag.ack(m.run, m.seq));
 net.on('hostview', (m) => { hostView = m.m ? m : null; });
-net.on('close', () => {
-  diag.log('ws', { closed: true });
+net.on('close', (code, reason) => {
+  diag.log('ws', { closed: true, code });
   diag.flush();
-  $('disconnected').hidden = false;
   document.exitPointerLock?.();
+  if (code === REFUSED && myId === null && REFUSAL[reason]) return refused(reason);
+  $('disconnectedText').textContent = code === REFUSED && reason === 'flood'
+    ? 'The server disconnected this tab: it sent far more than the game ever does.'
+    : 'Lost the connection to the server.';
+  $('disconnected').hidden = false;
 });
 $('reconnectBtn').addEventListener('click', () => location.reload());
 
@@ -228,6 +272,13 @@ $('saveLogBtn').addEventListener('click', () => {
 });
 $('hostLogsBtn').addEventListener('click', downloadAllLogs);
 
+/** Everyone's logs, zipped by the server. Only the host gets them: the browser on the server's
+ *  computer, or the one with the host link's key or (internet mode) the host password. */
+function fetchAllLogs() {
+  const key = params.get('host') || (isHost ? joinPassword : '');
+  return fetch('/logs/download', { headers: key ? { 'X-Host-Key': encodeURIComponent(key) } : {} });
+}
+
 /** The host's "Download all logs": every browser's log and the server's, zipped by the server. */
 async function downloadAllLogs() {
   const button = $('hostLogsBtn');
@@ -235,8 +286,7 @@ async function downloadAllLogs() {
   try {
     diag.flush();
     await new Promise((resolve) => setTimeout(resolve, 500));     // let our own latest lines arrive
-    const key = params.get('host');
-    const res = await fetch(`/logs/download${key ? `?key=${encodeURIComponent(key)}` : ''}`);
+    const res = await fetchAllLogs();
     if (!res.ok) throw new Error(await res.text());
     const a = document.createElement('a');
     a.href = URL.createObjectURL(await res.blob());
@@ -1221,7 +1271,7 @@ requestAnimationFrame(frame);
 // Handle for automated tests and console poking.
 window.dp = {
   net, input, local, aim, world, lobby, editor, rules, diag, showMenu, spec, followNext,
-  exportSettings, importSetupText, settingsFile, ownValue, ballColorOf,
+  exportSettings, importSetupText, settingsFile, ownValue, ballColorOf, fetchAllLogs,
   get hostView() { return hostView; },
   get me() { return me; }, get threat() { return threat; }, get view() { return view; }, get cfg() { return cfg; }, get isHost() { return isHost; },
 };

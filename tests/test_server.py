@@ -1,5 +1,5 @@
 """Server tests over real WebSockets: the host, the lobby protocol, rule updates, saved rules,
-and the session logs (plus the report tool that reads them).
+the session logs (plus the report tool that reads them), and internet mode.
 
 Starts server.py on a free port (with --fresh, so your saved rules are neither used nor
 touched) and talks to it like browsers do. Run with:  python tests/test_server.py
@@ -9,6 +9,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import queue
 import re
 import socket
@@ -18,9 +19,11 @@ import tempfile
 import threading
 import time
 import traceback
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
+from urllib.parse import quote
 
 import websockets
 
@@ -129,21 +132,26 @@ async def scenario(url, host_key):
 
 @contextlib.contextmanager
 def running_server(*extra):
-    """server.py on a free port (--no-browser --fresh plus `extra`): yields (port, host key)."""
+    """server.py on a free port (--no-browser --fresh plus `extra`): yields (port, host key). In
+    internet mode the console shows no host link (the host password is the key): (port, None)."""
     port = free_port()
     proc = subprocess.Popen([sys.executable, "-u", str(ROOT / "server.py"), "--port", str(port), "--no-browser",
                              "--fresh", *extra], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     lines = queue.Queue()
     threading.Thread(target=lambda: [lines.put(line) for line in proc.stdout], daemon=True).start()
     try:
-        key, printed = None, []
+        key, ready, printed = None, False, []
         deadline = time.time() + 20
-        while key is None and time.time() < deadline:
+        while not ready and time.time() < deadline:
             with contextlib.suppress(queue.Empty):
                 printed.append(lines.get(timeout=0.5))
-                found = re.search(r"\?host=(\S+)", printed[-1])
-                key = found.group(1) if found else None
-        assert key, "the console never showed the host link. It printed:\n" + "".join(printed[-30:])
+                if "--internet" in extra:
+                    ready = "internet mode" in printed[-1]
+                else:
+                    found = re.search(r"\?host=(\S+)", printed[-1])
+                    key = found.group(1) if found else None
+                    ready = key is not None
+        assert ready, "the console never showed the server's banner. It printed:\n" + "".join(printed[-30:])
         for _ in range(100):
             with socket.socket() as s:
                 if s.connect_ex(("127.0.0.1", port)) == 0:
@@ -162,6 +170,8 @@ def running_server(*extra):
 def test_lobby_protocol_over_websockets():
     with running_server() as (port, key):
         asyncio.run(scenario(f"ws://127.0.0.1:{port}/ws", key))
+        info = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/join-info", timeout=10).read())
+        assert info == {"password": False}                 # on a LAN the join screen asks for no password
 
 
 async def own_settings_scenario(url):
@@ -368,6 +378,210 @@ def test_the_hosts_rules_are_saved_and_come_back():
         server.game = Game()
         server.load_saved_rules()
         assert server.game.rules.GRAVITY == rules_mod.DEFAULTS["GRAVITY"]
+
+
+# ---------------------------------------------------------------- internet mode
+
+PASSWORD, HOST_PASSWORD = "let me in", "the boss 42"
+INTERNET = ("--internet", "--password", PASSWORD, "--host-password", HOST_PASSWORD)
+
+
+async def knock(url, name, address=None, **fields):
+    """A browser joining from `address`, as a proxy on the server reports it (X-Forwarded-For):
+    (the connection, its welcome) if let in, else (None, the reason the server closed with)."""
+    ws = await websockets.connect(url, max_queue=None, additional_headers={"X-Forwarded-For": address} if address else {})
+    await ws.send(json.dumps({"t": "join", "name": name, **fields}))
+    try:
+        while (m := json.loads(await asyncio.wait_for(ws.recv(), 5)))["t"] != "welcome":
+            pass
+    except websockets.ConnectionClosed:
+        assert ws.close_code == 4001, ws.close_code
+        return None, ws.close_reason
+    return ws, m
+
+
+async def closed_with(ws, seconds=8):
+    """Read until the server closes the connection (at most `seconds`, or TimeoutError):
+    (code, reason, the kinds of message that came)."""
+    kinds, end = set(), time.perf_counter() + seconds
+    with contextlib.suppress(websockets.ConnectionClosed):
+        while True:
+            kinds.add(json.loads(await asyncio.wait_for(ws.recv(), end - time.perf_counter()))["t"])
+    return ws.close_code, ws.close_reason, kinds
+
+
+async def passwords_scenario(url):
+    # Nobody is the host because of where they connect from: neither this computer nor a forged address.
+    local, w = await knock(url, "Local", password=PASSWORD)
+    forged, w2 = await knock(url, "Forged", "127.0.0.1", password=PASSWORD)
+    assert w["host"] is False and w2["host"] is False and w["internet"] is True and w["cfg"]["joinUrls"] == []
+    # No password, or a wrong one: not let in, and the reason says so.
+    assert await knock(url, "Nobody", "198.51.100.7") == (None, "password")
+    assert await knock(url, "Guess", "198.51.100.7", password="let me ln") == (None, "password")
+    # The host password, typed in or in the ?host= link, makes the host.
+    boss, w3 = await knock(url, "Boss", "198.51.100.8", password=f" {HOST_PASSWORD} ")
+    laptop, w4 = await knock(url, "Laptop", "198.51.100.8", hostKey=HOST_PASSWORD)
+    assert w3["host"] is True and w4["host"] is True
+    # Three people at most (--max-players 3): a fourth friend waits, the host always gets in.
+    assert await knock(url, "Late", "198.51.100.9", password=PASSWORD) == (None, "full")
+    # Five wrong passwords from one address within a minute: it waits, even with the right one.
+    for _ in range(3):
+        assert await knock(url, "Guess", "198.51.100.7", password="nope") == (None, "password")
+    assert await knock(url, "Guess", "198.51.100.7", password=PASSWORD) == (None, "wait")
+    assert await knock(url, "Late", "198.51.100.9", password=PASSWORD) == (None, "full")     # others don't wait
+    # A connection that hasn't joined gets nothing, not even the rules.
+    stranger = await websockets.connect(url, additional_headers={"X-Forwarded-For": "198.51.100.10"})
+    await stranger.send(json.dumps({"t": "sync"}))
+    await asyncio.sleep(0.5)
+    await stranger.send(json.dumps({"t": "join", "name": "Late", "password": "wrong"}))
+    assert await closed_with(stranger) == (4001, "password", set())
+    for ws in (local, forged, boss, laptop):
+        await ws.close()
+
+
+def test_internet_mode_lets_people_in_by_password_only():
+    with tempfile.TemporaryDirectory() as tmp:
+        with running_server(*INTERNET, "--max-players", "3", "--log-dir", tmp) as (port, _key):
+            assert not list(Path(tmp).iterdir())           # no game night yet: no log folder
+            info = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/join-info", timeout=10).read())
+            assert info == {"password": True}
+            asyncio.run(passwords_scenario(f"ws://127.0.0.1:{port}/ws"))
+            time.sleep(0.3)
+
+            def download(key=None):
+                headers = {"X-Host-Key": quote(key)} if key else {}
+                req = urllib.request.Request(f"http://127.0.0.1:{port}/logs/download", headers=headers)
+                try:
+                    return urllib.request.urlopen(req, timeout=10).read()
+                except urllib.error.HTTPError as e:
+                    return e.code
+            # Only the host password gets everyone's logs, not being on this computer.
+            assert download() == 403 and download(PASSWORD) == 403
+            data = download(HOST_PASSWORD)
+        assert len([p for p in Path(tmp).iterdir() if p.is_dir()]) == 1    # the game night's folder
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        everything = b"".join(z.read(n) for n in z.namelist())
+        server_lines = [json.loads(line) for n in z.namelist() if n.endswith("/server.jsonl") for line in z.read(n).splitlines()]
+    meta = next(r for r in server_lines if r["ty"] == "meta")
+    joins = [r for r in server_lines if r["ty"] == "join"]
+    refused = [r["why"] for r in server_lines if r["ty"] == "refused"]
+    assert meta["internet"] is True and "password" not in meta["args"] and "host_password" not in meta["args"]
+    assert PASSWORD.encode() not in everything and HOST_PASSWORD.encode() not in everything     # never logged
+    assert {j["ip"] for j in joins} == {"127.0.x.x", "198.51.x.x"}            # addresses only in part
+    assert refused.count("password") == 6 and refused.count("full") == 2 and refused.count("wait") == 1
+
+
+async def limits_scenario(url):
+    # A connection must join within 5 s...
+    idle = await websockets.connect(url, additional_headers={"X-Forwarded-For": "203.0.113.1"})
+    started = time.perf_counter()
+    assert await closed_with(idle) == (4001, "slow", set()) and 4.5 < time.perf_counter() - started < 7
+    # ...with a small message.
+    big = await websockets.connect(url, additional_headers={"X-Forwarded-For": "203.0.113.2"})
+    await big.send(json.dumps({"t": "join", "name": "x" * 5000, "password": PASSWORD}))
+    assert await closed_with(big) == (4001, "flood", set())
+    # One address can't hold more than 10 connections open.
+    held = [await websockets.connect(url, additional_headers={"X-Forwarded-For": "203.0.113.3"}) for _ in range(10)]
+    one_more = await websockets.connect(url, additional_headers={"X-Forwarded-For": "203.0.113.3"})
+    assert await closed_with(one_more) == (4001, "busy", set())
+    for ws in held:
+        await ws.close()
+    # A player who sends far more than a browser ever does is disconnected: many messages...
+    chatty, _ = await knock(url, "Chatty", "203.0.113.4", password=PASSWORD)
+    for i in range(6000):
+        await chatty.send(json.dumps({"t": "ping", "c": i}))
+    assert (await closed_with(chatty))[:2] == (4001, "flood")
+    # ...or many bytes,
+    heavy, _ = await knock(url, "Heavy", "203.0.113.5", password=PASSWORD)
+    for _ in range(20):
+        await heavy.send("x" * 1_000_000)
+    assert (await closed_with(heavy))[:2] == (4001, "flood")
+    # ...or one message bigger than any browser sends (1 MiB): the WebSocket's own limit.
+    huge, _ = await knock(url, "Huge", "203.0.113.6", password=PASSWORD)
+    await huge.send("x" * (1024 * 1024 + 1))
+    assert (await closed_with(huge))[0] == 1009
+    # Playing normally (30 inputs a second plus pings) is nowhere near any of it.
+    calm, _ = await knock(url, "Calm", "203.0.113.7", password=PASSWORD)
+    for i in range(90):
+        await calm.send(json.dumps({"t": "in", "x": 5, "z": 0, "yaw": -1.57, "pitch": 0, "wt": 0, "tp": 1}))
+        if i % 30 == 0:
+            await calm.send(json.dumps({"t": "ping", "c": i}))
+        await asyncio.sleep(1 / 30)
+    await calm.send(json.dumps({"t": "sync"}))
+    while json.loads(await asyncio.wait_for(calm.recv(), 5))["t"] != "rules":
+        pass
+    await calm.close()
+
+
+def test_internet_mode_limits_what_anyone_can_send():
+    with running_server(*INTERNET) as (port, _key):
+        asyncio.run(limits_scenario(f"ws://127.0.0.1:{port}/ws"))
+
+
+def test_internet_mode_needs_two_different_passwords():
+    def start(*args):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("DODGEBALL_")}
+        out = subprocess.run([sys.executable, str(ROOT / "server.py"), "--no-browser", "--fresh", *args],
+                             cwd=ROOT, capture_output=True, text=True, timeout=60, env=env)
+        return out.returncode, out.stderr
+    code, err = start("--internet")
+    assert code == 2 and "needs a password for the players and one for the host" in err, err
+    code, err = start("--internet", "--password", "same", "--host-password", "same")
+    assert code == 2 and "must differ" in err, err
+    code, err = start("--password", "secret")
+    assert code == 2 and "add --internet" in err, err
+
+
+def test_session_logs_have_limits_and_internet_mode_keeps_one_per_game_night():
+    import diag
+    import server
+    line = {"ty": "sec", "pad": "x" * 80}
+    size = len(json.dumps(line, separators=(",", ":"))) + 1
+    def records(folder, name):
+        path = folder / f"{name}.jsonl"
+        return [json.loads(x)["ty"] for x in path.read_text().splitlines()] if path.exists() else None
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = diag.SessionLog(tmp, start=False)
+        try:
+            log.write({"ty": "lost"})                      # no session open: nowhere to keep it
+            assert log.client("r0", "Ann", "t0", 1, [line]) is True and not list(Path(tmp).iterdir())
+            log.start()
+            night = log.dir
+            log.write({"ty": "kept"})
+            saved = diag.MAX_CLIENTS_BYTES, diag.MAX_CLIENT_FILES
+            diag.MAX_CLIENTS_BYTES, diag.MAX_CLIENT_FILES = 4 * size, 2
+            try:
+                log.client("run1", "Ann", "t1", 1, [line] * 3)
+                log.client("run2", "Bob", "t2", 1, [line] * 3)  # every browser together: 4 lines
+                log.client("run3", "Cat", "t3", 1, [line])      # a third page in one session: dropped
+            finally:
+                diag.MAX_CLIENTS_BYTES, diag.MAX_CLIENT_FILES = saved
+            # The game loop closes the night once nobody has been on for half an hour.
+            before = server.session_log, server.clients, server.empty_since
+            server.session_log, server.clients, server.empty_since = log, {}, None
+            try:
+                server.end_idle_session(100.0)
+                server.end_idle_session(100.0 + server.SESSION_IDLE - 1)
+                assert log.active
+                server.end_idle_session(100.0 + server.SESSION_IDLE)
+                assert not log.active
+            finally:
+                server.session_log, server.clients, server.empty_since = before
+            log.write({"ty": "lost"})
+            time.sleep(1.05)                                # folders are named to the second
+            log.start()                                     # the next game night: its own folder
+            log.client("run1", "Ann", "t1", 1, [line])      # the same page may log again there
+            log.flush()
+            assert log.dir != night
+            assert records(night, "server") == ["kept"]
+            assert records(night, "client-run1-Ann") == ["file", "sec", "sec", "sec"]
+            assert records(night, "client-run2-Bob") == ["file", "sec"]
+            assert records(night, "client-run3-Cat") is None
+            assert records(log.dir, "client-run1-Ann") == ["file", "sec"] and records(log.dir, "server") is None
+        finally:
+            log.stop()
+            log.flush()                                     # files closed: the folder can be deleted
 
 
 def run_all():

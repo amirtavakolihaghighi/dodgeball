@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0).
+Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, unreleased).
 
 ## Contents
 
@@ -35,6 +35,7 @@ Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules edito
 - **Throwing:** throws are charged, and harder throws cost more stamina, fly faster and deal more damage. Balls fly in gentle arcs and can ricochet once off the floor or a side wall.
 - **Elimination:** 0 HP knocks you out, and teammates can spend cash to revive you.
 - **Hosting:** one PC runs the game server (Python, or the packaged `Dodgeball.exe`). Everyone on the same Wi-Fi opens a web page.
+- **Internet mode:** for friends elsewhere, the server runs on a cloud server behind HTTPS (`--internet`, `docs/INTERNET.md`). Players join with a password, and the host is whoever types the host password.
 - **The lobby:** the server starts in a lobby. The host, who plays in the browser on that PC, sets up the teams, the bots and **every rule of the game**, then starts the match. Others can join at any time, but only the host changes anything. Changes made during a match apply from the next round.
 - **The rules editor:** each of the 152 numbers has a name, a description and an animated preview that runs the default next to the lobby's value.
 - **One player's own settings:** the host can give any person or bot their own values for the rules about a player (health, throws, defences, a bot's skill...). The whole setup saves to a file and loads back.
@@ -61,6 +62,7 @@ Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules edito
 - **Plays with coworkers in the office** (6–10 people, office Wi-Fi; several on Linux laptops). Some of them had lag; see `LAG_ANALYSIS.md`. The user collects the session logs and drops them in `testlog\` (git-ignored) for analysis.
 - **Works in development cycles:** a stable version on `main`, then a batch of requested changes, then the user tests.
 - **Wants to discuss before building** when a topic is open-ended (the lag plan was discussed first, then built as settings: phase 7).
+- **Isn't a developer, SRE or devops person.** Explain setup and infrastructure in plain steps. A friend who is a developer sets up servers (internet mode's test server, phase 14).
 
 ## 3. Folder map
 
@@ -79,6 +81,7 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │                              workflows\release.yml (the Windows zip from a tag), issue and PR templates
 ├── docs\
 │   ├── MANUAL.md              the player and host guide: run, share, lobby, controls, every rule's default, logs
+│   ├── INTERNET.md            internet mode, and setting up a cloud server step by step (Ubuntu, Caddy, a service)
 │   ├── PROJECT.md             this document
 │   ├── LAG_ANALYSIS.md        cycle 2: measured causes of lag, options, what the office logs showed
 │   └── images\                the README's screenshots
@@ -87,6 +90,8 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 ├── build_exe.py               the build logic (PyInstaller + zip with retries; ships the firewall helper too)
 ├── Allow friends to connect.bat   lets other PCs join through Windows Firewall: one rule, local network only
 ├── server.py                  FastAPI web server + WebSocket + game loop + host detection + rules broadcast/saving
+├── internet.py                internet mode: the passwords, the wait after wrong ones, the limits per connection and address
+├── deploy\                    for a cloud server: dodgeball.service (systemd) and Caddyfile (HTTPS in front)
 ├── sim.py                     all game rules (server-authoritative), lobby/match states, host actions
 ├── diag.py                    the session log: per-second server/host/connection numbers, stalls, late presses
 ├── rules.py                   every host-editable rule: name, description, range, preview; the Rules object
@@ -115,7 +120,7 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   └── vendor\                three.js 0.185.1: three.module.min.js + three.core.min.js
 ├── tests\
 │   ├── test_sim.py            69 rule tests: python tests\test_sim.py (or pytest)
-│   ├── test_server.py         7 server tests (lobby protocol, players' own settings and files, the host's screen, saved rules, session logs, the log report)
+│   ├── test_server.py         11 server tests (lobby protocol, players' own settings and files, the host's screen, saved rules, session logs, the log report, internet mode)
 │   └── browser\               headless-Chrome end-to-end tests (cdp.js driver + step files, freeze_server.py)
 ├── logs\                      (made at runtime) one folder of session logs per server run; the 30 newest are kept
 ├── saved_rules.json           (made at runtime) the host's rules and players' own settings, reloaded at the next start
@@ -124,7 +129,7 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 └── dist\                      build output: Dodgeball\ (app) + Dodgeball-windows.zip
 ```
 
-The code is about 12,000 lines in total. The biggest files are `previews.js` (~1,580), `sim.py` (~1,400), `test_sim.py` (~1,260), `main.js` (~1,190), `world.js` (~800), `rules.py` (~660), `rules_ui.js` (~580), `server.py` (~510), `log_report.py` (~490) and `diag.py` (~450).
+The code is about 13,000 lines in total. The biggest files are `previews.js` (~1,580), `sim.py` (~1,450), `main.js` (~1,280), `test_sim.py` (~1,260), `world.js` (~800), `server.py` (~680), `rules.py` (~770), `test_server.py` (~600), `rules_ui.js` (~580), `diag.py` (~500) and `log_report.py` (~490).
 
 ## 4. History: the path from idea to now
 
@@ -641,6 +646,60 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 
 **Released as v2.2.0**, with phases 11 and 12, after the user had tested it all ("everything okay").
 
+### Phase 14: internet mode (2026-10-29)
+
+**The question:** "Up to now the game ran on LAN Wi-Fi. If I want to run it on a server on the internet and play on the internet, what changes should take place in the game, and what is the approach from right now, step by step?"
+
+**The answer, discussed before anything was built:**
+
+- The game already works over the internet: it's a web page plus a server, and the browser switches to `wss://` by itself on an HTTPS page (`net.js`). What's missing is protection: on a LAN it trusts everyone who can reach it.
+- **Ping, in player terms:** your own movement stays instant; what the server confirms comes about one ping later; presses are judged fairly up to about 150 ms of ping (the 0.25 s lag compensation limit minus the 0.10 s view delay); a lost packet holds up everything behind it (TCP).
+- **Measured on a throwaway server:** through a tunnel or proxy on the same computer that doesn't pass on players' addresses, every stranger became the host and could download everyone's logs. With `X-Forwarded-For` passed on (uvicorn trusts it from 127.0.0.1 by default) they were guests, and a forged `X-Forwarded-For: 127.0.0.1` passed on unchanged made a stranger the host again. One maximum-size message (15 MiB to parse, 15 KiB on the wire, since it compresses) took 361 ms on the game's own thread.
+- **Where to host:** a cloud server (recommended), the user's PC through a tunnel, or a private-network app such as Tailscale (no code changes, but every player installs it).
+
+**The user's choices:** friends with a password (rather than anyone); a cloud server; "start the internet-mode batch".
+
+**What got built:**
+
+- **`--internet`**, with `--password` and `--host-password` (or `DODGEBALL_PASSWORD` and `DODGEBALL_HOST_PASSWORD`; both needed, and different) and `--max-players` (16). Without it, LAN play is unchanged.
+- **`internet.py`:**
+  - `Door`: the passwords (compared in constant time), the wait after 5 wrong ones from an address within a minute, connections per address (10) and in all (64, or the cap plus 16), and the player cap (the host always gets in).
+  - `Budget`: what a joined connection may send: 512 KiB/s after a 16 MiB burst, 300 messages/s after 5,000 (a browser resending its stored log fits easily).
+  - `masked()`: an address for the logs (`203.0.x.x`).
+  - A new connection must join within 5 s with a message under 4 KB.
+- **`server.py`:**
+  - In internet mode the host is whoever sends the host password (typed in the same box, or the `?host=` link), never an address; everyone's logs need it too (`X-Host-Key`).
+  - A refused connection is closed with code 4001 and a reason: `password`, `wait`, `full`, `busy`, `slow` or `flood`.
+  - `/join-info` tells the join screen to ask for a password. `welcome` carries `internet`, and `joinUrls` is empty (the browser shows the address it was opened with).
+  - It listens on `127.0.0.1:8000` (no "next free port") and opens no browser.
+  - Everywhere: messages up to 1 MiB (`ws_max_size`), binary frames ignored, `sync` only after joining.
+  - The console notes wrong passwords, a flood, and a player who seems to connect from the server itself (a proxy not passing on addresses).
+- **`diag.py`:**
+  - `SessionLog.start()` / `stop()`. In internet mode a session is a game night: the first join starts a folder (`begin_session`: `meta`, then `describe_host` on a thread), and the game loop closes it once nobody has been on for 30 minutes (`end_idle_session`).
+  - Everywhere: browsers' logs are capped per session (200 pages, 300 MB in all) as well as per page (30 MB).
+  - In internet mode, `join` and `refused` records keep addresses only in part, and `meta` never holds the passwords.
+- **The page:**
+  - a password box when the server asks for one; the join fields are a form;
+  - a refusal goes back to the join screen with the reason ("Wrong password.", "The game is full."...), and a reload doesn't retry;
+  - each tab keeps the password it joined with, for reloads;
+  - the lobby's texts for internet mode; `fetchAllLogs` sends the host's key in a header.
+- **Docs and setup:** `docs/INTERNET.md` (what internet mode does, trying it on one computer, a cloud server step by step, the first game night, everyday things, troubleshooting), `deploy/dodgeball.service` and `deploy/Caddyfile`; README, SECURITY, MANUAL and the browser tests' README. CI also runs the internet browser test.
+
+**Evidence:**
+
+- 69 rule tests and 11 server tests pass (4 new: password-only entry and the host password; the limits; the start-up checks; the log folders and caps).
+- Each protection was broken on purpose in a throwaway copy of the project (13 breaks), and the tests caught every one except `SessionLog.write` ignoring whether a session is open. That one changes nothing a player or the logs would show: the writer drops records while no folder is open.
+- Browser:
+  - `internet.json`: a wrong password, a player without host controls or logs, a reload that rejoins, the host password with the logs zip and a match.
+  - On a LAN server, unchanged: smoke, logs, the lobby controls, the two-browser lobby test, and the auto-defender (deflect at 150 ms lag: 12 presses, 10 defended, 0 hits).
+- Measured log growth while playing: a browser about 410 B/s (1.5 MB per player-hour), the server about 460 B/s with one player. A 3-hour night with 16 players comes to about 90 MB.
+
+**Not tested here:** the Linux steps of the guide, the service file and Caddy in front of the game. This PC has no Linux (no WSL distribution, no Docker), and downloading Caddy to run it locally was refused by the permission check. The first setup on the cloud server is their test.
+
+**Found along the way** (section 14): uvicorn's `limit_concurrency` doesn't cover WebSocket upgrades; `secrets.compare_digest` refuses non-ASCII strings; a fetch header must be Latin-1; a test helper that reads until a connection closes needs an overall deadline.
+
+**Where it lives:** the user isn't a developer; a friend of theirs who is will set up the test server. At the user's request the work went to its own branch, `internet-mode` (pushed to GitHub, not merged), for the friend to fetch and try. The user says when to merge it into main. The guide's clone command uses `--branch internet-mode` meanwhile; at the merge it loses that option and the sentence after it. For the friend, the guide starts with a technical summary ("At a glance, for whoever sets up the server").
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -675,7 +734,7 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 | 26 | A lobby before the match: the host sets it up and starts it; anyone can join any time; only the host changes settings, bots or teams | U | Cycle-2 request 2 |
 | 27 | Changes made during a match (rules, bots, team moves) apply from the next round | U | Cycle-2 request 2 |
 | 28 | The host can change every game-mechanic number; each has a name, a description and a preview of its effect | U | Cycle-2 request 3 |
-| 29 | Host = a browser on the server's own computer, or the console's secret host link (`?host=KEY`); `?guest` opts a local tab out | C | No accounts or passwords; the user hosts from the PC running the app |
+| 29 | Host = a browser on the server's own computer, or the console's secret host link (`?host=KEY`); `?guest` opts a local tab out | C | No accounts or passwords; the user hosts from the PC running the app. In internet mode only the host password counts (#104) |
 | 30 | Players no longer pick teams: a newcomer joins the team with fewer people, the host moves them; a reconnecting player gets their team back (by name) | C | "Give all the controls to the host". Nothing re-balances afterwards (#47) |
 | 31 | In free play (lobby, or a match waiting for players) changes apply at once | C | No round is running; otherwise a stalled match (empty team) could never be fixed |
 | 32 | Rule previews are animated 2D canvas diagrams using the game's formulas (default next to this lobby), not recorded videos or images | C | Recordings can't show arbitrary values; diagrams follow the slider live |
@@ -748,6 +807,15 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 | 99 | Standing still = within 2 cm of where you stopped; turning, throwing and defending don't count | C | Measured from where you stopped, so slow creeping counts as moving |
 | 100 | Hurt bots stand still to regenerate (a Bots rule, on by default; a bot can have its own) | U | "Yes, when hurt". How (stop wandering, no sidesteps, still defend and throw): C |
 | 101 | Phases 11–13 are version 2.2.0 (minor) | C | They add features; settings saved by older versions still load, and nothing players rely on changes (bots' new names aside) |
+| 102 | Playing over the internet: friends with a password, on a cloud server | U | Chosen over "anyone" (which would need cheat checks and a kick button) and over the user's own PC through a tunnel |
+| 103 | Internet mode is a switch (`--internet`); without it the server works on a LAN as before | C | LAN play unchanged. The only changes there: the 1 MiB message limit and the per-session caps on browsers' logs (#108) |
+| 104 | In internet mode the host is whoever sends the host password (typed in the same box as the players' password, or in the `?host=` link), never an address; the two passwords must differ | C | Behind a proxy every player seems to connect from the server itself: measured, everyone became the host |
+| 105 | Internet mode's limits: 16 people (the host always gets in), a wait after 5 wrong passwords a minute per address, 10 connections per address and 64 in all, joining within 5 s with under 4 KB, then 512 KiB/s and 300 messages/s after a 16 MiB / 5,000-message burst | C | Far above what a browser sends (a stored log resent at once fits the burst), so one address can't wear the server down |
+| 106 | Internet mode listens on `127.0.0.1:8000` (a fixed port) behind HTTPS, and opens no browser | C | The game has no TLS of its own; Caddy needs to find it at a known port |
+| 107 | Internet mode logs a folder per game night (from the first join until 30 minutes with nobody on), with players' addresses only in part and never the passwords | C | A server running for weeks would otherwise grow one folder by ~30 MB a day, and "Download all logs" would zip all of it |
+| 108 | Everywhere: no message over 1 MiB; browsers' logs capped per session (200 pages, 300 MB) | C | Measured: a 15 MiB message stalled the game 361 ms, and new page ids got around the per-page cap. A whole settings file is 150 KB; a 3-hour night with 16 players logs ~90 MB |
+| 109 | A refused connection is closed with code 4001 and a reason, and the join screen says why | C | "Wrong password.", "The game is full.": not a silent "Disconnected" |
+| 110 | The cloud setup: Ubuntu 24.04; the game as a systemd service under its own user in `/opt/dodgeball`; the passwords in `/etc/dodgeball.env` (root only); Caddy from its official repository | C | Ubuntu's own Caddy (2.6.2, from 2022) misses security fixes. Not yet run on a real server (phase 14) |
 
 ## 6. Current features
 
@@ -807,6 +875,7 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 - Multi-tab support: per-tab identity, auto-rejoin on reload, inputs released on blur, sound only in the focused tab.
 - **Session logs** from the server and every browser, collected on the host. The host downloads them as one zip, and `tools\log_report.py` turns them into a diagnosis. Players press L to mark laggy moments.
 - **`Allow friends to connect.bat`:** lets other PCs through Windows Firewall without turning it off.
+- **Internet mode** (`--internet`): a password to join, the host password for the host, limits against abuse, a log folder per game night; `docs/INTERNET.md` and `deploy/` for a cloud server behind Caddy.
 
 ## 7. Rules and numbers
 
@@ -947,6 +1016,12 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - the WebSocket comes from this computer (loopback, or one of its own addresses, refreshed every 15 s off the game thread) and the join doesn't say `guest`;
   - the join carries the console's host key.
   `sim.Game.handle` refuses host-only messages from anyone else.
+- **Internet mode** (`door`, an `internet.Door`, is set):
+  - The address never makes the host: the join's `password` (or `hostKey`) must be the host password, and `HOST_KEY` is the host password. Everyone else needs the players' password.
+  - `door.arrive` / `depart` count connections per address and in all; `door.join` decides a join (the wait after wrong passwords, the passwords, the player cap).
+  - Each `Client` has two `internet.Budget`s (bytes, messages). `too_much` closes a connection over them, or over 4 KB before it has joined.
+  - Refusals close the WebSocket with code 4001 and a reason.
+  - Addresses are uvicorn's: the peer, or `X-Forwarded-For` when the peer is 127.0.0.1 or ::1 (`FORWARDED_ALLOW_IPS`'s default).
 - **States:** `lobby` → `count` → `play` → `over` → `count` … → `lobby`, plus `wait` when a team is empty mid-match.
 - **Spectating:** a spectating host is a player on team `WATCHING` (−1), not alive. Everything that loops over teams 0 and 1 skips them; the warm-up respawn skips them too.
 - **Team health:** `game.team_hp` and `team_hp_max` per team, filled at every line-up (and in free play on any rule change), resized when someone joins or leaves (`_resize_team_health`), drained by `_hit`, refilled by `heal`; snapshots carry `r.th`.
@@ -958,6 +1033,8 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - `game_loop` calls `stats.loop` (loop gaps, tick and snapshot cost), `stats.events` (hits on people, rounds, rules) and `stats.tick` (writes a `sec` record once a second).
   - Every message from a browser goes through `stats.message`: input rate and gaps, screen delay from `wt`, and late presses. A press is "late" when its `wt` window covers the contact time of a hit already decided for that player.
   - `Client` counts dropped messages, the longest queue and the slowest send.
+- **Sessions:** on a LAN, one folder for the server's whole run. In internet mode, one per game night: the first join calls `begin_session` (`SessionLog.start`, the `meta` record, `describe_host` on a thread), and `end_idle_session` in the game loop calls `SessionLog.stop` once nobody has been on for 30 minutes. While no session is open, writes are dropped.
+- **Limits:** a browser's log is capped at 30 MB per page and, per session, 200 pages and 300 MB in all; past them chunks are acknowledged and dropped, so browsers don't resend them forever.
 - **Writing never blocks the game:**
   - `SessionLog.write` only queues; a background thread appends to the files.
   - The slow host checks (`netsh`, `ipconfig`) run on their own thread every 30 s.
@@ -1015,16 +1092,27 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 
 ## 9. Network protocol
 
-JSON over one WebSocket at `/ws`. Snapshot entries are **arrays**, to keep messages small.
+JSON over one WebSocket at `/ws`. Snapshot entries are **arrays**, to keep messages small. No message may be over 1 MiB (uvicorn closes the connection with 1009); binary frames are ignored.
+
+**Internet mode refusals:** a connection the server won't serve is closed with code **4001** and a reason, which the join screen shows (`main.js REFUSAL`):
+
+| Reason | When |
+| --- | --- |
+| `password` | No password, or a wrong one |
+| `wait` | 5 wrong passwords from this address within a minute |
+| `full` | `--max-players` people are in (the host always gets in) |
+| `busy` | 10 connections already open from this address, or the server's total |
+| `slow` | No join within 5 s (browsers join the moment they connect) |
+| `flood` | Over 4 KB before joining, or more than a browser ever sends (512 KiB/s and 300 messages/s after a 16 MiB / 5,000-message burst) |
 
 **Client → server:**
 
 | Message | Fields | Notes |
 | --- | --- | --- |
-| `join` | `name`, `guest?` (true = no host powers), `hostKey?`, `tab`, `run` | Must be first. Team = the one this name had before, else auto (fewer humans, then fewer players, then red). `tab`/`run` identify the browser tab and page load in the logs |
+| `join` | `name`, `guest?` (true = no host powers), `hostKey?`, `password?`, `tab`, `run` | Must be first. Team = the one this name had before, else auto (fewer humans, then fewer players, then red). `tab`/`run` identify the browser tab and page load in the logs. Internet mode: `password` (or `hostKey`) must be the players' or the host's password, and `guest` means nothing |
 | `log` | `run, seq, tab, lines:[…]` | A chunk of the browser's diagnostics log. The server stores it once per (run, seq) and replies `logack` |
 | `ping` | `c` (client ms) | Server replies `pong {c, st}`; used for the ping display |
-| `sync` | none | A snapshot showed a newer rules version than the client has: the server resends `rules` |
+| `sync` | none | A snapshot showed a newer rules version than the client has: the server resends `rules` (only after joining) |
 | `in` | `x, z, yaw, pitch, wt, tp, aim:[x,y,z], tg` | Sent at 30 Hz. Position/yaw/pitch are ignored unless `tp` matches |
 | `charge` | `wt` | Start the wind-up (needs a ball, not busy) |
 | `throw` | `wt, aim, tg` | Power = (`wt` − charge `wt`) / 0.9 |
@@ -1043,8 +1131,8 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 
 **Server → client:**
 
-- **`welcome {id, host, cfg, rules, next, rv, defaults, schema, logging, version, logDir?}`:**
-  - `logging`: whether the server keeps logs (then the browser sends its own). `version`: `{commit, built?}` of the server. `logDir`: where the logs are, for the host only.
+- **`welcome {id, host, internet, cfg, rules, next, rv, defaults, schema, logging, version, logDir?}`:**
+  - `internet`: the server is in internet mode. `logging`: whether the server keeps logs (then the browser sends its own). `version`: `{commit, built?}` of the server. `logDir`: where the logs are, for the host only.
   - `cfg` holds what the client needs, derived from the live rules as this player plays by them (`Rules.for_player(name).for_client`):
     - `centerGap`, `gravity`, `ricochet{normalKeep, tangentKeep, minSpeed, max}`, `damage{min, perSpeed, max}`
     - `playerRadius`, `ballRadius`, `chestHeight`, `walk`, `chargeWalk`, `defendWalk`, `maxHp`, `maxStamina`
@@ -1058,7 +1146,8 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 - **`rules {cfg, rules, players, next, nextPlayers, rv}`:** sent to everyone after any change, each with its own `cfg`.
 - **`logack {run, seq}`:** that log chunk (and everything before it) is stored.
 - **`hostview {m, g?, q?, f?, d?}`:** the host's screen (the cleaned copy of the host's own message), sent to everyone but the host when it changes and to each newcomer after `welcome`. `{m: null}`: no host is connected any more.
-- **HTTP `GET /logs/download`:** the host's zip of the last 24 h of sessions. It answers 403 to anyone else (allowed: this computer, or `?key=` with the host key) and 404 when the server isn't logging. The filename comes in `X-Filename`, not `Content-Disposition` (see section 14).
+- **HTTP `GET /logs/download`:** the host's zip of the last 24 h of sessions. It answers 403 to anyone else (allowed: this computer, or the host key in the `X-Host-Key` header, URI-encoded, or `?key=`; in internet mode only the host password) and 404 when the server isn't logging. The filename comes in `X-Filename`, not `Content-Disposition` (see section 14).
+- **HTTP `GET /join-info`:** `{password: true}` in internet mode: the join screen shows its password box.
 - **`s` (snapshot, 30 Hz):** `{st, r, p, b, e}`:
   - `r` (round): `{s: lobby|wait|count|play|over, n, left, score:[red,blue], w, bots:[red, blue], skill, rc:[red, blue], court:[halfLength, halfWidth], win, res, pend, rv, th}`.
     - `rc`: what R costs each team now: a revive, or with team health the next health pack (0: all your cash).
@@ -1106,15 +1195,17 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 
 **`server.py`:**
 
-- **`Client`:** wraps a WebSocket. Its send queue has maxsize 8 and drops the oldest message if full. A `pump` task writes to the socket. It counts dropped messages, its longest queue and its slowest send, for the log.
-- **Logging:** `start_logging()` (the `meta` record, the host watcher), `say()` (console prints that note when Windows held them up), `version_info()` (git describe, or the packaged `build_info.json`), `may_download_logs()` and the `/logs/download` route. The flags are `--no-log` and `--log-dir`; `--fresh` turns logs off unless `--log-dir` is given.
+- **`Client`:** wraps a WebSocket. Its send queue has maxsize 8 and drops the oldest message if full. A `pump` task writes to the socket. It counts dropped messages, its longest queue and its slowest send, for the log. It keeps the connection's address (`ip`) and, in internet mode, two `internet.Budget`s that `too_much()` checks.
+- **Logging:** `start_logging()` (the `SessionLog`, the host watcher; on a LAN the session starts at once), `begin_session()` (a new folder, the `meta` record, `describe_host` on a thread), `end_idle_session()` (internet mode: closes a game night after 30 minutes with nobody on), `say()` (console prints that note when Windows held them up), `version_info()` (git describe, or the packaged `build_info.json`), `may_download_logs()` and the `/logs/download` route. The flags are `--no-log` and `--log-dir`; `--fresh` turns logs off unless `--log-dir` is given. `log_args` is the command line without the passwords.
+- **Internet mode:** `door` (an `internet.Door`, or None on a LAN); `refuse()` (close with 4001 and a reason), `turned_away()` (the console and the log), `note_loopback()` (a player seeming to connect from the server itself, once), `people()`; the `/join-info` route.
 - **`game_loop()`:**
   - ticks the game at `TICK_RATE` and sends one snapshot string per `1/SNAPSHOT_RATE` to every client (both are rules);
   - when `game.rules_version` changes, sends `rules_message()` to everyone and calls `save_current_rules()`;
   - catches and prints exceptions so the match keeps running.
 - **`play()`:** the WebSocket endpoint.
-  - On `join` it decides host (`is_this_computer`, `guest`, `hostKey`) and sends `welcome` with the schema.
-  - It answers `ping` and `sync` itself, relays the host's `hostview` (`clean_host_view`, `share_host_view`, the latest kept in `host_view`), and hands everything else to `game.handle`.
+  - Internet mode first: `door.arrive` (connections per address and in all), then a 5 s deadline to join, `too_much` on every message, and `door.join` on the join.
+  - On `join` it decides host (on a LAN `is_this_computer`, `guest`, `hostKey`; in internet mode the host password) and sends `welcome` with the schema.
+  - It answers `ping` and (after joining) `sync` itself, relays the host's `hostview` (`clean_host_view`, `share_host_view`, the latest kept in `host_view`), and hands everything else to `game.handle`. It reads with `ws.receive()`, so a binary frame is skipped instead of ending the handler.
 - **Utilities:**
   - `lan_addresses(wait)`: UDP-connect trick plus hostname lookup; the lookup runs on a thread, and startup waits at most 2 s for it (it can stall on macOS). It drops `127.x` and `169.254.x` and lists `192.168.x`, then `10.x`, first.
   - `watch_addresses()`: refreshes `own_ips` every 15 s on a thread (a hotspot or cable may appear mid-session).
@@ -1122,16 +1213,19 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
   - `load_saved_rules()` and `save_current_rules()`: `saved_rules.json` next to the exe or script (`{rules: {changed}, players}`; the older flat file still loads), written on a thread, atomically.
   - `rules_message(name)` (a client's `rules` message, with its player's own `cfg`) and `send_rules()` (one per client).
   - `first_free_port()`; `open_browser_when_ready()` (a thread that polls the port, then calls `webbrowser.open`); Windows `timeBeginPeriod(1)` for a steady loop.
-  - `HOST_KEY`: a random key per run, printed in the console's host link.
-- **Flags:** `--port`, `--host`, `--no-browser`, and `--fresh` (default rules, nothing saved; for tests).
+  - `HOST_KEY`: a random key per run, printed in the console's host link (in internet mode, the host password, never printed).
+- **Flags:** `--port`, `--host` (the address to listen on), `--no-browser`, `--fresh` (default rules, nothing saved; for tests), and for internet mode `--internet`, `--password`, `--host-password` (or `DODGEBALL_PASSWORD`, `DODGEBALL_HOST_PASSWORD`) and `--max-players`. Internet mode listens on 127.0.0.1:8000 unless told otherwise, and never opens a browser.
+- **`MAX_MESSAGE`** (1 MiB) goes to uvicorn as `ws_max_size`, in both modes.
 - **Static files** are served with `Cache-Control: no-cache`, so a browser reload always picks up client edits.
+
+**`internet.py`:** `Door` (`arrive`, `depart`, `join`), `Budget` (a token bucket), `same()` (constant-time password check, on UTF-8 bytes), `masked()` (an address's network part), and the limits as constants: `DEFAULT_MAX_PLAYERS`, `WRONG_TRIES` / `WRONG_WINDOW`, `PER_ADDRESS`, `JOIN_TIMEOUT`, `JOIN_MAX`, `BYTES_PER_S` / `BYTES_BURST`, `MSGS_PER_S` / `MSGS_BURST`.
 
 **`diag.py`:**
 
-- **`SessionLog`:** the run's folder (keeps the 30 newest sessions), `write()` (queued and written by a thread), `client()` (stores a browser's chunk once per run and seq; at most 30 MB per page), `flush()`, `zip_recent()`.
-- **`HostInfo`:** Windows `ctypes` readings: system and process CPU, memory, page faults, power, QuickEdit. Plus `wifi_status()` (`netsh`, with network names and addresses dropped), `adapters()` (`ipconfig`), `route_ip()` (which local address traffic to an address leaves from) and `watch_host()`.
+- **`SessionLog`:** the session folders (keeps the 30 newest), `start()` / `stop()` (a new folder; none until the next start), `active`, `write()` (queued and written by a thread; dropped while no session is open), `client()` (stores a browser's chunk once per run and seq; at most 30 MB per page, and per session 200 pages and 300 MB in all), `flush()`, `zip_recent()`.
+- **`HostInfo`:** Windows `ctypes` readings: system and process CPU, memory, page faults, power, QuickEdit. Plus `wifi_status()` (`netsh`, with network names and addresses dropped), `adapters()` (`ipconfig`), `route_ip()` (which local address traffic to an address leaves from), `describe_host()` (the `host` record, once per session) and `watch_host()` (the `poll` records while a session is open).
 - **`Stats`:** per-second numbers and the notable records (`stall`, `hit`, `late_press`, `game`).
-- **Record types in `server.jsonl`:** `meta`, `host`, `poll` (Wi-Fi and power), `sec`, `stall`, `print_block`, `join`, `leave`, `hit` (with `bank` and the on-screen `gap`), `sidestep`, `graced`, `late_press`, `game`.
+- **Record types in `server.jsonl`:** `meta` (with `internet`), `host`, `poll` (Wi-Fi and power), `sec`, `stall`, `print_block`, `join`, `leave`, `refused` (internet mode: why, and the address in part), `hit` (with `bank` and the on-screen `gap`), `sidestep`, `graced`, `late_press`, `game`.
 - **Record types in the browser logs:** `file` (written by the server), `welcome`, `env`, `battery`, `sec`, `hitch`, `freeze`, `press`, `ignored` (a press during the recovery), `clock` (the clock estimate was re-anchored), `ev` (own events, rounds), `mark`, `vis`, `focus`, `lock`, `ws`, `error`.
 
 **`tools/log_report.py`:** loads a zip, a session folder, the logs folder or one saved browser log. It leaves out what browsers resent from earlier sessions, counts input gaps only while the player was really playing, shows every time on the host's clock (from the server log, or the host's browser log), and counts presses ignored during a recovery. Its FAIRNESS section lists, per player, balls sidestepped on screen, defences saved by the press grace, and hits while clear on their own screen.
@@ -1214,8 +1308,11 @@ Other parts of `main.js`:
 - **Actions:** `startCharge`, `releaseThrow`, `tryAction` (local busy, stamina pre-check, dodge direction, the "handled" ball), `ignored` (a press during the recovery: "Still recovering", logged as `ignored`).
 - **Spectating:** `startSpectating`, `moveSpectator`, `followNext` (LMB/RMB), `shoulderCamera`; `watching()` is true while the player's team is −1.
 - **The join flow:**
-  - The name is saved per tab in sessionStorage, and a reloaded tab rejoins automatically; the server gives back its team.
+  - The name (and in internet mode the password) is saved per tab in sessionStorage, and a reloaded tab rejoins automatically; the server gives back its team.
   - `?guest` and `?host=KEY` go along with the join. Personal settings live in localStorage.
+  - The join fields are a form (`joinForm`): the button or Enter joins. `/join-info` shows the password box when the server asks for one.
+  - A refusal (`REFUSED` = 4001) brings back the join screen with `REFUSAL[reason]` and stops a reload from retrying (`refused`). After a welcome, a closed connection shows the Disconnected box, worded for a flood.
+  - `fetchAllLogs()`: everyone's logs, with the host's key (the `?host=` key, or the password a host joined with) in `X-Host-Key`.
 - **Rules:**
   - `applyRules()` runs on `welcome` and on every `rules` message. It sets `cfg`, the net's interpolation delay and gravity, and the ball size, redraws the court, and refreshes the editor and the lobby.
   - `updateHud` sends `sync` when a snapshot's `rv` stays ahead for over 1 s.
@@ -1224,7 +1321,7 @@ Other parts of `main.js`:
 - **Team health:** `hud.setTeamHealth(r.th)`, your bar from `r.th`, the R tile from `r.rc` and `cfg.teamHeal`, the `heal` event, "team" wording in hit popups and the feed.
 - **Standing still:** `trackStill` (the server's rule, for the hint) and `regenHint` → `hud.setRegenHint`; `local.hurtAt` / `teamHurtAt` from the hit events, for the pause.
 - **Settings files:** `exportSettings()`, `importSettings()` and `importSetupText()` (the lobby's buttons).
-- **The debug handle `window.dp`** exposes `net`, `input`, `local`, `aim`, `world`, `lobby`, `editor`, `rules`, `diag`, `showMenu`, `spec`, `followNext`, `exportSettings`, `importSetupText`, `settingsFile`, `ownValue`, `ballColorOf`, `hostView`, `me`, `threat`, `view`, `cfg` and `isHost`.
+- **The debug handle `window.dp`** exposes `net`, `input`, `local`, `aim`, `world`, `lobby`, `editor`, `rules`, `diag`, `showMenu`, `spec`, `followNext`, `exportSettings`, `importSetupText`, `settingsFile`, `ownValue`, `ballColorOf`, `fetchAllLogs`, `hostView`, `me`, `threat`, `view`, `cfg` and `isHost`.
 
 **`lobby.js`:** the lobby / pause menu.
 
@@ -1270,7 +1367,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - The menu's "Lag diagnostics" section has "Save my log" and the host's "Download all logs (zip)". L logs a `mark`.
 - `net.js` reports each update's lateness (`onSnapshot`) and stale events (`onStale`), and supports `?jitter=N`.
 
-**`net.js`:** connection, `?lag=N` simulation, clock offset, snapshot buffer (1.5 s), `sample()` with the interpolation rules above, and `takeEvents()` (drops events more than 1 s stale).
+**`net.js`:** connection (the close handler gets the code and reason; an earlier, replaced connection is ignored), `?lag=N` simulation, clock offset, snapshot buffer (1.5 s), `sample()` with the interpolation rules above, and `takeEvents()` (drops events more than 1 s stale).
 
 **`world.js`:**
 
@@ -1345,8 +1442,9 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **Restarts:** restart the server after changing Python code; there's no auto-reload. Client changes only need a browser reload.
 - **A test server remembers rules** that tests changed until it restarts, so restart it between test suites.
 - **Hosting from the test PC:** the browser on the server's PC is the host. Add `?guest` to a tab's URL to see the guest view.
+- **Internet mode on the test PC:** `.venv\Scripts\python server.py --internet --password "let me in" --host-password "the boss 42" --port 8123 --fresh` (it never opens a browser). Join with the host password to be the host, with the other to be a player.
 
-**Rule tests** (all 69 must pass) and **server tests** (all 7 must pass):
+**Rule tests** (all 69 must pass) and **server tests** (all 11 must pass):
 
 ```powershell
 .venv\Scripts\python tests\test_sim.py
@@ -1361,7 +1459,13 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **saved rules:** saving and loading the rules and players' own settings, an older flat file, and ignoring a damaged `saved_rules.json`;
 - **the session log:** server and browser records reaching the host's zip, a resent chunk stored once, and inputs counted per player;
 - **the detectors:** stalls, late presses (and early ones that aren't), and console prints held up;
-- **the report:** it blames a freeze during a server stall on the host and a player's own freezes on them, and gives each L mark the right cause.
+- **the report:** it blames a freeze during a server stall on the host and a player's own freezes on them, and gives each L mark the right cause;
+- **internet mode, over real WebSockets** (addresses as a proxy reports them, `X-Forwarded-For`):
+  - nobody is the host by address (this computer, a forged address); no password or a wrong one is refused; the host password, typed or in `hostKey`, makes the host; the player cap, with the host always in; the wait after 5 wrong passwords, for that address only; nothing for a connection that hasn't joined;
+  - everyone's logs need the host password; the log has addresses in part, the refusals, and no password anywhere;
+  - a connection that never joins, joins with a big message, is one too many from an address, sends too many messages or too many bytes, or one message over 1 MiB, is closed; normal play is nowhere near any limit;
+  - the start-up checks: both passwords needed and different, and the internet options only with `--internet`;
+- **the log folders:** nothing written while no session is open, the caps on browsers' logs per session, a game night closing after 30 minutes with nobody on, and the next one getting its own folder.
 
 **Reading a session's logs:** `.venv\Scripts\python tools\log_report.py <zip | session folder | logs folder | saved log>`. The logging browser test and the server-freeze helper are described in the browser tests' README.
 
@@ -1414,8 +1518,9 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 - **The regeneration test** (`regen.json` + `regen.js`): the round-time buttons, both regeneration previews, and a player's health and a team bar sampled ten times a second (the pause after each hit, the speed, where it stops) with the limit markers. Re-run it after touching regeneration or the round-time buttons.
 - **The standing-still test** (`still.json` + `still.js`): with a bot that hits for 40 every 20 s, holds keys like a player through standing, walking and two kinds of dodge, and checks what each part regains and the hint, for a player and a team bar. Re-run it after touching standing still.
 - **The own-settings test** (`own_settings.json` + `own_settings.js`): a bot's and a person's own settings through the ⚙ pages, the ball colours editor, export → reset → import, a profile moved between bots, wrong files, and the colour every ball in flight is drawn in. Re-run it after touching players' own settings, the ball colours or the settings files.
+- **The internet test** (`internet.json`, against a server in internet mode with the passwords `let me in` and `the boss 42` and a log folder): a wrong password, a player without host controls or logs, a reload that rejoins, the host password with everyone's logs and a match. Each step checks its own result. Re-run it after touching the join screen, internet mode or who is host.
 
-**CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`; any page error fails it).
+**CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`), then runs `internet.json` against a second server in internet mode (any page error or failed step fails it).
 
 **Balance profiling** (a bots-only match; prints round lengths and event counts):
 
@@ -1451,6 +1556,7 @@ print(lengths, g.score, dict(counts))
 - **People without Python:** send the zip, or the link to the latest GitHub release. They unzip it and run `Dodgeball.exe`. SmartScreen may say "Windows protected your PC" (the app is unsigned): **More info → Run anyway**.
 - **Friends can't connect (firewall):** the host double-clicks `Allow friends to connect.bat` next to the exe once (it asks for admin; `... check` shows what it would do, `... undo` removes the rule). Or set the Wi-Fi to Private and allow the prompt. Never turn the firewall off.
 - **Playing together on one Wi-Fi:** only the host runs it; others open the address shown in its window. The host sets up the lobby in the browser that opens on their PC and presses Start match.
+- **Friends elsewhere:** internet mode on a cloud server, behind Caddy: `docs/INTERNET.md` step by step, with `deploy/dodgeball.service` and `deploy/Caddyfile`.
 - **Passing on tuned rules:** Export settings in the lobby and give them the file (they Import it), or copy `saved_rules.json` next to another host's `Dodgeball.exe`, or `server.py`.
 - **Sharing the source:** exclude `.venv`, `build`, `dist`. A copied `.venv` is auto-repaired by `run.bat`.
 - **Mac/Linux:** run from source with Python. There's no Mac build; it would have to be built on a Mac.
@@ -1499,6 +1605,13 @@ print(lengths, g.score, dict(counts))
 - **Git and line endings on Windows:** with `core.autocrlf` on, files checked out before `.gitattributes` existed keep CRLF in the working tree, while git stores LF. Scripts that match text across lines must handle `\r\n`.
 - **GitHub keeps force-pushed commits:** rewriting a published history doesn't unpublish the old commits; they stay reachable by id and in the repository's Activity view. A clean history needs a new repository (phase 9).
 - **On macOS, looking up the computer's own name can stall:** `socket.gethostbyname_ex(socket.gethostname())` asks the local network. Startup caps it at 2 s; nothing on the game loop or the console may wait for it.
+- **Behind a proxy, everyone is "this computer":** a tunnel or proxy on the server connects from 127.0.0.1 for every player. uvicorn (0.54) trusts `X-Forwarded-For` from 127.0.0.1 and ::1 by default and takes the rightmost address it doesn't trust, so Caddy's header gives the real address. Without the header every player is 127.0.0.1, and with a forged header passed on unchanged a client picks its own address. Hence internet mode never decides anything by address except the limits.
+- **uvicorn's `limit_concurrency` doesn't cover WebSockets:** the upgrade is handled before the check (`httptools_impl.on_headers_complete`), so internet mode counts connections itself (`Door.arrive`).
+- **`secrets.compare_digest` refuses non-ASCII strings** (TypeError): compare UTF-8 bytes (`internet.same`).
+- **A `fetch` header must be Latin-1:** a password with other letters throws in the browser, so `X-Host-Key` is URI-encoded and the server unquotes it.
+- **One big JSON message stalls everyone:** the game loop and message parsing share one thread. 15 MiB took 361 ms to parse, and compressed it was 15 KiB on the wire. Hence `ws_max_size` (1 MiB) and the size check before parsing.
+- **A test that reads until the server closes needs an overall deadline:** a connection that was wrongly let in gets snapshots 30 times a second, so a per-message timeout never fires (a broken-on-purpose run hung).
+- **Killing a hung test leaves its server running** (and the throwaway copy locked): end the whole process tree.
 
 ## 15. Known limitations and ideas for next steps
 
@@ -1510,7 +1623,12 @@ print(lengths, g.score, dict(counts))
 - **Movement is trusted** to each browser within the court limits: fine among friends, not for strangers.
 - **One lobby per server:** no separate rooms.
 - **No reconnect-with-state:** a reloaded tab rejoins as a fresh player with the same name and team (full HP, no cash). Only the host's rules persist between server runs.
-- **The host is whoever plays on the server's PC** (or holds the host link). Anyone with access to that PC's browser has host powers, and with several local tabs, every one of them is a host.
+- **The host is whoever plays on the server's PC** (or holds the host link). Anyone with access to that PC's browser has host powers, and with several local tabs, every one of them is a host. (In internet mode: whoever types the host password.)
+- **Internet mode:**
+  - No accounts and no kick button: anyone with the password joins, and keeping someone out means a new password and a restart (which ends the match).
+  - Movement is still trusted to each browser.
+  - The limits stop one address, not a flood from many at once.
+  - The Linux setup (`docs/INTERNET.md`, `deploy/`) hasn't been run on a real server yet, nor has Caddy been run in front of the game (phase 14).
 - **Rule previews are illustrations, though computed with the game's formulas:**
   - top views ignore gravity;
   - side views may stretch distances up to 1.5×;
@@ -1529,7 +1647,8 @@ print(lengths, g.score, dict(counts))
 
 - **The lag plan:** the next office session's logs will show what the new settings do (the report's FAIRNESS section). Still open: a per-player "your Wi-Fi is dropping out" notice; buffering a press made just before a lockout ends.
 - A list of saved setups in the lobby to pick from (settings files exist; today you pick the file yourself).
-- Kicking a player from the lobby.
+- Kicking a player from the lobby (more useful in internet mode).
+- The lag of a first internet game night, measured with the session logs, and the Network settings tuned for it (view delay, lag compensation limit).
 - Touch controls for phones.
 - Obstacles and cover.
 - A short practice mode or tutorial for the timing windows.
@@ -1576,7 +1695,10 @@ print(lengths, g.score, dict(counts))
 | **Slot (bot)** | A bot's place on its team (0 = first); it gives the bot its name, so its own settings stay with it |
 | **Lobby / wait / count / play / over** | States: before a match (warm-up) / a match waiting for an empty team / countdown / playing / round result |
 | **Free play** | `lobby` or `wait`: no round running; the downed stand up, and host changes apply at once |
-| **Host** | The player who sets up the lobby: a browser on the server's PC, or anyone with the console's host link |
+| **Host** | The player who sets up the lobby: a browser on the server's PC, or anyone with the console's host link (in internet mode: whoever typed the host password) |
+| **Internet mode** | `--internet`: for a server on the internet, behind HTTPS. A password to join, the host password for the host, limits per address and connection, a log folder per game night |
+| **Refusal** | Internet mode not letting a connection in: closed with code 4001 and a reason (`password`, `wait`, `full`, `busy`, `slow`, `flood`) that the join screen shows |
+| **Game night** | Internet mode's log session: from the first join until nobody has been on for 30 minutes |
 | **Rules** | The 141 host-editable numbers (`rules.py`); `game.rules` is the live set |
 | **Pending / next rules** | Changes made during a match, waiting for the next round's countdown (`game.next_rules`) |
 | **rv** | Rules version: bumps on every change; in snapshots, so a browser that missed an update asks again |
