@@ -1,6 +1,6 @@
 # The look and feel: the working plan
 
-This is the working plan for the branch `look-and-feel`. Why the branch exists, the analysis behind it and every decision are in phase 15 and decisions 112–126 of [PROJECT.md](PROJECT.md). This file holds:
+This is the working plan for the branch `look-and-feel`. Why the branch exists, the analysis behind it and every decision are in phase 15 and decisions 112–127 of [PROJECT.md](PROJECT.md). This file holds:
 
 - the goal;
 - the plan and where each step stands;
@@ -49,7 +49,7 @@ The game should look and feel professionally made: juice and good art, both. We 
 
 | # | Step | Status |
 | --- | --- | --- |
-| 1 | **Style samples:** two or three directions, rendered; the user picks | Round 1 done: the sports hall (decisions 124–126). Round 2 done: the hall in vibrant colour and light, and athletes towards Fortnite-like humanoids, with a helmet and with a face. Waiting for the user's pick |
+| 1 | **Style samples:** two or three directions, rendered; the user picks | Done. Round 1: the sports hall (decisions 124–126). Round 2: the hall in vibrant colour and light, and athletes towards Fortnite-like humanoids; the helmet, for now (decision 127) |
 | 2 | **Smooth and fair:** a graphics setting that scales itself down when the frame rate drops (D1); a warning when Chrome draws without the graphics card (D2); presses timed from the key event (B4); every effect prepared in the lobby; the host's tab on a lower setting by default | To do |
 | 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | To do |
 | 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | To do |
@@ -233,7 +233,15 @@ These are starting targets, to be checked on an office laptop and adjusted:
   - **Depth of field** in the close-ups: not used in play.
   - **The leaf and cloud blobs:** hundreds of thousands of small triangles, replaced by a textured panel and the backdrop.
 
-**The user's pick:** to come.
+**The user's pick** (decision 127):
+
+- **The helmet, for now:** "Helmet is ok for now." The face version is set aside.
+- **The bodies are "mostly okay", but the lats looked abnormally big.** They were: the lat shapes leaned the wrong way and flared out under the arms. They were slimmed and re-tilted, the shirt's drape narrowed to match, and the round was rendered again. The pictures above are the new ones.
+- **The user will look for free models later.** CC0 candidates Claude checked on their official pages:
+  - [Quaternius Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html): CC0, "superhero" proportions, about 13,000 triangles, with a skeleton made for the Universal Animation Library. The free download has 2 base models and 5 hairstyles; the full set costs money.
+  - [Blender Studio's Human Base Meshes](https://www.blender.org/download/demo-files/): CC0 realistic and stylised bodies and heads, for sculpting.
+  - [MakeHuman / MPFB](https://static.makehumancommunity.org/mpfb/faq.html): CC0 exports; realistic, adjustable, with a skeleton.
+  - Not usable: "free" downloads of characters from other games. They're copies of someone else's characters, with no real licence (the `Models` folder, phase 15).
 
 ## The log
 
@@ -254,3 +262,6 @@ These are starting targets, to be checked on an office laptop and adjusted:
       - **The face:** sleepy, then staring eyes; a hair "helmet", then a "beanie".
       - **The mesher:** long streaks from a bug.
     - The lessons are in section 14 of `PROJECT.md`.
+  - The user's pick: the helmet, for now (decision 127).
+    - The lats looked abnormally big, so they were slimmed and the round rendered again. The scene was reopened in the user's Blender, after a copy of their open file was saved as `art/out/style-samples-2-before-slimmer-lats.blend`.
+    - The `Models` folder of "free" Fortnite and Call of Duty character downloads was checked (no licences; copies of those games' characters) and removed at the user's request.

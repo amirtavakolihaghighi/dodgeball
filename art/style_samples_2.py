@@ -503,8 +503,8 @@ def body_parts(J):
             t = smin(t, E(p, at(Rc, c, (0.045, 0, 0.14)), (0.05, 0.09, 0.075), Rc), 0.04)          # sternum: no cleavage
             t = smin(t, E(p, at(Rc, c, (0.05, 0, 0.152)), (0.034, 0.158, 0.064), Rc), 0.035)          # a broad, flat chest
             for s in (1, -1):
-                lat = Rc @ r1.rot(x=s * 18)
-                t = smin(t, E(p, at(Rc, c, (-0.032, s * 0.122, 0.08)), (0.07, 0.058, 0.135), lat), 0.04)
+                lat = Rc @ r1.rot(x=-s * 10)               # widest under the arm, tapering to the waist
+                t = smin(t, E(p, at(Rc, c, (-0.03, s * 0.1, 0.085)), (0.062, 0.042, 0.12), lat), 0.04)
                 t = smin(t, sd_cone(p, at(Rc, c, (-0.03, s * 0.045, 0.265)), at(Rc, c, (-0.03, s * 0.175, 0.21)), 0.05, 0.04), 0.04)
         if neck:
             n = sd_cone(p, at(Rc, c, (-0.014, 0, 0.17)), J["head"] + J["Rn"] @ Vector((-0.022, 0, -0.02)), 0.07, 0.06)
@@ -910,7 +910,7 @@ def jersey_parts(J, parts):
 
     def f(p):
         d = parts["torso"](p, inflate=0.008, neck=False)
-        d = smin(d, sd_ellipsoid(p, J["chest"] + J["Rm"] @ Vector((0.014, 0, -0.01)), (0.108, 0.15, 0.21), J["Rm"]), 0.05)  # hangs straight from the chest
+        d = smin(d, sd_ellipsoid(p, J["chest"] + J["Rm"] @ Vector((0.014, 0, -0.01)), (0.104, 0.136, 0.2), J["Rm"]), 0.05)  # hangs straight from the chest
         for side in ("L", "R"):
             o, n = sleeves[side]
             arm = smax(parts["upper_arm"](p, side, inflate=0.007), sd_plane(p, o, n), 0.004)

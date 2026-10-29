@@ -2,7 +2,7 @@
 
 **Read `docs/PROJECT.md` before changing anything.** It holds the full history, every design decision and who made it, the architecture, network protocol, rules and numbers, how to run, test and build, and known pitfalls.
 
-**This is the branch `look-and-feel`** (graphics, juice and sound; phase 15 and decisions 112–126 in `docs/PROJECT.md`). It's checked out in its own folder, `Dodgeball-look-and-feel`, next to the main folder `Dodgeball`. The main folder belongs to the user's other work (`main`, `internet-mode`): never switch its branch or edit there from this branch's sessions.
+**This is the branch `look-and-feel`** (graphics, juice and sound; phase 15 and decisions 112–127 in `docs/PROJECT.md`). It's checked out in its own folder, `Dodgeball-look-and-feel`, next to the main folder `Dodgeball`. The main folder belongs to the user's other work (`main`, `internet-mode`): never switch its branch or edit there from this branch's sessions.
 
 - **The working plan is `docs/LOOK_AND_FEEL.md`:** the plan with each step's status, the art conventions, the budgets, the style samples and the log. Update it after each step, and keep phase 15 in `docs/PROJECT.md` as the record.
 - **Making art:**

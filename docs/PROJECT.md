@@ -807,11 +807,15 @@ This is the short version, kept on `main` while internet mode waits on its branc
 - **What carries over:**
   - the hall, its baked sunlight, the shafts, the sky backdrop, bloom and the grade carry over cheaply;
   - each athlete is about 1.5 million triangles, against a budget of 5,000–10,000, and exists only as posed statues, so the game needs lighter rigged models (step 7).
-- **The user's pick** is next. The user also put models found online in a `Models` folder for Claude to check (licences first: the repository is public).
+- **The user's pick** (decision 127): the helmet, for now. The bodies are "mostly okay", but the lats looked abnormally big. They were: the lat shapes leaned the wrong way and flared out under the arms, so they were slimmed and re-tilted, and the round was rendered again.
+- **The `Models` folder:** the user had downloaded four "free" character models for Claude to check: three Fortnite characters and a Call of Duty character.
+  - They were copies of Epic Games' and Activision's characters, at least one extracted from the game itself (Fortnite's own texture names), with no licence at all.
+  - They were unusable (decision 119, and decision 126: a reference, not something to copy), and risky in a public repository. They were removed at the user's request.
+  - Claude listed CC0 alternatives in `docs/LOOK_AND_FEEL.md`, and the user will look for models later.
 
 **Next, in order:** the plan in `docs/LOOK_AND_FEEL.md`:
 
-1. Style samples.
+1. Style samples (done: the sports hall, the helmet for now).
 2. The performance items.
 3. Juice and sound.
 4. The arena, the ball and effects, the characters and their animation, and the HUD.
@@ -943,6 +947,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
 | 124 | The setting is the sports hall | U | "I think the sport hall is the proper setting for the game." Picked from style samples round 1 (night arena, daylight court, sports hall) |
 | 125 | Colours and light like the landscapes of Genshin Impact: vibrant, alive, cheerful, with beautiful light. Never pale | U | "I like the colors from the hall. It's vibrant and alive and cheerful… I want the colors to look like Genshin Impact lands… I don't like pale." A reference for the style, not something to copy |
 | 126 | Characters towards Fortnite-like humanoids: stylised human proportions | U | "I'm looking forward for them to look something like Fortnite humanoid characters." A reference for the style, not something to copy. Round 1's characters were a first draft |
+| 127 | The athletes wear the sports helmet with a visor, for now; the face version is set aside. Round 2's bodies are the base, with slimmer lats | U | "Helmet is ok for now." "The model is mostly okay but they look like they all have big lats." Picked from style samples round 2. The face came out generic and slightly uncanny up close. The user will look for free (CC0) models later |
 
 ## 6. Current features
 
