@@ -61,7 +61,7 @@ Step 2 comes before anything heavy, and steps 3 and 4 can follow right after ste
 - **Scripts in `art/`** build the art from nothing in Blender, so every piece can be rebuilt and changed (decision 120).
   - Their output (renders and `.blend` files) goes to `art/out/`, which isn't in git.
   - What the game loads is exported as glTF into `static/`.
-- **Running a script, in the background:**
+- **Running a script, in the background** (from a Windows prompt; in a Claude Code worktree session, see `CLAUDE.md` for the Bash form):
 
   ```text
   "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --factory-startup --python art\<script>.py -- <options>
@@ -94,7 +94,47 @@ These are starting targets, to be checked on an office laptop and adjusted:
 
 ### Round 1 (2026-10-29)
 
-Waiting to be rendered.
+**How they were made:**
+
+- `art/style_samples.py` builds three scenes from nothing, with no downloaded assets, at the game's real sizes and colours. It renders each twice in Blender's EEVEE:
+  - **the gameplay view:** the game's own camera, over the right shoulder (`main.js shoulderCamera`: 0.75 m right, 4.4 m back, 2.3 m up, 62° tall);
+  - **a close-up** of the near player.
+- It also saves them to `art/out/style-samples.blend`, so they can be looked at in Blender.
+- The pictures below are copies of `art/out/`.
+- The same character kit dresses all three: a smooth body made of lofted tubes, gloves, shoes and a helmet with a visor. Two body types:
+  - **sleek**, with armour plates for night and day;
+  - **chunky**, with a jersey for the hall.
+
+**The three directions:**
+
+- **Night arena:** a dark stadium; a glossy floor that mirrors the lights; glowing court lines; LED end walls in the team colours; a light rig and haze; a dark crowd with phone lights. The athletes wear glossy team-coloured armour over a dark suit, with glowing rings and a glowing visor. Closest to Venge.io and Rocket League's arenas, and the most readable at night: the glow outlines every player.
+
+  ![Night arena, gameplay view](images/look-and-feel/sample-night-play.jpg)
+  ![Night arena, close-up](images/look-and-feel/sample-night-hero.jpg)
+
+- **Daylight court:** an open-air court on a green plateau, glass side walls, hills fading into haze, round trees, soft sun. The athletes are white with team-coloured armour and dark visors. Calm and soft, close to Slow Roads' mood; the least saturated of the three.
+
+  ![Daylight court, gameplay view](images/look-and-feel/sample-day-play.jpg)
+  ![Daylight court, close-up](images/look-and-feel/sample-day-hero.jpg)
+
+- **Sports hall:** a bright indoor hall. Each team's half is painted in its colour, with padded boards in five colours, a colourful crowd, bunting and big colour blocks on the walls. The athletes are chunkier: team jerseys over dark sleeves, a white belt, big gloves, and white helmets with dark visors. The most playful, nearest to a toy look.
+
+  ![Sports hall, gameplay view](images/look-and-feel/sample-hall-play.jpg)
+  ![Sports hall, close-up](images/look-and-feel/sample-hall-hero.jpg)
+
+**What carries over to the game, and what doesn't:** these are offline renders. In the browser, on office laptops:
+
+- **Carries over:**
+  - the shapes, colours and materials;
+  - baked lighting;
+  - the glow (bloom, a screen effect);
+  - the trails.
+- **Expensive:** the haze and the mirror-like floor.
+  - The haze would be faked with cheap light beams.
+  - The floor reflection costs a second render of the scene, so it would be a setting, or faked.
+- So the night arena loses the most in the move to a browser, but its darkness also hides simple geometry, and that helps.
+
+**Waiting for:** the user's pick, or a mix of the three, and their notes on the characters.
 
 ## The log
 
@@ -102,4 +142,6 @@ Waiting to be rendered.
   - The question and the analysis (phase 15).
   - Blender 5.2 and the "MCP for Blender" add-on were installed by the user, then checked, pinned and tested by Claude.
   - The branch `look-and-feel` was created in its own folder, with this plan.
-  - Style samples, round 1.
+  - Style samples, round 1: three directions, each in a gameplay view and a close-up, also loaded into the user's Blender.
+    - Five rounds of fixes along the way: a black daylight scene (world haze blocks the sun), a lamp mirrored as a blob in the floor, a crowd that took 100 s to build, an overexposed hall, and frilly shorts.
+    - The lessons are in section 14 of `PROJECT.md`.

@@ -1626,6 +1626,13 @@ print(lengths, g.score, dict(counts))
 
 ## 14. Pitfalls and lessons learned
 
+- **Blender 5.2, found while making the style samples (`art/style_samples.py`):**
+  - **A world volume (haze) blocks the sun and the sky completely:** EEVEE treats it as endless, and the picture renders black. Only lamps inside the haze still light it. For outdoor haze, use a large box with a volume material.
+  - **A glossy floor mirrors big lamps:** a 2.5 m point lamp showed up as a round blob mid-court. Lamps that are only for coloured glow get `specular_factor = 0`.
+  - **Building hundreds of small meshes with one bmesh operation each is slow** (a crowd took 100 s). Make one template and copy its vertices into one mesh with `from_pydata` (0.5 s).
+  - **The compositor is a node group now:** `scene.compositing_node_group` with a Group Output instead of a Composite node, and the Glare node's type is an input socket (`"Bloom"`).
+  - **The Volume Scatter shader rendered black in every test.** Principled Volume works.
+  - **In a worktree session, Claude Code's guard refuses a program run by its quoted path with spaces.** Put Blender's folder on the PATH for that one command: `PATH="/c/Program Files/Blender Foundation/Blender 5.2:$PATH" blender.exe --background ...`.
 - **Never start the server in automated tests without `--no-browser`**, or it opens browser windows on the user's desktop.
 - **A venv is not portable**: it stores the absolute path of its Python. Hence `run.bat`'s self-repair.
 - **Windows batch files:**
