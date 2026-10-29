@@ -31,7 +31,7 @@ const port = Number(portArg || 9333);
 // otherwise max out the CPU and slow the server they're testing.
 const [W, H] = (process.env.CDP_SIZE || '1280x720').split('x').map(Number);
 const chrome = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const profile = path.join(os.tmpdir(), `dodgeparry-chrome-${port}`);
+const profile = path.join(os.tmpdir(), `dodgeball-chrome-${port}`);
 const proc = spawn(chrome, [
   '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, `--window-size=${W},${H}`,
   '--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--no-first-run', '--no-default-browser-check',

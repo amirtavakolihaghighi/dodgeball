@@ -1,4 +1,4 @@
-# Dodge & Parry: LAN prototype
+# Dodgeball: the manual
 
 Schoolyard dodgeball with Souls-style stamina, in 3D in the browser. One computer runs a small
 Python server. Everyone on the same Wi-Fi opens a web page and plays. The host can add bots to
@@ -9,6 +9,8 @@ The server starts in a **lobby**. The **host**, whoever plays on the computer ru
 ## Run it
 
 Double-click **`run.bat`**. The first run creates a local Python environment (`.venv`), which needs Python 3.10+ on PATH. The game opens in your browser by itself.
+
+No Python? Download the Windows app from the [latest release](https://github.com/amirtavakolihaghighi/dodgeball/releases/latest), unzip it and double-click `Dodgeball.exe` (more under "Share it with people who don't have Python").
 
 Or run it by hand (on Mac/Linux, use `python3` and `.venv/bin/python`):
 
@@ -35,7 +37,7 @@ The menu (Esc) is the lobby. As the host you get:
 - **Bots:** each team has its own **− / +** (0–12 bots each). Nothing adds, removes or balances them but you. Bot skill sits under Match.
 - **Match length:** "first to N" round wins, or endless.
 - **Spectate:** watch instead of playing. The others (and the bots) play on; you keep all the host controls. Mouse looks, **W A S D** fly, **Space / Shift** go up and down, **left / right click** ride behind the next / previous player. **Join a team** brings you back to the team you had. During a match both take effect from the next round.
-- **Game rules…**: every number of the game, about 110 of them, in 16 groups. For example: throw speeds, charge time, damage, gravity, ricochets, aim assist, every dodge/catch/deflect window, stamina, movement, hitboxes, court size, cash and revives, rounds, the bots' skill numbers and the network smoothing.
+- **Game rules…**: every number of the game, 117 of them, in 16 groups. For example: throw speeds, charge time, damage, gravity, ricochets, aim assist, every dodge/catch/deflect window, stamina, movement, hitboxes, court size, cash and revives, rounds, the bots' skill numbers and the network smoothing.
   - Each rule has a plain description, its default, and an **animated preview**. The preview runs the default next to your value in real time, using the game's own formulas: you see the throw arc higher, the timing window widen, the ball bend harder, and so on.
   - Drag, type or reset values, then press **Apply**. **Undo my edits** and **Reset all to defaults** are there too.
 
@@ -47,18 +49,18 @@ Everyone else sees the same lobby read-only: the teams, the bots, the settings, 
 
 ## Share it with people who don't have Python
 
-Double-click **`build_exe.bat`** (after running `run.bat` once). It builds **`dist\DodgeAndParry-windows.zip`**, about 19 MB. Send that zip: your friends unzip it and double-click `DodgeAndParry.exe`. No Python needed.
+Every [release](https://github.com/amirtavakolihaghighi/dodgeball/releases) has the Windows app ready-made: `Dodgeball-windows.zip`, built by GitHub Actions from that version's code, with its SHA-256 checksum. To build it yourself, double-click **`build_exe.bat`** (after running `run.bat` once). It builds **`dist\Dodgeball-windows.zip`**, about 19 MB. Send that zip: your friends unzip it and double-click `Dodgeball.exe`. No Python needed.
 
 - Windows may say "Windows protected your PC", because the app isn't signed by a publisher: click **More info**, then **Run anyway**.
 - Closing the app's window stops the game server.
-- Rebuild after changing the code or `config.py`; the defaults are baked into the app. Rules the host sets in the lobby aren't baked in: they're saved in `saved_rules.json` next to `DodgeAndParry.exe`.
+- Rebuild after changing the code or `config.py`; the defaults are baked into the app. Rules the host sets in the lobby aren't baked in: they're saved in `saved_rules.json` next to `Dodgeball.exe`.
 - It's Windows-only. Friends on a Mac need Python and the manual steps above.
 
 If you share this source folder instead, leave out `.venv`, `build` and `dist`. They're made on your computer and are big. A copied `.venv` won't work elsewhere, but `run.bat` notices and rebuilds it.
 
 If other devices can't connect, it's almost always Windows Firewall. **Don't turn the firewall off.** Instead, on the host's computer, either:
 
-- double-click **`Allow friends to connect.bat`** (next to `DodgeAndParry.exe`, or in this folder) once. It asks for administrator permission, then lets computers on your local network (never the internet) reach the game's ports 8000–8019, whether Windows calls the Wi-Fi Public or Private, and removes the old "block" rules Windows made when its "allow access" prompt was answered for private networks only. `Allow friends to connect.bat check` shows what it would do; `... undo` removes the rule; or
+- double-click **`Allow friends to connect.bat`** (next to `Dodgeball.exe`, or in the project folder) once. It asks for administrator permission, then lets computers on your local network (never the internet) reach the game's ports 8000–8019, whether Windows calls the Wi-Fi Public or Private, and removes the old "block" rules Windows made when its "allow access" prompt was answered for private networks only. `Allow friends to connect.bat check` shows what it would do; `... undo` removes the rule; or
 - set the Wi-Fi network to **Private** in Windows settings, and allow the app when Windows asks.
 
 ## Testing alone
@@ -175,7 +177,7 @@ These are the **defaults** (they live in `config.py`). The host can change every
 .venv\Scripts\python tests\test_server.py    # 6 server tests: real WebSockets, the host's screen, the session logs, the log report
 ```
 
-End-to-end browser tests (headless Chrome) are in `tests\browser\`; see its README. The full project history and technical reference is `..\PROJECT.md`.
+End-to-end browser tests (headless Chrome) are in `tests\browser\`; see its README. The full project history and technical reference is [PROJECT.md](PROJECT.md).
 
 The tests cover:
 

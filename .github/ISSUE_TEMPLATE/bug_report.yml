@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in the game or the server doesn't work the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. A security problem doesn't belong here: please report it
+        privately instead (see the [security policy](https://github.com/amirtavakolihaghighi/dodgeball/security/policy)).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      placeholder: |
+        1. Host a lobby with 2 bots on each team
+        2. Start the match
+        3. Deflect a ball that bounced off the side wall
+        4. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release you downloaded (for example v2.0.0), or the commit if you run it from source.
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Where were you?
+      options:
+        - Hosting (playing on the computer that runs the game)
+        - Hosting from another device (the host link)
+        - Playing from another computer
+        - Spectating
+  - type: input
+    id: setup
+    attributes:
+      label: Computers, systems and browsers involved
+      placeholder: "Host: Windows 11 desktop on a cable. Me: Ubuntu 24.04 laptop on Wi-Fi, Chrome."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: |
+        The server window's output, or the summary printed by `python tools/log_report.py <the zip>`.
+        A session log zip contains players' names, LAN addresses and device details: share the summary,
+        or check what is in the zip before attaching it.
+      render: text

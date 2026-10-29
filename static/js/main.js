@@ -222,7 +222,7 @@ async function downloadAllLogs() {
     if (!res.ok) throw new Error(await res.text());
     const a = document.createElement('a');
     a.href = URL.createObjectURL(await res.blob());
-    a.download = res.headers.get('X-Filename') ?? 'dodgeparry-logs.zip';
+    a.download = res.headers.get('X-Filename') ?? 'dodgeball-logs.zip';
     document.body.append(a);
     a.click();
     a.remove();
@@ -435,7 +435,7 @@ function syncSelf() {
     if (me.team === -1 && myTeam !== -1) startSpectating();
     myTeam = me.team;
     hud.setIdentity(myName, myTeam);
-    document.title = `${myName} · ${TEAM[myTeam] ?? 'SPECTATING'} | Dodge & Parry`;
+    document.title = `${myName} · ${TEAM[myTeam] ?? 'SPECTATING'} | Dodgeball`;
   }
 }
 

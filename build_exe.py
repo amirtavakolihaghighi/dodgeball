@@ -1,4 +1,4 @@
-"""Builds the standalone Windows app into dist/DodgeAndParry and zips it for sharing.
+"""Builds the standalone Windows app into dist/Dodgeball and zips it for sharing.
 
 Players don't need Python to run the result. Run this again after changing the code or
 config.py. Usually started through build_exe.bat.
@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-NAME = "DodgeAndParry"
+NAME = "Dodgeball"
 FIREWALL_HELPER = "Allow friends to connect.bat"
 
 
@@ -27,8 +27,9 @@ def git_version():
 
 
 def main():
-    print("Installing the packaging tool (PyInstaller)...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q", "pyinstaller"], check=True)
+    print("Installing the packaging tool (PyInstaller, the version pinned in requirements-build.txt)...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q", "-r",
+                    str(ROOT / "requirements-build.txt")], check=True)
     import PyInstaller.__main__
 
     print("Building, this takes a minute...")

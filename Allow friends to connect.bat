@@ -1,5 +1,5 @@
 @echo off
-rem Dodge & Parry: lets other computers on your network join the game, without turning
+rem Dodgeball: lets other computers on your network join the game, without turning
 rem Windows Firewall off. Double-click it on the computer that runs the game (once is enough).
 rem It asks Windows for administrator permission, then:
 rem   1. allows connections to the game's ports (TCP 8000-8019) from your local network only,
@@ -29,14 +29,15 @@ exit /b
 
 #PSSTART (PowerShell from here on; cmd never gets this far)
 $ErrorActionPreference = 'Stop'
-$name = 'Dodge & Parry'
+$name = 'Dodgeball'
+$oldName = 'Dodge & Parry'    # the same rule, made before the game was renamed
 $dir = $env:DP_DIR
 $mode = "$env:DP_MODE".ToLowerInvariant()
 $check = $mode -eq 'check'
 
 # The programs that run the game's server here: the packaged app, or the Python behind .venv.
 $programs = @()
-foreach ($p in @((Join-Path $dir 'DodgeAndParry.exe'), (Join-Path $dir '.venv\Scripts\python.exe'))) {
+foreach ($p in @((Join-Path $dir 'Dodgeball.exe'), (Join-Path $dir '.venv\Scripts\python.exe'))) {
   if (Test-Path -LiteralPath $p) { $programs += $p }
 }
 $cfg = Join-Path $dir '.venv\pyvenv.cfg'
@@ -49,7 +50,7 @@ if (Test-Path -LiteralPath $cfg) {
 }
 $wanted = $programs | ForEach-Object { [IO.Path]::GetFullPath($_).ToLowerInvariant() }
 
-$ours = @(Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue)
+$ours = @(Get-NetFirewallRule -DisplayName $name, $oldName -ErrorAction SilentlyContinue)
 $blocks = @(Get-NetFirewallRule -Direction Inbound -Action Block -ErrorAction SilentlyContinue | Where-Object {
   $app = ($_ | Get-NetFirewallApplicationFilter).Program
   $app -and $app -ne 'Any' -and ($wanted -contains [Environment]::ExpandEnvironmentVariables($app).ToLowerInvariant())
@@ -62,18 +63,18 @@ if ($check) {
   Write-Host "Networks: $($profiles -join ', ')"
   Write-Host "Windows rules that block those programs: $($blocks.Count)"
   $blocks | ForEach-Object { Write-Host "  $($_.DisplayName) [$($_.Profile)]" }
-  Write-Host "The '$name' rule exists already: $($ours.Count -gt 0)"
+  Write-Host "The game's rule exists already: $(if ($ours.Count) { ($ours.DisplayName | Select-Object -Unique) -join ', ' } else { 'no' })"
   return
 }
 $ours | Remove-NetFirewallRule
 if ($mode -eq 'undo') {
-  Write-Host "Removed the '$name' firewall rule."
+  Write-Host "Removed the game's firewall rule ($($ours.Count) found)."
   return
 }
 $blocks | Remove-NetFirewallRule
-New-NetFirewallRule -DisplayName $name -Description 'Lets computers on your local network join Dodge & Parry (TCP 8000-8019). Made by "Allow friends to connect.bat".' `
+New-NetFirewallRule -DisplayName $name -Description 'Lets computers on your local network join Dodgeball (TCP 8000-8019). Made by "Allow friends to connect.bat".' `
   -Direction Inbound -Action Allow -Protocol TCP -LocalPort '8000-8019' -RemoteAddress LocalSubnet -Profile Any | Out-Null
 Write-Host ''
-Write-Host 'Done. Computers on your local network can now join Dodge & Parry, and the firewall stays on.'
+Write-Host 'Done. Computers on your local network can now join Dodgeball, and the firewall stays on.'
 if ($blocks.Count) { Write-Host "Also removed $($blocks.Count) old Windows rule(s) that blocked the game's program." }
 Write-Host 'To undo: run "Allow friends to connect.bat undo".'

@@ -1,0 +1,23 @@
+name: Idea or feature request
+description: Something that would make the game better to play or easier to host.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem, from a player's or the host's side?
+      description: Describe what happens in a match or in the lobby today, and why it's a problem.
+      placeholder: "When three balls come at once I can only answer one, so ..."
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like instead?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you already tried?
+      description: For example a lobby setting (Game rules) that came close.

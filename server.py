@@ -1,4 +1,4 @@
-"""Dodge & Parry LAN server.
+"""Dodgeball LAN server.
 
 Serves the browser client and runs the authoritative game simulation (sim.py).
 Run:  python server.py [--port 8000] [--no-browser] [--fresh]
@@ -309,7 +309,7 @@ async def download_logs(request: Request, key: str = ""):
     data = await asyncio.to_thread(session_log.zip_recent)
     # The page fetches this and saves it itself. No Content-Disposition: Chrome hands such a
     # response to its download manager and gives the page's fetch an empty 204 instead.
-    name = f"dodgeparry-logs-{datetime.now():%Y-%m-%d_%H-%M}.zip"
+    name = f"dodgeball-logs-{datetime.now():%Y-%m-%d_%H-%M}.zip"
     return Response(data, media_type="application/zip", headers={"X-Filename": name})
 
 
@@ -423,7 +423,7 @@ def start_logging(folder, args):
 
 def main():
     global port, save_rules, own_ips, VERSION
-    parser = argparse.ArgumentParser(description="Dodge & Parry LAN server")
+    parser = argparse.ArgumentParser(description="Dodgeball LAN server")
     parser.add_argument("--port", type=int, help="default: 8000, or the next free port")
     parser.add_argument("--host", default="0.0.0.0", help="0.0.0.0 = reachable from the LAN")
     parser.add_argument("--no-browser", action="store_true", help="don't open the game in a browser")
@@ -441,7 +441,7 @@ def main():
             ctypes.windll.winmm.timeBeginPeriod(1)   # 1 ms timer resolution for a steady 60 Hz loop
     own_ips = lan_addresses()
     watch_addresses()
-    print("\n  DODGE & PARRY server")
+    print("\n  DODGEBALL server")
     print(f"    this computer : http://localhost:{port}    <- you're the host here: set up the lobby, then Start")
     for ip in own_ips:
         print(f"    same Wi-Fi    : http://{ip}:{port}")

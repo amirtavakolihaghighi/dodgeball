@@ -1,11 +1,11 @@
-# Dodge & Parry: full project context and history
+# Dodgeball: full project context and history
 
 This document is the complete hand-off for the project. It's written so that a brand-new chat (an AI assistant with no memory of earlier conversations) or a returning human can pick up the work: what the game is, how it got here, every design decision and who made it, how the code works, how to run, test and ship it, and the pitfalls already discovered.
 
-- **In Claude Code:** `CLAUDE.md` in this folder loads automatically and points here.
+- **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-27 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast).
+Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds).
 
 ## Contents
 
@@ -28,15 +28,15 @@ Last updated: 2026-10-27 (development cycle 2: lobby, host controls, rules edito
 
 ## 1. The game in one paragraph
 
-**Dodge & Parry** is a real-time multiplayer 3D dodgeball game played in the browser on a local network, with no internet needed:
+**Dodgeball** (called Dodge & Parry until v2.0.0) is a real-time multiplayer 3D dodgeball game played in the browser on a local network, with no internet needed:
 
 - **The core:** two teams throw balls at each other. Stamina limits everything, Dark Souls-style. An incoming ball can be **dodged**, **caught** or **deflected**, and pressing at the last moment is "perfect", which is cheaper and pays more.
 - **Rallies:** a ball deflected back and forth gets faster every time.
 - **Throwing:** throws are charged, and harder throws cost more stamina, fly faster and deal more damage. Balls fly in gentle arcs and can ricochet once off the floor or a side wall.
 - **Elimination:** 0 HP knocks you out, and teammates can spend cash to revive you.
-- **Hosting:** one PC runs the game server (Python, or the packaged `DodgeAndParry.exe`). Everyone on the same Wi-Fi opens a web page.
+- **Hosting:** one PC runs the game server (Python, or the packaged `Dodgeball.exe`). Everyone on the same Wi-Fi opens a web page.
 - **The lobby:** the server starts in a lobby. The host, who plays in the browser on that PC, sets up the teams, the bots and **every rule of the game**, then starts the match. Others can join at any time, but only the host changes anything. Changes made during a match apply from the next round.
-- **The rules editor:** each of the ~110 numbers has a name, a description and an animated preview that runs the default next to the lobby's value.
+- **The rules editor:** each of the 117 numbers has a name, a description and an animated preview that runs the default next to the lobby's value.
 - **Looks:** an over-the-shoulder, Fortnite-style camera, with stick figures for characters.
 - **Bots:** the host puts any number on either team, so it also works solo.
 - **Spectating and the host's screen:** the host can watch instead of playing, and everyone else sees the host's menus and rule edits live while they set things up.
@@ -48,7 +48,7 @@ Last updated: 2026-10-27 (development cycle 2: lobby, host controls, rules edito
   - Python 3.14 (python.org install).
   - Node 24, Chrome and Edge, uv, git, GitHub CLI.
   - Edited in VS Code with Claude Code (PowerShell, with Git Bash also available).
-  - **Git:** the folder is a git repository, pushed to the private GitHub repo `amirtavakolihaghighi/dodge-and-parry`. `main` holds **v1.0.0**, the first stable version (tagged, with a GitHub release carrying the Windows zip). Cycle-2 work happens on the branch `cycle-2`. Commit or push only when the user asks.
+  - **Git:** the folder is a git repository, published as the **public** GitHub repo `amirtavakolihaghighi/dodgeball` (MIT) with a history rebuilt for publishing (phase 9); the user's old private repo `dodge-and-parry` holds the original history until they delete it. `main` holds the releases, **v1.0.0** and **v2.0.0** (tags, each with a GitHub release carrying the Windows zip built by GitHub Actions). Commits use GitHub's noreply address. Commit or push only when the user asks.
   - The PC runs VPN/proxy tools, whose tunnel adapters show up in the join-address list.
 - **Wants simple but genuinely working prototypes.** They were burned by a ChatGPT prototype that looked polished but didn't work, with fake UI, mechanics that could never trigger and a broken renderer. No fake or decorative features: everything shown must work.
 - **Wants blunt, evidence-based judgment**, backed by screenshots, simulations and measurements, not opinion.
@@ -56,58 +56,69 @@ Last updated: 2026-10-27 (development cycle 2: lobby, host controls, rules edito
 - **Tests solo** by opening several browser tabs or windows as different players, plus bots.
 - **Platform:** desktop/laptop only for now (keyboard and mouse). Phones/touch were explicitly deferred.
 - **Shares builds with friends.** They first sent a RAR of the source folder, which broke, and now send the standalone Windows app.
-- **Plays with coworkers in the office** (6–10 people, office Wi-Fi; several on Linux laptops). Some of them had lag; see `LAG_ANALYSIS.md`. The user collects the session logs and drops them in `prototype\testlog\` for analysis.
+- **Plays with coworkers in the office** (6–10 people, office Wi-Fi; several on Linux laptops). Some of them had lag; see `LAG_ANALYSIS.md`. The user collects the session logs and drops them in `testlog\` (git-ignored) for analysis.
 - **Works in development cycles:** a stable version on `main`, then a batch of requested changes, then the user tests.
-- **Wants to discuss before building** when a topic is open-ended (the lag plan is in discussion: a frame of grace for presses, sidestep compensation and a bigger view delay wait for the user's decision).
+- **Wants to discuss before building** when a topic is open-ended (the lag plan was discussed first, then built as settings: phase 7).
 
 ## 3. Folder map
 
 ```text
-dodge-and-parry/                (git repo -> github.com/amirtavakolihaghighi/dodge-and-parry, private)
-├── PROJECT.md                 this document
+dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodgeball, public)
+├── README.md                  the front page: what the game is, playing and hosting, safety and privacy
 ├── CLAUDE.md                  short instructions auto-loaded by Claude Code (points here)
-├── LAG_ANALYSIS.md            cycle 2: measured causes of lag, options, hotspot question (discussion draft)
-├── .gitignore / .gitattributes  venvs, builds, test screenshots, saved_rules.json; .bat files kept CRLF
-└── prototype\                 THE GAME
-    ├── run.bat                start the server (creates/repairs .venv; opens the browser)
-    ├── build_exe.bat          build the standalone Windows app -> dist\DodgeAndParry-windows.zip
-    ├── build_exe.py           the build logic (PyInstaller + zip with retries; ships the firewall helper too)
-    ├── Allow friends to connect.bat   lets other PCs join through Windows Firewall: one rule, local network only
-    ├── server.py              FastAPI web server + WebSocket + game loop + host detection + rules broadcast/saving
-    ├── sim.py                 all game rules (server-authoritative), lobby/match states, host actions
-    ├── diag.py                the session log: per-second server/host/connection numbers, stalls, late presses
-    ├── tools\log_report.py    reads a session's logs and prints the diagnosis
-    ├── logs\                  (made at runtime) one folder of session logs per server run; the 30 newest are kept
-    ├── testlog\               the user's collected session logs from office tests (git-ignored: names and IPs)
-    ├── rules.py               every host-editable rule: name, description, range, preview; the Rules object
-    ├── bots.py                bot AI
-    ├── config.py              the DEFAULT value of every gameplay number
-    ├── saved_rules.json       (made at runtime) the host's rules, reloaded at the next start
-    ├── requirements.txt       fastapi, uvicorn[standard]
-    ├── icon.ico               app icon (gold dodgeball, generated by a script)
-    ├── README.md              player/operator-facing guide (run, share, controls, rules)
-    ├── .gitignore             .venv, __pycache__, build, dist
-    ├── static\                the browser client (served by server.py)
-    │   ├── index.html         HUD, lobby menu, rules editor, join screen markup; import map for three.js
-    │   ├── style.css
-    │   ├── js\main.js         glue: join flow, rules, local player, camera, aim, preview, threat ring, events, HUD
-    │   ├── js\lobby.js        the lobby / pause menu: teams, each team's bots, match settings, host controls, spectate
-    │   ├── js\rules_ui.js     the rules editor (list, search, draft, apply, reset; following the host's screen)
-    │   ├── js\previews.js     the rules editor's animated previews (20 scenes, the game's own formulas)
-    │   ├── js\physics.js      launchVelocity and curveShare, shared by the game client and the rules previews
-    │   ├── js\diag.js         this browser's diagnostics log: per-second numbers, moments, L marks; sent to the host
-    │   ├── js\net.js          WebSocket, server-clock estimate, snapshot interpolation, event queue
-    │   ├── js\world.js        three.js scene: court, stick figures, balls, trails, effects
-    │   ├── js\hud.js          DOM HUD (bars, tags, ring, popups, feed, scoreboard, hint line)
-    │   ├── js\input.js        keyboard/mouse, pointer lock, release-everything-on-blur
-    │   ├── js\sfx.js          synthesized sounds (WebAudio)
-    │   └── vendor\            three.js 0.185.1: three.module.min.js + three.core.min.js
-    ├── tests\
-    │   ├── test_sim.py        50 rule tests: python tests\test_sim.py (or pytest)
-    │   ├── test_server.py     6 server tests (lobby protocol, the host's screen, saved rules, session logs, the log report)
-    │   └── browser\           headless-Chrome end-to-end tests (cdp.js driver + step files, freeze_server.py)
-    ├── .venv\                 local Python environment (made by run.bat; never share it)
-    └── dist\                  build output: DodgeAndParry\ (app) + DodgeAndParry-windows.zip
+├── LICENSE                    MIT
+├── CHANGELOG.md               what changed in each version (Keep a Changelog)
+├── CONTRIBUTING.md            setup, tests, conventions, the release routine
+├── SECURITY.md                what the game exposes and writes; reporting a vulnerability privately
+├── CODE_OF_CONDUCT.md
+├── THIRD_PARTY_NOTICES.md     three.js, the Python packages, PyInstaller's bootloader
+├── .gitignore / .gitattributes / .editorconfig   venvs, builds, logs, saved rules ignored; LF except .bat (CRLF)
+├── .github\                   workflows\ci.yml (tests on 3 OSes x Python 3.10-3.14, a browser match),
+│                              workflows\release.yml (the Windows zip from a tag), issue and PR templates
+├── docs\
+│   ├── MANUAL.md              the player and host guide: run, share, lobby, controls, every rule's default, logs
+│   ├── PROJECT.md             this document
+│   ├── LAG_ANALYSIS.md        cycle 2: measured causes of lag, options, what the office logs showed
+│   └── images\                the README's screenshots
+├── run.bat                    start the server (creates/repairs .venv; opens the browser)
+├── build_exe.bat              build the standalone Windows app -> dist\Dodgeball-windows.zip
+├── build_exe.py               the build logic (PyInstaller + zip with retries; ships the firewall helper too)
+├── Allow friends to connect.bat   lets other PCs join through Windows Firewall: one rule, local network only
+├── server.py                  FastAPI web server + WebSocket + game loop + host detection + rules broadcast/saving
+├── sim.py                     all game rules (server-authoritative), lobby/match states, host actions
+├── diag.py                    the session log: per-second server/host/connection numbers, stalls, late presses
+├── rules.py                   every host-editable rule: name, description, range, preview; the Rules object
+├── bots.py                    bot AI
+├── config.py                  the DEFAULT value of every gameplay number
+├── requirements.in            the direct dependencies: fastapi, uvicorn[standard]
+├── requirements.txt           the lockfile: exact versions for every OS (uv pip compile)
+├── requirements-build.in/.txt PyInstaller for build_exe.py, pinned the same way
+├── icon.ico                   app icon (gold dodgeball, generated by a script)
+├── tools\log_report.py        reads a session's logs and prints the diagnosis
+├── static\                    the browser client (served by server.py)
+│   ├── index.html             HUD, lobby menu, rules editor, join screen markup; import map for three.js
+│   ├── style.css
+│   ├── js\main.js             glue: join flow, rules, local player, camera, aim, preview, threat ring, events, HUD
+│   ├── js\lobby.js            the lobby / pause menu: teams, each team's bots, match settings, host controls, spectate
+│   ├── js\rules_ui.js         the rules editor (list, search, draft, apply, reset; following the host's screen)
+│   ├── js\previews.js         the rules editor's animated previews (20 scenes, the game's own formulas)
+│   ├── js\physics.js          launchVelocity and curveShare, shared by the game client and the rules previews
+│   ├── js\diag.js             this browser's diagnostics log: per-second numbers, moments, L marks; sent to the host
+│   ├── js\net.js              WebSocket, server-clock estimate, snapshot interpolation, event queue
+│   ├── js\world.js            three.js scene: court, stick figures, balls, trails, effects
+│   ├── js\hud.js              DOM HUD (bars, tags, ring, popups, feed, scoreboard, hint line)
+│   ├── js\input.js            keyboard/mouse, pointer lock, release-everything-on-blur
+│   ├── js\sfx.js              synthesized sounds (WebAudio)
+│   └── vendor\                three.js 0.185.1: three.module.min.js + three.core.min.js
+├── tests\
+│   ├── test_sim.py            50 rule tests: python tests\test_sim.py (or pytest)
+│   ├── test_server.py         6 server tests (lobby protocol, the host's screen, saved rules, session logs, the log report)
+│   └── browser\               headless-Chrome end-to-end tests (cdp.js driver + step files, freeze_server.py)
+├── logs\                      (made at runtime) one folder of session logs per server run; the 30 newest are kept
+├── saved_rules.json           (made at runtime) the host's rules, reloaded at the next start
+├── testlog\                   the user's collected session logs from office tests (git-ignored: names and IPs)
+├── .venv\                     local Python environment (made by run.bat; never share it)
+└── dist\                      build output: Dodgeball\ (app) + Dodgeball-windows.zip
 ```
 
 The code is about 10,000 lines in total. The biggest files are `previews.js` (~1,390), `sim.py` (~1,170), `main.js` (~1,110), `test_sim.py` (~900), `world.js` (~790), `rules.py` (~470), `log_report.py` (~450) and `diag.py` (~440).
@@ -116,7 +127,7 @@ The code is about 10,000 lines in total. The biggest files are `previews.js` (~1
 
 ### Phase 0: the idea and ChatGPT's attempt (2026-10-19)
 
-The user described the game to ChatGPT (free version); the transcript is kept privately, outside this repository. The requirements, in the user's words, condensed:
+The user described the game to ChatGPT (free version); the transcript was deleted when the project was published (phase 9). The requirements, in the user's words, condensed:
 
 - **Teams and balls:** two teams. Each player has a ball; after throwing there's a cooldown, then a new ball.
 - **Defence:** the targeted player can **dodge, catch or deflect**.
@@ -128,7 +139,7 @@ The user described the game to ChatGPT (free version); the transcript is kept pr
 - **Tech:** a Python server on a PC, with friends on the same Wi-Fi playing in a browser.
 - **Follow-up message:** throwing costs stamina **based on how hard you throw**. It should be **3D with a Fortnite-like camera**; stick figures are fine.
 
-ChatGPT produced a first attempt (not part of this repository): a FastAPI server and a single `index.html` with hand-written WebGL. When asked to judge it harshly, I verified every claim by running it:
+ChatGPT produced a first attempt (deleted since): a FastAPI server and a single `index.html` with hand-written WebGL. When asked to judge it harshly, I verified every claim by running it:
 
 1. **The 3D view never rendered.**
    - Its matrix multiply produced B·A instead of A·B for column-major matrices, so the whole MVP chain was reversed.
@@ -154,7 +165,7 @@ ChatGPT produced a first attempt (not part of this repository): a FastAPI server
    - It used a deprecated startup hook and paths relative to the working directory.
    - It had no network-delay handling.
 
-**Salvaged:** only the stack choice (Python FastAPI server, browsers over WebSockets). Everything else was rewritten in `prototype\`.
+**Salvaged:** only the stack choice (Python FastAPI server, browsers over WebSockets). Everything else was rewritten in `prototype\` (the game's folder until phase 9 moved it to the repository root).
 
 ### Phase 1: the first real prototype (2026-10-20 → 21)
 
@@ -468,6 +479,31 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 
 **Evidence:** a new browser test (`clock.json`) makes the page's clock run fast (+300 ms over 10 s). Before the fix: frozen about 1 s of every second until the end (22 s of 25, and it would have gone on for minutes). After: 2 s in total, partly during the ramp, recovered as soon as the clock settled. With jitter up to 200 ms it re-anchored once (49 ms) in 35 s; with 100 ms jitter or a steady 150 ms lag, never. The auto-defender is unchanged (deflect at 150 ms lag 14/15, dodge 10/12, catch 6/6 and 11/12, no hits apart from one two-balls-at-once case), and the sidestep test still has no hits while clear.
 
+### Phase 9: publishing on GitHub as Dodgeball (2026-10-29)
+
+**The request:** check the user's standard for publishing projects on GitHub and suggest improvements (then work them into it), prepare the project, and publish it following the standard. The user's choices:
+
+- a **public** repository under the **MIT** licence, with commits under GitHub's **noreply** address;
+- the name **Dodgeball** for the project, wherever it's needed (it was Dodge & Parry), in a new repository `dodgeball`; the old private `dodge-and-parry` stays untouched until the user deletes it;
+- the idea transcript (`Chat.md`) and ChatGPT's attempt left out of the repository, then deleted from disk altogether;
+- the game's files moved out of `prototype/` to the repository root.
+
+**The privacy gate** (the standard's first step) found personal data in the old history: a personal email address in every commit and in the v1.0.0 tag, and in the docs a local folder path containing the Windows user name, coworkers' names (from the log analysis), a LAN address and details of the office network. The idea transcript and ChatGPT's attempt were committed in v1.0.0 too.
+
+**What was done:**
+
+- **The history was rebuilt** with the same content, dates and messages, minus the personal data (coworkers became "Player A" to "Player F", the path a generic one, the address `192.168.x.x`) and the two dropped files: v1.0.0, then the cycle-2 commit, then one publishing commit (v2.0.0). The v1.0.0 tag was recreated with its original date. GitHub keeps force-pushed commits reachable by their id and in a repository's public Activity view, so the clean history went to a fresh repository rather than over the old one.
+- **The rename:** the join screen's logo and the page title, the browser tab, the server window, the app (`Dodgeball.exe` in `Dodgeball-windows.zip`), the log downloads (`dodgeball-logs-…`, `dodgeball-log-…`), the firewall helper's rule (it removes the old "Dodge & Parry" rule too), the docs and the repository. Internal names (`dp.settings` in the browser's storage, `window.dp` for the tests) stay, so players' saved settings survive. `log_report.py` reads logs by their content, so logs with the old names still work.
+- **The flat layout:** everything that was in `prototype/` sits at the repository root, and its README became `docs/MANUAL.md`. The code needed no changes, since every path is relative to its own file; the docs, CI and the release workflow did. The release workflow still builds v1.0.0, which has the old layout.
+- **Front page and policies:** `README.md` (the problem first, playing and hosting, safety and privacy, screenshots checked by eye for personal data), `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md` (what the game exposes and writes), `CODE_OF_CONDUCT.md`, `THIRD_PARTY_NOTICES.md`, issue and pull request templates. `PROJECT.md` and `LAG_ANALYSIS.md` moved to `docs/`.
+- **Line endings:** `.gitattributes` stores every text file with LF and `.bat` files with CRLF, and leaves images, archives and the vendored three.js untouched.
+- **Locked dependencies:** `requirements.in` lists the two direct dependencies; `requirements.txt` is a lockfile for every OS and Python 3.10+ (`uv pip compile --universal`); `requirements-build.txt` pins PyInstaller, which `build_exe.py` installs from it.
+- **CI** (`.github/workflows/ci.yml`): the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, plus a job that boots the server and plays a match in headless Chrome.
+- **Release builds** (`.github/workflows/release.yml`): a pushed `vX.Y.Z` tag builds the Windows app on GitHub's machines and attaches the zip and its SHA-256 checksum to the release; "Run workflow" with a tag rebuilds an older one.
+- **Repository settings:** private vulnerability reporting (`SECURITY.md` relies on it), secret scanning with push protection, Dependabot alerts, a description and topics.
+
+**Evidence:** before the push, both test suites passed in a fresh clone installed from the lockfile (Python 3.14, and Python 3.10 through uv), the server booted and a match ran in headless Chrome with no page errors, the Windows app built and started, the privacy scan found nothing in any commit, and the line endings were checked in the staged files. CI's results are on the repository's Actions tab.
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -533,6 +569,17 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 | 57 | The lockout after a missed press is a setting (0–1.5×, default 1×); at 0 a new press takes over the active one | U | "Maybe I want to test with 0 lockout time". A short lockout never cuts the window itself (C) |
 | 58 | Hits log the on-screen gap; sidesteps and graced defences are logged and reported | U | The fifth suggestion: measure what the fairness settings do |
 | 59 | A browser re-anchors its clock estimate when every update of 1.5 s arrived over 40 ms late | C | A laptop whose clock ran fast saw a frozen picture for ~5 minutes (28 Oct log). Logged as `clock` |
+| 60 | Publish as a public GitHub repository under the MIT licence | U | Following the user's publishing standard; MIT was the recommendation |
+| 61 | Commits use GitHub's noreply address, and the published history was rebuilt without personal data | U | The old commits carried a personal email, the docs a local path and coworkers' names. How the history was rebuilt: C |
+| 62 | The idea transcript (`Chat.md`) and ChatGPT's first attempt are left out of the published history, then deleted from disk | U | "Drop both", then "delete the folder of the failed prototype altogether, and Chat.md" |
+| 63 | The clean history goes to a new repository, `dodgeball`; the old private `dodge-and-parry` stays untouched until the user deletes it | U | A new repository: C (force-pushing over the old one would leave the old commits reachable by id and in its Activity view). "Leave the old repo, I delete it myself": U |
+| 64 | Windows release builds are made by GitHub Actions from the tag, with a SHA-256 checksum | C | Anyone can see what the app was built from; no local paths end up in the build |
+| 65 | `requirements.txt` is a lockfile (uv, every OS, Python 3.10+) generated from `requirements.in`; PyInstaller is pinned too | C | A fresh clone installs exactly what CI tested |
+| 66 | CI runs the Python tests on Windows, macOS and Linux with Python 3.10–3.14, and a headless-Chrome match on Linux | C | The README says the game runs from source on all three; CI proves it |
+| 67 | Cycle 2 is version 2.0.0 (major) | C | Hosts use it differently (the host starts matches; players no longer pick teams or add bots), and a saved "team size with bots" no longer applies |
+| 68 | The project is called **Dodgeball** (it was Dodge & Parry): the title, the app and zip names, the log downloads, the firewall rule, the repository | U | "The name of the project is Dodgeball; rename it anywhere that is needed". Internal names (`dp.settings`, `window.dp`) stay, so saved settings survive (C) |
+| 69 | The game's files live at the repository root (no `prototype/` folder); its manual is `docs/MANUAL.md` | U | "Bring out the content of the prototype folder into the root". The manual's new place: C |
+| 70 | The firewall helper treats the old "Dodge & Parry" rule as its own | C | Running it again (or `undo`) on a PC that ran the old helper replaces that rule instead of leaving it behind |
 
 ## 6. Current features
 
@@ -591,7 +638,7 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 
 ## 7. Rules and numbers
 
-These are the **defaults**, all in `prototype\config.py`. The host can change any of them in the lobby's rules editor; `rules.py` lists each editable rule with its range. Units are seconds, metres and m/s.
+These are the **defaults**, all in `config.py`. The host can change any of them in the lobby's rules editor; `rules.py` lists each editable rule with its range. Units are seconds, metres and m/s.
 
 **Court:**
 
@@ -1079,7 +1126,6 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 **Run, for development or hosting:**
 
 ```powershell
-cd prototype
 .\run.bat                                        # creates/repairs .venv, starts on 8000 (or next free), opens browser
 .venv\Scripts\python server.py --port 8123 --no-browser --fresh   # for testing: fixed port, no browser, default rules, nothing saved
 ```
@@ -1145,6 +1191,8 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 - **The clock test** (`clock.json`) makes the page's clock run fast (+300 ms over 10 s, like an OS time correction) and prints the frozen time per second. Healthy: the picture recovers as soon as the clock settles. Re-run it after touching the clock estimate in `net.js`.
 - **The sidestep test** (`sidestep.json` + `sidestep.js`, with `&lag=150`, and `&comp=0` for compensation off) walks out of every incoming ball's path and counts balls sidestepped, hits, and hits while clear on screen. Re-run it after touching sidestep compensation, position reports or the pending logic.
 
+**CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`; any page error fails it).
+
 **Balance profiling** (a bots-only match; prints round lengths and event counts):
 
 ```python
@@ -1166,19 +1214,20 @@ print(lengths, g.score, dict(counts))
 **Build the standalone Windows app:**
 
 ```powershell
-.\build_exe.bat      # needs a working .venv (run run.bat once); installs PyInstaller if missing
+.\build_exe.bat      # needs a working .venv (run run.bat once); installs the PyInstaller pinned in requirements-build.txt
 ```
 
-- Output: `dist\DodgeAndParry\DodgeAndParry.exe` plus `_internal\`, and `dist\DodgeAndParry-windows.zip` (~19 MB).
+- Output: `dist\Dodgeball\Dodgeball.exe` plus `_internal\`, and `dist\Dodgeball-windows.zip` (~19 MB).
 - Rebuild after any code or `config.py` change: the defaults are baked in. The host's lobby rules are not; they live in `saved_rules.json` next to the exe.
 - The PyInstaller flags live in `build_exe.py`: `--onedir --console --icon icon.ico --add-data static;static --collect-submodules uvicorn/websockets/anyio`.
+- **Releases:** pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml` on GitHub's Windows machines. It builds the app from the tag and attaches the zip and its `.sha256` checksum to the tag's release, a draft until its notes are written. **Run workflow** with a tag rebuilds an older release. The routine is in `CONTRIBUTING.md`.
 
 **Sharing:**
 
-- **People without Python:** send the zip. They unzip it and run `DodgeAndParry.exe`. SmartScreen may say "Windows protected your PC" (the app is unsigned): **More info → Run anyway**.
+- **People without Python:** send the zip, or the link to the latest GitHub release. They unzip it and run `Dodgeball.exe`. SmartScreen may say "Windows protected your PC" (the app is unsigned): **More info → Run anyway**.
 - **Friends can't connect (firewall):** the host double-clicks `Allow friends to connect.bat` next to the exe once (it asks for admin; `... check` shows what it would do, `... undo` removes the rule). Or set the Wi-Fi to Private and allow the prompt. Never turn the firewall off.
 - **Playing together on one Wi-Fi:** only the host runs it; others open the address shown in its window. The host sets up the lobby in the browser that opens on their PC and presses Start match.
-- **Passing on tuned rules:** copy `saved_rules.json` next to another host's `DodgeAndParry.exe`, or `server.py`.
+- **Passing on tuned rules:** copy `saved_rules.json` next to another host's `Dodgeball.exe`, or `server.py`.
 - **Sharing the source:** exclude `.venv`, `build`, `dist`. A copied `.venv` is auto-repaired by `run.bat`.
 - **Mac/Linux:** run from source with Python. There's no Mac build; it would have to be built on a Mac.
 
@@ -1215,7 +1264,7 @@ print(lengths, g.score, dict(counts))
 - **Python on Windows writes CRLF in text mode.** `Path.write_text` / `open(..., "w")` turn `\n` into `\r\n`, which silently changes a file's line endings. Edit scripts should use `read_bytes`/`write_bytes` (or `newline="\n"`).
 - **Chrome hands `Content-Disposition: attachment` responses to its download manager**, so a page's `fetch()` of such a URL gets an empty 204 instead. Measured in headless Chrome with a probe server. `/logs/download` sends the filename in `X-Filename`, and the page saves the zip itself.
 - **The venv's `python.exe` is a launcher:** the real interpreter runs as its child. Killing only the launcher leaves the server alive for a moment, still holding its files and port. Tests end the tree with `taskkill /F /T`.
-- **This PC's console code page is 1256.** Printing characters outside it to a pipe raises `UnicodeEncodeError`. The real console window is fine (Python writes UTF-16 to it). `say()` falls back to ASCII, and the log report prints ASCII only.
+- **This PC's console code page is 1256.** Printing characters outside it to a pipe raises `UnicodeEncodeError`. The real console window is fine (Python writes UTF-16 to it). `say()` falls back to ASCII, and the log report prints ASCII only. `python -I` ignores `PYTHONIOENCODING`, so isolated scripts call `sys.stdout.reconfigure(encoding="utf-8")`.
 - **Headless Chrome renders in software on every CPU core.** Two at once saturate this 16-thread PC and starve the server under test; the session logs show it as server stalls. Rehearse with one browser (plus `CDP_SIZE=640x360`), and fake other players with a script.
 - **Browser-test steps share one global scope:** a `const` declared in one `eval` step makes the next step that declares it fail ("already been declared"). Wrap steps in `(() => { ... })()`.
 - **Browser tests and localStorage:** each debug port keeps its Chrome profile in the temp folder, so personal settings (like "Follow the host") survive between runs. Tests set what they rely on.
@@ -1223,6 +1272,8 @@ print(lengths, g.score, dict(counts))
 - **Windows Firewall:** block rules win over allow rules. Answering its "allow access" prompt for private networks only makes *block* rules for public ones, so on an office Wi-Fi marked Public the game stays blocked until those go (`Allow friends to connect.bat` removes them).
 - **A computer's clock can run fast for a while:** an OS time correction (seen on a Linux laptop) made the browser's `performance.now()` run about 1% fast for 25 s. Anything that estimates the server clock from arrival times must be able to move back quickly, not just drift (`net.js` re-anchors).
 - **Browsers resend old log chunks:** a page keeps unsent chunks in localStorage and sends them to whichever server it reaches next, so a session folder can hold lines from earlier sessions. The report leaves out lines from before the server started.
+- **Git and line endings on Windows:** with `core.autocrlf` on, files checked out before `.gitattributes` existed keep CRLF in the working tree, while git stores LF. Scripts that match text across lines must handle `\r\n`.
+- **GitHub keeps force-pushed commits:** rewriting a published history doesn't unpublish the old commits; they stay reachable by id and in the repository's Activity view. A clean history needs a new repository (phase 9).
 
 ## 15. Known limitations and ideas for next steps
 
@@ -1290,7 +1341,7 @@ print(lengths, g.score, dict(counts))
 | **Lobby / wait / count / play / over** | States: before a match (warm-up) / a match waiting for an empty team / countdown / playing / round result |
 | **Free play** | `lobby` or `wait`: no round running; the downed stand up, and host changes apply at once |
 | **Host** | The player who sets up the lobby: a browser on the server's PC, or anyone with the console's host link |
-| **Rules** | The ~110 host-editable numbers (`rules.py`); `game.rules` is the live set |
+| **Rules** | The 117 host-editable numbers (`rules.py`); `game.rules` is the live set |
 | **Pending / next rules** | Changes made during a match, waiting for the next round's countdown (`game.next_rules`) |
 | **rv** | Rules version: bumps on every change; in snapshots, so a browser that missed an update asks again |
 | **Draft** | The editor's unapplied edits; Apply sends them |

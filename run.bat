@@ -1,5 +1,5 @@
 @echo off
-rem Starts the Dodge & Parry server. The first run sets up a local Python environment (.venv).
+rem Starts the Dodgeball server. The first run sets up a local Python environment (.venv).
 cd /d "%~dp0"
 
 rem A .venv copied from another computer points at that computer's Python and fails here,

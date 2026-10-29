@@ -1,0 +1,5 @@
+# What the server needs. requirements.txt is generated from this file with exact versions for every
+# platform and Python 3.10+, so every install gets the same, tested versions. To update it:
+#   uv pip compile requirements.in --universal --python-version 3.10 -o requirements.txt
+fastapi>=0.110
+uvicorn[standard]>=0.29

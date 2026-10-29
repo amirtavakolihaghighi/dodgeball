@@ -1,5 +1,5 @@
 @echo off
-rem Builds the standalone Windows app (players don't need Python): dist\DodgeAndParry-windows.zip
+rem Builds the standalone Windows app (players don't need Python): dist\Dodgeball-windows.zip
 rem Run it again after changing the code or config.py.
 cd /d "%~dp0"
 ".venv\Scripts\python.exe" -c "import fastapi, uvicorn" >nul 2>&1 || goto novenv

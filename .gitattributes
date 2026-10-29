@@ -1,7 +1,17 @@
-* text=auto
-# Windows batch files break with LF line endings
+# Line endings: LF in the repository and in every checkout, so files are identical on
+# Windows, macOS and Linux. Windows batch files are the exception: cmd.exe needs CRLF
+# (with LF, labels and goto can silently misbehave).
+* text=auto eol=lf
 *.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files: never touched by line-ending conversion.
 *.ico binary
 *.png binary
-# Vendored libraries are kept byte-for-byte
-prototype/static/vendor/* -text
+*.jpg binary
+*.gif binary
+*.zip binary
+*.exe binary
+
+# Vendored libraries are kept byte-for-byte as published upstream.
+static/vendor/** -text

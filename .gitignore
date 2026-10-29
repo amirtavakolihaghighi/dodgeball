@@ -3,14 +3,14 @@
 __pycache__/
 *.pyc
 
-# Build output: rebuild with prototype\build_exe.bat; releases carry the zip
+# Build output: rebuild with build_exe.bat; releases carry the zip
 build/
 dist/
 
 # Screenshots and other output from the browser tests
-prototype/*.png
-prototype/tests/browser/*.png
-prototype/tests/browser/out/
+/*.png
+tests/browser/*.png
+tests/browser/out/
 
 # Made at runtime, per machine: the host's saved rules and the session logs
 saved_rules.json
@@ -19,5 +19,13 @@ logs/
 # Written by build_exe.py during a build
 build_info.json
 
-# Session logs the user collects from office tests: coworkers' names and IP addresses
-prototype/testlog/
+# Session logs collected from play sessions: players' names and LAN addresses
+/testlog/
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

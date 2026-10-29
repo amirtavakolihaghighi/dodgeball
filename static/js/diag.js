@@ -273,7 +273,7 @@ export class Diag {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([text], { type: 'application/x-ndjson' }));
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-    a.download = `dodgeparry-log-${(this.name || 'player').replace(/[^\w-]+/g, '_')}-${stamp}.jsonl`;
+    a.download = `dodgeball-log-${(this.name || 'player').replace(/[^\w-]+/g, '_')}-${stamp}.jsonl`;
     document.body.append(a);
     a.click();
     a.remove();

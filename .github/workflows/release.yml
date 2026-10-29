@@ -1,0 +1,58 @@
+# Builds the standalone Windows app from a release tag on GitHub's machines (not on anyone's
+# own computer), and attaches it, with a SHA-256 checksum, to that tag's GitHub release.
+# Runs when a vX.Y.Z tag is pushed; "Run workflow" (with a tag) rebuilds an older release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and attach, for example v1.0.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows-app:
+    name: Windows app for ${{ inputs.tag || github.ref_name }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0      # the build records `git describe`, which needs the tags
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Find the game's folder (v1.0.0 kept it in prototype/)
+        shell: bash
+        run: |
+          if [ -f prototype/build_exe.py ]; then dir=prototype; else dir=.; fi
+          echo "APP_DIR=$dir" >> "$GITHUB_ENV"
+      - name: Install the locked dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Build the app and its zip
+        working-directory: ${{ env.APP_DIR }}
+        run: python build_exe.py
+      - name: Write the checksum
+        working-directory: ${{ env.APP_DIR }}/dist
+        shell: pwsh
+        run: |
+          $zip = Get-Item *-windows.zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($zip.Name)" | Out-File -Encoding ascii "$($zip.Name).sha256"
+      - name: Attach to the release (a draft is created if none exists yet)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$TAG" > /dev/null 2>&1 \
+            || gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes "Release notes to follow."
+          gh release upload "$TAG" "$APP_DIR"/dist/*-windows.zip "$APP_DIR"/dist/*-windows.zip.sha256 --clobber
