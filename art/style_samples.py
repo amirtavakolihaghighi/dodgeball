@@ -996,4 +996,5 @@ def main():
     print("saved", blend)
 
 
-main()
+if __name__ == "__main__":      # round 2 (style_samples_2.py) imports the helpers above
+    main()

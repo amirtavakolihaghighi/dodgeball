@@ -7,7 +7,7 @@
 - **The working plan is `docs/LOOK_AND_FEEL.md`:** the plan with each step's status, the art conventions, the budgets, the style samples and the log. Update it after each step, and keep phase 15 in `docs/PROJECT.md` as the record.
 - **Making art:**
   - Scripts in `art/` build it in Blender, run in the background. From Bash in this worktree, the guard refuses a quoted path with spaces, so put Blender's folder on the PATH: `PATH="/c/Program Files/Blender Foundation/Blender 5.2:$PATH" blender.exe --background --factory-startup --python art/<script>.py -- <options>`.
-  - Blender 5.2's pitfalls (black haze, mirrored lamp blobs, the slow crowd, the compositor) are in section 14 of `docs/PROJECT.md`.
+  - Blender 5.2's pitfalls (black haze, mirrored lamp blobs, the slow crowd, the compositor, beams that won't show, hills that hide the sun, loading into the user's Blender) are in section 14 of `docs/PROJECT.md`.
   - Their output (renders and `.blend` files) goes to `art/out/`, which is git-ignored. What the game loads is exported as glTF into `static/`.
 - **The user's open Blender** is reached through the MCP tools `mcp__blender__*`:
   - `look` shows it, and `get_scene_info` describes it.

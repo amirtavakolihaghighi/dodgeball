@@ -36,6 +36,7 @@ The game should look and feel professionally made: juice and good art, both. We 
   - not wanted: pixel art or a retro look, blocky (Minecraft- or Roblox-shaped) humanoids, dull colours.
 - **What Claude makes well:** hard-surface shapes, lighting, materials and effects.
 - **What Claude makes badly:** faces, hands, hair and cloth. So the proposal is characters in sleek suits, armour and helmets with visors.
+  - Round 2 showed hands can be done well from code; faces and hair stay weak, and cloth has no folds.
 - **How it's chosen:** from rendered style samples (decision 123; [the samples](#the-style-samples) below).
 - **Chosen after round 1:**
   - **The setting:** the sports hall (decision 124).
@@ -48,7 +49,7 @@ The game should look and feel professionally made: juice and good art, both. We 
 
 | # | Step | Status |
 | --- | --- | --- |
-| 1 | **Style samples:** two or three directions, rendered; the user picks | Round 1 done: the sports hall (decisions 124–126). Round 2 next: the hall in vibrant colour and light, and characters towards Fortnite-like humanoids |
+| 1 | **Style samples:** two or three directions, rendered; the user picks | Round 1 done: the sports hall (decisions 124–126). Round 2 done: the hall in vibrant colour and light, and athletes towards Fortnite-like humanoids, with a helmet and with a face. Waiting for the user's pick |
 | 2 | **Smooth and fair:** a graphics setting that scales itself down when the frame rate drops (D1); a warning when Chrome draws without the graphics card (D2); presses timed from the key event (B4); every effect prepared in the lobby; the host's tab on a lower setting by default | To do |
 | 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | To do |
 | 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | To do |
@@ -146,19 +147,93 @@ These are starting targets, to be checked on an office laptop and adjusted:
 - The colours and light should become like Genshin Impact's landscapes (decision 125), and "I don't like pale" rules out the daylight court's softness.
 - The characters were accepted as a first draft. They should move towards Fortnite-like humanoids (decision 126).
 
-### Round 2 (planned)
+### Round 2 (2026-10-29)
 
-- **The hall in vibrant colour and light:**
-  - **Warm, low sun** pouring through big windows or a glass roof, in visible beams, with cool sky light filling the shadows. Warm light against cool shade is what makes such landscapes glow.
-  - **Rich, saturated paint** that stays harmonious, warm wood, some greenery, and a bright sky with clouds outside.
-  - **Bloom and a warm/cool colour grade.**
-  - All of these carry over to the browser cheaply: baked light, bloom, a colour grade, faked light beams.
-- **Characters towards Fortnite-like humanoids:**
-  - athletic, slightly heroic proportions (larger hands, feet and head than real life);
-  - sports kit in the team colours;
-  - real hands, not mittens;
-  - livelier poses.
-- **Faces, shown side by side:** a sports helmet with a visor, and a stylised face with hair. Faces and hair are Claude's weakest area, so the user judges whether the face version is good enough.
+**What was asked** (the plan after round 1):
+
+- **The hall in vibrant colour and light:** a warm, low sun through big windows, in visible beams, with cool sky light filling the shade; rich but harmonious paint, warm wood, some greenery, a bright sky with clouds outside; bloom and a warm/cool colour grade.
+- **Characters towards Fortnite-like humanoids:** athletic, slightly heroic proportions; a sports kit in the team colours; real hands, not mittens; livelier poses.
+- **The same athlete twice:** with a sports helmet and visor, and with a stylised face and hair. Faces are Claude's weakest area, so the user judges the face version.
+
+**How it was made:**
+
+- `art/style_samples_2.py` builds everything from nothing, with no downloaded assets, reusing round 1's helpers. Round 1's script still rebuilds round 1.
+- **The same views as round 1,** at the game's real sizes and colours:
+  - **the gameplay view** (the game's own camera) and **a close-up** of the near player, each rendered twice: with helmets and with faces;
+  - plus **the two versions side by side** and **a portrait of the face**.
+- It also saves `art/out/style-samples-2.blend`: one scene, with tick boxes in the outliner to switch between the helmet version, the face version and the pair.
+- **The athletes are sculpted from code:**
+  - Each body is made of smooth shapes (ellipsoids and tapered capsules for bones and muscles) blended into each other like clay, then turned into a mesh by the script itself.
+  - A pose says where the hands and feet go, and the elbows and knees follow.
+  - Heads, hands and shoes are made once and shared by every athlete; only the colours change from player to player.
+- **Time:** at full quality it takes about 5 minutes to build and 3 seconds a picture on the user's PC. `--quick` builds coarser meshes for tests.
+
+**The hall:**
+
+- **The light:**
+  - A low golden sun (24° up) comes from the left through 11 tall windows between solid piers. It puts window-shaped stripes of sun on the floor and the players, with cool blue sky light in the shade.
+  - **The beams in the air are drawn the way a browser game would draw them:** soft, glowing, see-through shafts along the sun, fading at their edges and before they reach the floor, so they never veil the players. EEVEE's real haze either showed no beams or turned the hall milky. A very thin real haze adds depth.
+- **The floor and walls:**
+  - Deep team-coloured halves in satin paint: a mirror-like court reflected the bright windows, washed the far half out and hid the blue team.
+  - Honey-coloured wood, and a warm wooden ceiling on laminated beams.
+  - Boards and banners in teal, sunflower, leaf green, violet and tangerine. None are in the team colours, so players stay easy to read.
+  - Round 1's colourful crowd, and bunting.
+- **Greenery and sky:**
+  - A window band over the far end looks out on green hills, round trees and white clouds.
+  - A scoreboard in the team colours, a living green wall, and planters with shrubs and small trees.
+- **The colour:** AgX "Punchy" colour, bloom, a warm/cool grade (cooler shade, warmer light) and a little extra saturation.
+
+**The athletes:**
+
+- **Proportions:** 1.75 m tall like the game's player, with heroic proportions: the head 1/7 of the height, hands 10% larger with chunky fingers, broad shoulders and back, a narrow waist, muscular arms and legs.
+- **Real hands:** a palm, four fingers of three bones each, and a thumb, in four grips: holding the ball (the fingers wrap it by themselves), open for a catch, relaxed, and a fist.
+- **The kit:**
+  - a short-sleeved jersey in the team colour, with a white collar, cuffs and hem and a number on the back;
+  - navy shorts with a team-coloured waistband and side stripe, and white hems;
+  - white socks with team stripes, chunky white sneakers with team accents, and wristbands.
+- **Poses:** a wind-up (left- and right-handed), the release, running, ready, catching, dodging, and standing.
+- **The helmet:** a team-coloured shell with a white centre stripe, a big wraparound visor (dark, turning the team colour at grazing angles) in a white frame, and ear pods.
+- **The face:**
+  - a stylised male head with eyelids and a dark lash line, eyes with an iris and pupil, a nose, lips with a slight smile, and ears;
+  - eyebrows and a short swept-back haircut;
+  - six skin tones, with hair and eye colours, spread over the players.
+
+**The pictures:**
+
+![Gameplay view, helmets](images/look-and-feel/sample2-hall-play-helmet.jpg)
+![Gameplay view, faces](images/look-and-feel/sample2-hall-play-face.jpg)
+![Close-up, helmet](images/look-and-feel/sample2-hall-hero-helmet.jpg)
+![Close-up, face](images/look-and-feel/sample2-hall-hero-face.jpg)
+![The same athlete twice: face and helmet](images/look-and-feel/sample2-athlete-pair.jpg)
+![The face up close](images/look-and-feel/sample2-athlete-face.jpg)
+
+**Claude's honest verdict on the characters:**
+
+- **The bodies, hands, kit and poses work:** athletic and heroic, clearly sports players, with team colours that read. They're a clear step up from round 1's mannequins, but they look like smooth vinyl toys rather than Fortnite's artist-made characters: no cloth folds, simple shoes, plain skin.
+- **The helmet version is the stronger one:** clean shapes and nothing uncanny.
+- **The face version is the weakest part of the round:**
+  - From the game's camera it's fine: faces are tiny there, and the hair reads well from behind.
+  - Up close it looks generic and slightly uncanny: the eyes are large and stare, the cheeks and nose are lumpy, and the hair is a simple smooth cap.
+  - Faces need a sculptor's hand, or a good CC0 base mesh. Smooth shapes from code only get this far.
+
+**What carries over to the game in a browser, on office laptops:**
+
+- **Carries over cheaply:**
+  - the hall's shapes, colours, wood and paint, as textures;
+  - the sunlight on the hall: the sun doesn't move, so its window-shaped stripes can be baked into the hall's textures once in Blender, at no cost to the laptops. Players crossing the stripes get lit by a cheap "sun mask" or by real-time shadows from one sun;
+  - the light shafts: the same glowing see-through shafts, a few dozen triangles;
+  - the sky, hills and clouds outside: a painted backdrop;
+  - bloom, tone mapping (three.js has the same AgX, and a Neutral mapping) and the colour grade, as screen effects;
+  - the kit's design, numbers and trims, and the helmet, as textures on a game model.
+- **Doesn't carry over as it is:**
+  - **The athlete meshes:** about 1.5 million triangles each in these pictures (smooth enough for close-ups), against a budget of 5,000–10,000. Each also exists only as a posed statue, one mesh per pose. A game version needs one lighter model per athlete, with the details baked into textures, and a skeleton to animate it (step 7).
+  - **The real haze:** replaced by the shafts and cheap distance fog.
+  - **The glossy floor's live reflections:** costly in a browser, so faked, or a setting.
+  - **The light under the skin** (subsurface scattering): approximated by warmer shading.
+  - **Depth of field** in the close-ups: not used in play.
+  - **The leaf and cloud blobs:** hundreds of thousands of small triangles, replaced by a textured panel and the backdrop.
+
+**The user's pick:** to come.
 
 ## The log
 
@@ -170,3 +245,12 @@ These are starting targets, to be checked on an office laptop and adjusted:
     - Five rounds of fixes along the way: a black daylight scene (world haze blocks the sun), a lamp mirrored as a blob in the floor, a crowd that took 100 s to build, an overexposed hall, and frilly shorts.
     - The lessons are in section 14 of `PROJECT.md`.
   - The user picked the sports hall, with Genshin-like colour and light and Fortnite-like characters (decisions 124–126). Round 2 is planned.
+  - Style samples, round 2: the hall lit by a low sun through tall windows, and new athletes sculpted from code with real hands, in a helmet and with a face.
+    - The scene was opened in the user's Blender. A copy of their open file (round 1, with unsaved changes) was saved first as `art/out/style-samples-before-round2.blend`.
+    - Many fixes along the way:
+      - **The light:** green hills outside that hid the low sun; a milky haze; beams too strong, then too faint (now drawn as glowing shafts); the hero standing in the shadow of a window bar.
+      - **The colours:** pink jerseys (warm light and the colour transform); the blue team lost against a mirror-like floor.
+      - **The kit:** shorts that looked like briefs; sleeves like shoulder pads; a chest that read as a bust under the shirt.
+      - **The face:** sleepy, then staring eyes; a hair "helmet", then a "beanie".
+      - **The mesher:** long streaks from a bug.
+    - The lessons are in section 14 of `PROJECT.md`.

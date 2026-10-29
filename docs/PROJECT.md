@@ -792,6 +792,23 @@ This is the short version, kept on `main` while internet mode waits on its branc
 - **The pick:** the sports hall is the setting. Its colours should become like Genshin Impact's landscapes: vibrant and full of light, never pale. The characters should move towards Fortnite-like humanoids.
 - **The tension:** Fortnite-like humanoids have faces and hair, which is where Claude's results are weakest. So round 2 shows both a sports helmet with a visor and a stylised face, and the user judges.
 
+**Style samples, round 2** (the pictures, the details and Claude's verdict are in `docs/LOOK_AND_FEEL.md`):
+
+- **How:** `art/style_samples_2.py` reuses round 1's helpers.
+  - The athletes are sculpted from code: smooth shapes for bones and muscles, blended like clay and meshed by the script. Poses say where the hands and feet go.
+  - Same views as round 1, each with helmets and with faces, plus the two versions side by side and a face portrait.
+  - Loaded into the user's Blender; their open file was copied first.
+- **The hall:** a low golden sun through tall windows between piers puts window-shaped stripes of sun on the court, with cool sky light in the shade.
+  - The beams in the air are glowing see-through shafts, as a browser game would draw them.
+  - Deep team-coloured halves in satin paint, honey wood, a wooden ceiling, a palette of teal, sunflower, leaf green, violet and tangerine.
+  - Hills, trees and clouds through the far windows, a living green wall, bloom and a warm/cool grade.
+- **The athletes:** heroic proportions, real hands with fingers and four grips, a full kit in the team colours, seven poses.
+- **The verdict:** the bodies, hands, kit and poses work, though they look like smooth vinyl toys. The helmet version is the stronger one. The face is generic and slightly uncanny up close, though fine from the game's camera.
+- **What carries over:**
+  - the hall, its baked sunlight, the shafts, the sky backdrop, bloom and the grade carry over cheaply;
+  - each athlete is about 1.5 million triangles, against a budget of 5,000–10,000, and exists only as posed statues, so the game needs lighter rigged models (step 7).
+- **The user's pick** is next. The user also put models found online in a `Models` folder for Claude to check (licences first: the repository is public).
+
 **Next, in order:** the plan in `docs/LOOK_AND_FEEL.md`:
 
 1. Style samples.
@@ -1641,7 +1658,18 @@ print(lengths, g.score, dict(counts))
   - **Building hundreds of small meshes with one bmesh operation each is slow** (a crowd took 100 s). Make one template and copy its vertices into one mesh with `from_pydata` (0.5 s).
   - **The compositor is a node group now:** `scene.compositing_node_group` with a Group Output instead of a Composite node, and the Glare node's type is an input socket (`"Bloom"`).
   - **The Volume Scatter shader rendered black in every test.** Principled Volume works.
+  - **EEVEE's real light beams barely show in a big hall** (round 2):
+    - With thin haze, the shafts overlap along the line of sight, and the haze scatters light forward, so a sun behind the camera hides them. Thick haze turns the whole hall milky.
+    - Draw the shafts as soft, glowing, see-through prisms instead: emission added on top of a transparent surface, faded at the edges with Layer Weight and before they reach the floor. A browser game would do the same.
+  - **Scenery outside can hide a low sun:** round 1's green hills blocked a 21° sun and left the whole hall in shade. Outside terrain and trees get `visible_shadow = False`.
+  - **AgX turns a saturated red pink in warm light:** the kit's cloth uses a deeper red (and blue) than the team colours on screen.
+  - **A mirror-like court washes out the far half:** at a grazing angle it reflects the bright windows, and the blue team disappeared against it. The court paint is satin.
   - **In a worktree session, Claude Code's guard refuses a program run by its quoted path with spaces.** Put Blender's folder on the PATH for that one command: `PATH="/c/Program Files/Blender Foundation/Blender 5.2:$PATH" blender.exe --background ...`.
+- **Meshing smooth shapes (`art/style_samples_2.py`):** when pulling vertices onto the surface, clip the step after dividing by the field's slope, not before. Flat spots in the field flung vertices far away, as long streaks across the picture.
+- **Loading results into the user's Blender:**
+  - Safe mode refuses to pull data out of another .blend (`bpy.data.libraries.load`), but opening and saving files is allowed.
+  - Opening a file throws away unsaved changes, so first save a copy of the user's open file with `bpy.ops.wm.save_as_mainfile(copy=True)`.
+  - Use the outliner's tick boxes (`LayerCollection.exclude`) to switch versions off: the per-collection switches are hidden in the outliner by default.
 - **Never start the server in automated tests without `--no-browser`**, or it opens browser windows on the user's desktop.
 - **A venv is not portable**: it stores the absolute path of its Python. Hence `run.bat`'s self-repair.
 - **Windows batch files:**
