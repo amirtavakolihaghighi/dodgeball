@@ -2,6 +2,21 @@
 
 **Read `docs/PROJECT.md` before changing anything.** It holds the full history, every design decision and who made it, the architecture, network protocol, rules and numbers, how to run, test and build, and known pitfalls.
 
+**This is the branch `look-and-feel`** (graphics, juice and sound; phase 15 and decisions 112–123 in `docs/PROJECT.md`). It's checked out in its own folder, `Dodgeball-look-and-feel`, next to the main folder `Dodgeball`. The main folder belongs to the user's other work (`main`, `internet-mode`): never switch its branch or edit there from this branch's sessions.
+
+- **The working plan is `docs/LOOK_AND_FEEL.md`:** the plan with each step's status, the art conventions, the budgets, the style samples and the log. Update it after each step, and keep phase 15 in `docs/PROJECT.md` as the record.
+- **Making art:**
+  - Scripts in `art/` build it in Blender, run in the background: `"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --factory-startup --python art\<script>.py -- <options>`.
+  - Their output (renders and `.blend` files) goes to `art/out/`, which is git-ignored. What the game loads is exported as glTF into `static/`.
+- **The user's open Blender** is reached through the MCP tools `mcp__blender__*`:
+  - `look` shows it, and `get_scene_info` describes it.
+  - `execute_blender_code` runs in safe mode: `bpy`, `bmesh`, `mathutils`, `math` and `random` only, with no `os`, `open`, files or network; files go through bpy's own import, export and save.
+  - Load results there for the user to turn around.
+  - Never turn telemetry on.
+  - The server is pinned to `mcp-for-blender==2.2.6`; if the user updates the add-on, update the pin to match its protocol.
+- **Only art made here or CC0** (decision 119): Poly Haven, Quaternius's Universal Animation Library, Mesh2Motion. Never Mixamo, paid packs or the AI generators. List every CC0 source used in `THIRD_PARTY_NOTICES.md`.
+- **Performance comes first** (decision 116): anything heavier must keep office laptops smooth. The budgets are in `docs/LOOK_AND_FEEL.md`. Claude can't see motion or hear sound, so ask the user to judge feel, animation and audio.
+
 Quick facts:
 
 - **Where things are:**

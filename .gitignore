@@ -22,6 +22,9 @@ build_info.json
 # Session logs collected from play sessions: players' names and LAN addresses
 /testlog/
 
+# Blender output: renders and .blend files, rebuilt by the scripts in art/
+art/out/
+
 # Editors and operating systems
 .vscode/
 .idea/
