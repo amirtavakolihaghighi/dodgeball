@@ -365,3 +365,21 @@ The user approved all five suggestions, as settings with explanations (Game rule
 - **Sidestep compensation, A/B in a real session:** the host turned it off halfway. On: 233 balls missed people who had stepped clear on their own screen, and no hit while clear on screen. Off: about 400 hits on people who were clear on their own screen (up to 0.9 m).
 - **A new cause of a frozen picture: the player's own clock.** One Linux laptop's clock ran about 1% fast for 25 s (most likely the system correcting its time). Updates kept arriving normally, but the game's clock estimate only moved back 1 ms per second, so that player's picture stood still for about 5 minutes and their presses lost lag compensation. Fixed: the browser now re-anchors when every update of 1.5 s arrives over 40 ms late (tested: a +300 ms clock run now costs 2 s of frozen picture instead of minutes).
 - The server and the host were healthy; no browser errors.
+
+## Update 4: playing over the internet (expected, not measured yet)
+
+Internet mode (`server.py --internet`, [INTERNET.md](INTERNET.md), PROJECT.md phase 14) puts the server on a cloud machine. Nothing below has been measured yet: the first internet game night's logs will show it.
+
+- **Ping:** a few ms on the office Wi-Fi; usually 10–50 ms to a server in the same region, 100–200 ms or more across continents (about 10 ms per 1,000 km).
+- **What players notice:**
+  - Their own movement stays instant.
+  - What the server confirms comes about one ping later than at the office: the ball leaving the hand (the arm swings at once), the CATCH and DEFLECT popups, the perfect-dodge spin.
+- **Fair presses up to about 150 ms of ping:** a press is judged against the player's screen up to the lag compensation limit (0.25 s), and a screen runs about ping + view delay (0.10 s) behind the server. Above that, or on an uneven connection, "I pressed in time and still got hit" comes back. The host can raise the limit (up to 0.5 s); then others see balls hang on that player a little longer.
+- **Short freezes:** over TCP a lost packet holds up everything behind it for about one ping. The 0.10 s view delay was tuned for the office; 0.12–0.15 s may suit the internet better.
+- **What to read in the first internet session's logs** (`tools/log_report.py`):
+  - the ping column (median and p95);
+  - late presses, and whether they were over the compensation limit (`over_cap` in the server log);
+  - frozen time, and whether players froze alone or together;
+  - the L marks.
+  Then tune View delay and Lag compensation limit under Game rules › Network (advanced).
+- **UDP:** still not planned (see "UDP instead of WebSockets?" above). Revisit if the internet logs show short stalls on otherwise good connections.

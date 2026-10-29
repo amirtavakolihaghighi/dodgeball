@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, unreleased).
+Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it).
 
 ## Contents
 
@@ -698,7 +698,19 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 
 **Found along the way** (section 14): uvicorn's `limit_concurrency` doesn't cover WebSocket upgrades; `secrets.compare_digest` refuses non-ASCII strings; a fetch header must be Latin-1; a test helper that reads until a connection closes needs an overall deadline.
 
-**Where it lives:** the user isn't a developer; a friend of theirs who is will set up the test server. At the user's request the work went to its own branch, `internet-mode` (pushed to GitHub, not merged), for the friend to fetch and try. The user says when to merge it into main. The guide's clone command uses `--branch internet-mode` meanwhile; at the merge it loses that option and the sentence after it. For the friend, the guide starts with a technical summary ("At a glance, for whoever sets up the server").
+**Where it lives (decision 111):** the user isn't a developer; a friend of theirs who is will set up the test server. At the user's request the work went to its own branch, `internet-mode` (pushed to GitHub, not merged), for the friend to fetch and try. The user says when to merge it into main.
+
+- The guide's clone command uses `--branch internet-mode` meanwhile; at the merge it loses that option and the sentence after it.
+- For the friend, the guide starts with a technical summary ("At a glance, for whoever sets up the server"). The user also got a short note to forward, with the branch, the guide and what to report back: anything that fails, with the command's output or `journalctl -u dodgeball -n 50`.
+- **CI on the branch:** CI starts by itself only for `main` and pull requests, so it was started by hand (`gh workflow run ci.yml --ref internet-mode`). All 16 jobs passed (run 40890626397): the rule and server tests on Windows, Linux and macOS with Python 3.10–3.14, the browser match, and `internet.json` on Linux.
+
+**Next, in order:**
+
+1. The friend's setup; fix the guide or the code on the branch from what they report.
+2. The first internet game night: its logs (Update 4 in `LAG_ANALYSIS.md` says what to read).
+3. The merge into main, when the user says so.
+4. A release, if the user wants one (their routine is in `CONTRIBUTING.md`).
+5. Optional: running Caddy locally, in front of the game, if the user allows the download.
 
 ## 5. Decision log
 
@@ -816,6 +828,7 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 | 108 | Everywhere: no message over 1 MiB; browsers' logs capped per session (200 pages, 300 MB) | C | Measured: a 15 MiB message stalled the game 361 ms, and new page ids got around the per-page cap. A whole settings file is 150 KB; a 3-hour night with 16 players logs ~90 MB |
 | 109 | A refused connection is closed with code 4001 and a reason, and the join screen says why | C | "Wrong password.", "The game is full.": not a silent "Disconnected" |
 | 110 | The cloud setup: Ubuntu 24.04; the game as a systemd service under its own user in `/opt/dodgeball`; the passwords in `/etc/dodgeball.env` (root only); Caddy from its official repository | C | Ubuntu's own Caddy (2.6.2, from 2022) misses security fixes. Not yet run on a real server (phase 14) |
+| 111 | Internet mode waits on its own branch, `internet-mode` (pushed, not merged), until the user's friend has tried it on a cloud server; it goes into main only when the user says so | U | "Commit to a separate branch dedicated for this feature… then if it's okay, I tell you to merge." The user isn't a developer; the friend is |
 
 ## 6. Current features
 
@@ -1520,7 +1533,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 - **The own-settings test** (`own_settings.json` + `own_settings.js`): a bot's and a person's own settings through the ⚙ pages, the ball colours editor, export → reset → import, a profile moved between bots, wrong files, and the colour every ball in flight is drawn in. Re-run it after touching players' own settings, the ball colours or the settings files.
 - **The internet test** (`internet.json`, against a server in internet mode with the passwords `let me in` and `the boss 42` and a log folder): a wrong password, a player without host controls or logs, a reload that rejoins, the host password with everyone's logs and a match. Each step checks its own result. Re-run it after touching the join screen, internet mode or who is host.
 
-**CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`), then runs `internet.json` against a second server in internet mode (any page error or failed step fails it).
+**CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`), then runs `internet.json` against a second server in internet mode (any page error or failed step fails it). On another branch, start it by hand: `gh workflow run ci.yml --ref <branch>`.
 
 **Balance profiling** (a bots-only match; prints round lengths and event counts):
 

@@ -6,14 +6,15 @@ Quick facts:
 
 - **Where things are:**
   - The game's code sits at the repository root (`server.py`, `sim.py`, `static/`, `tests/`, ...). Until v2.0.0 it was in `prototype/`, and the game was called Dodge & Parry.
-  - `docs/MANUAL.md` is the player and host guide. `docs/LAG_ANALYSIS.md` is the cycle-2 lag study, with what the office sessions' logs showed (Updates 2 and 3). Logging is built, and the game-side fixes are settings under Network (advanced).
+  - `docs/MANUAL.md` is the player and host guide. `docs/LAG_ANALYSIS.md` is the cycle-2 lag study, with what the office sessions' logs showed (Updates 2 and 3) and what to expect over the internet (Update 4). Logging is built, and the game-side fixes are settings under Network (advanced).
   - Internet mode (`server.py --internet`, `internet.py`): a password to join, the host password for the host, limits against abuse. `docs/INTERNET.md` is the cloud-server guide, with `deploy/` (systemd service, Caddyfile). The Linux steps haven't been run on a real server yet.
   - `testlog/` holds the session logs the user collected (git-ignored: coworkers' names and IPs). Run `tools/log_report.py` on a session folder first.
 - **Git and GitHub:**
   - **Public** repo `github.com/amirtavakolihaghighi/dodgeball` (MIT). Never commit personal data: names, email addresses, local paths with the Windows user name, IP addresses, anything from `testlog/`. Anonymise examples taken from logs or conversations.
   - `main` holds the releases (tags `v1.0.0`, `v2.0.0`, `v2.1.0`, `v2.2.0`). Commits use GitHub's noreply address (set in the repo's git config).
   - The history from before publishing was deleted everywhere on 2026-10-29: the user's old private repo `dodge-and-parry` and every local backup. Push `main`, explicit tags and explicitly named feature branches only (never `--all`, `--tags` or `--mirror`).
-  - The branch `internet-mode` (pushed, not merged) holds internet mode, waiting for the user's friend to test it on a cloud server. Merge it into main only when the user says so. At the merge, take `--branch internet-mode` (and the sentence after it) out of the clone command in `docs/INTERNET.md`.
+  - The branch `internet-mode` (pushed, not merged) holds internet mode, waiting for the user's friend to test it on a cloud server. Merge it into main only when the user says so. At the merge, take `--branch internet-mode` (and the sentence after it) out of the clone command in `docs/INTERNET.md`. The next steps are at the end of phase 14 in `docs/PROJECT.md`.
+  - CI starts by itself only for `main` and pull requests. On another branch, start it by hand: `gh workflow run ci.yml --ref <branch>`.
   - Commit or push only when the user asks.
   - CI (`.github/workflows/ci.yml`) runs the Python tests on Windows, macOS and Linux with Python 3.10–3.14, plus a headless-Chrome match. Pushing a `vX.Y.Z` tag builds the Windows zip in GitHub Actions (`release.yml`); the release routine is in `CONTRIBUTING.md`.
   - `requirements.txt` is a lockfile: edit `requirements.in`, then run `uv pip compile requirements.in --universal --python-version 3.10 -o requirements.txt`.
