@@ -8,6 +8,10 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-29
+
+Players now see why a ball got through their defence.
+
 ### Added
 
 - **A hit says why it got through.** When a ball hits you just after your dodge, catch or deflect
@@ -95,6 +99,7 @@ The first stable version, released as Dodge & Parry: real-time 3D dodgeball for 
 - A standalone Windows app (`build_exe.bat`), `run.bat`, and 30 rule tests plus headless-browser
   tests.
 
-[Unreleased]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/amirtavakolihaghighi/dodgeball/releases/tag/v1.0.0
