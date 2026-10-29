@@ -502,7 +502,7 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 - **Release builds** (`.github/workflows/release.yml`): a pushed `vX.Y.Z` tag builds the Windows app on GitHub's machines and attaches the zip and its SHA-256 checksum to the release; "Run workflow" with a tag rebuilds an older one.
 - **Repository settings:** private vulnerability reporting (`SECURITY.md` relies on it), secret scanning with push protection, Dependabot alerts, a description and topics.
 
-**Evidence:** before the push, both test suites passed in a fresh clone installed from the lockfile (Python 3.14, and Python 3.10 through uv), the server booted and a match ran in headless Chrome with no page errors, the Windows app built and started, the privacy scan found nothing in any commit, and the line endings were checked in the staged files. CI's results are on the repository's Actions tab.
+**Evidence:** before the push, both test suites passed in a fresh clone installed from the lockfile (Python 3.14, and Python 3.10 through uv), the server booted and a match ran in headless Chrome with no page errors, the Windows app built and started, the privacy scan found nothing in any commit, and the line endings were checked in the staged files. CI's first run passed on Windows and Linux and in the browser, and failed on macOS: the tests that start a real server never saw its host link, because the server looked up the computer's own name before printing it, and on macOS that lookup can stall. Startup now waits at most 2 s for it (decision 71), and the second run passed on all three systems.
 
 ## 5. Decision log
 
@@ -580,6 +580,7 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 | 68 | The project is called **Dodgeball** (it was Dodge & Parry): the title, the app and zip names, the log downloads, the firewall rule, the repository | U | "The name of the project is Dodgeball; rename it anywhere that is needed". Internal names (`dp.settings`, `window.dp`) stay, so saved settings survive (C) |
 | 69 | The game's files live at the repository root (no `prototype/` folder); its manual is `docs/MANUAL.md` | U | "Bring out the content of the prototype folder into the root". The manual's new place: C |
 | 70 | The firewall helper treats the old "Dodge & Parry" rule as its own | C | Running it again (or `undo`) on a PC that ran the old helper replaces that rule instead of leaving it behind |
+| 71 | At startup the server waits at most 2 s for the lookup of the computer's own name before printing the join addresses; the 15 s watcher adds late ones | C | On macOS the lookup can stall: CI's first macOS run timed out waiting for the console's host link |
 
 ## 6. Current features
 
@@ -922,7 +923,7 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
   - On `join` it decides host (`is_this_computer`, `guest`, `hostKey`) and sends `welcome` with the schema.
   - It answers `ping` and `sync` itself, relays the host's `hostview` (`clean_host_view`, `share_host_view`, the latest kept in `host_view`), and hands everything else to `game.handle`.
 - **Utilities:**
-  - `lan_addresses()`: UDP-connect trick plus hostname lookup. It drops `127.x` and `169.254.x` and lists `192.168.x`, then `10.x`, first.
+  - `lan_addresses(wait)`: UDP-connect trick plus hostname lookup; the lookup runs on a thread, and startup waits at most 2 s for it (it can stall on macOS). It drops `127.x` and `169.254.x` and lists `192.168.x`, then `10.x`, first.
   - `watch_addresses()`: refreshes `own_ips` every 15 s on a thread (a hotspot or cable may appear mid-session).
   - `client_config()`, `rules_message()`.
   - `load_saved_rules()` and `save_current_rules()`: `saved_rules.json` next to the exe or script, written on a thread, atomically.
@@ -1274,6 +1275,7 @@ print(lengths, g.score, dict(counts))
 - **Browsers resend old log chunks:** a page keeps unsent chunks in localStorage and sends them to whichever server it reaches next, so a session folder can hold lines from earlier sessions. The report leaves out lines from before the server started.
 - **Git and line endings on Windows:** with `core.autocrlf` on, files checked out before `.gitattributes` existed keep CRLF in the working tree, while git stores LF. Scripts that match text across lines must handle `\r\n`.
 - **GitHub keeps force-pushed commits:** rewriting a published history doesn't unpublish the old commits; they stay reachable by id and in the repository's Activity view. A clean history needs a new repository (phase 9).
+- **On macOS, looking up the computer's own name can stall:** `socket.gethostbyname_ex(socket.gethostname())` asks the local network. Startup caps it at 2 s; nothing on the game loop or the console may wait for it.
 
 ## 15. Known limitations and ideas for next steps
 

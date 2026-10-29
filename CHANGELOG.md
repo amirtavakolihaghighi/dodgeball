@@ -65,6 +65,8 @@ the session logs they produced.
   silently; it now says "Still recovering".
 - A player whose computer clock was corrected mid-game saw a frozen picture for minutes; the
   game now recovers within a second or two.
+- On a Mac, the server could take a long time to start: it waited for a lookup of the computer's
+  own network name. It now waits at most 2 seconds, and adds any addresses it finds later.
 
 ## [1.0.0] - 2026-10-22
 
