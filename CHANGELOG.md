@@ -8,6 +8,14 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 
 ## [Unreleased]
 
+### Added
+
+- **A hit says why it got through.** When a ball hits you just after your dodge, catch or deflect
+  ended, the popup says **TOO EARLY** and by how much ("TOO EARLY (0.05 s)  −30 HP"). When it
+  hits you just after you stopped another ball, it says **SECOND BALL**: a catch or a deflect
+  stops one ball, so one right behind it still hits. The session logs keep both, and
+  `tools/log_report.py` counts them per player.
+
 ## [2.0.0] - 2026-10-29
 
 The second round of development, shaped by sessions with 6–10 players on an office Wi-Fi and by

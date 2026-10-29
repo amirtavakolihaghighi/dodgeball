@@ -92,6 +92,7 @@ To read a session: `python tools\log_report.py <the zip or a session folder>`. I
 
 - the host computer's state and the server's stalls;
 - a table of every player: frame rate, frozen time, late updates, ping, input gaps while playing, late presses, presses made while still recovering;
+- what the press grace and sidestep compensation did, and the hits that came just after a press or a defence (too early, second ball);
 - freezes several players shared, which point at the host;
 - the numbers just before every L.
 
@@ -127,6 +128,7 @@ These are the **defaults** (they live in `config.py`). The host can change every
   - The second contact ends the ball, and the team-colored end walls always stop it.
   - Bots use bank shots too.
 - **Defence:** press just before the ball arrives. Each action has a window. Arriving in its first fraction ("the last moment") is **perfect**: it refunds most of the stamina and pays extra cash. Pressing too early wastes the stamina, and there's a short recovery, so mashing is punished. A press during that recovery does nothing, and the game says **"Still recovering"** so you know why.
+  - **When a ball gets through anyway, the hit says why.** **TOO EARLY (0.05 s)**: your dodge, catch or deflect had ended that long before the ball reached you. **SECOND BALL**: you had just stopped another ball. A catch or a deflect stops one ball, so a second one right behind it still hits; a dodge covers every ball during its dash, so dodge through volleys.
   - **Fairness on Wi-Fi** (Game rules › Network, each with its own explanation): your screen shows the world 0.10 s in the past to stay smooth; presses are judged against what your screen showed, plus 0.02 s of **press grace** (your screen is drawn a moment before your finger moves); with **sidestep compensation** on, stepping out of a ball's way also counts by your screen ("SIDESTEPPED"); and **Lockout after a missed press** sets how long you wait before pressing again (0 = press again at once).
 
   | Action | Stamina (perfect) | Window | Perfect zone |
@@ -173,7 +175,7 @@ These are the **defaults** (they live in `config.py`). The host can change every
 ## Tests
 
 ```powershell
-.venv\Scripts\python tests\test_sim.py       # 50 rule tests
+.venv\Scripts\python tests\test_sim.py       # 53 rule tests
 .venv\Scripts\python tests\test_server.py    # 6 server tests: real WebSockets, the host's screen, the session logs, the log report
 ```
 
@@ -189,6 +191,7 @@ The tests cover:
 - the press grace, sidestep compensation, and the adjustable lockout after a missed press
 - the court growing with players and only shrinking between rounds
 - catch, deflect and dodge windows, including perfect presses, early presses and the deflect window being tighter than catch
+- why a hit got through: a press that ended too early (and by how much), or a second ball right after a defence
 - the rally speeding up to its cap
 - late-arriving inputs, which still count if they were in time on screen
 - no stamina, no defence

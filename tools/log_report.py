@@ -138,6 +138,8 @@ class Player:
         self.sidesteps = []         # balls that missed: clear on their own screen (sidestep compensation)
         self.graced = []            # defences that counted only thanks to the press grace
         self.clear_hits = []        # hits while they were clear of the ball on their own screen
+        self.early_hits = []        # hits just after their press had ended ("TOO EARLY")
+        self.second_hits = []       # hits just after they had stopped another ball ("SECOND BALL")
         self.in_gaps = []           # the server's view: longest gap between this player's inputs, per second
         self.shared_ms = 0          # frozen time while the server stalled or most others froze too
         self.own_ms = 0
@@ -278,8 +280,13 @@ def report(session, files):
                 q.sidesteps.append(r)
             elif r.get("ty") == "graced":
                 q.graced.append(r)
-            elif r.get("ty") == "hit" and (r.get("gap") or 0) > 0:
-                q.clear_hits.append(r)
+            elif r.get("ty") == "hit":
+                if (r.get("gap") or 0) > 0:
+                    q.clear_hits.append(r)
+                if r.get("early"):
+                    q.early_hits.append(r)
+                elif r.get("second"):
+                    q.second_hits.append(r)
         for r in secs:
             if (r.get("gap_max") or 0) >= 100:
                 continue        # the server itself stalled that second: every player's inputs waited
@@ -303,10 +310,11 @@ def report(session, files):
         " update the world updates arrived. input gap = longest wait between this player's inputs reaching the server,"
         " while playing. ignored = presses during the recovery after their own dodge, catch or deflect.)")
 
-    helped = [p for p in players if p.sidesteps or p.graced or p.clear_hits]
+    helped = [p for p in players if p.sidesteps or p.graced or p.clear_hits or p.early_hits or p.second_hits]
     if helped:
         say("")
-        say("FAIRNESS: what the press grace and sidestep compensation did (Game rules > Network)")
+        say("FAIRNESS: what the press grace and sidestep compensation did (Game rules > Network), and hits"
+            " that came right after a press or a defence")
         for p in helped:
             parts = []
             if p.sidesteps:
@@ -317,6 +325,12 @@ def report(session, files):
                 worst = max(r["gap"] for r in p.clear_hits)
                 parts.append(f"{len(p.clear_hits)} hit(s) while clear on their own screen (up to {worst:.2f} m;"
                              " sidestep compensation was off)")
+            if p.early_hits:
+                early = [r["early"] for r in p.early_hits]
+                parts.append(f"{len(early)} hit(s) just after their press had ended (too early by"
+                             f" {min(early):.2f}-{max(early):.2f} s)")
+            if p.second_hits:
+                parts.append(f"{len(p.second_hits)} hit(s) by a second ball right after they had stopped one")
             say(f"  {p.name}: " + "; ".join(parts))
 
     stalls = [r for r in server if r.get("ty") == "stall"]

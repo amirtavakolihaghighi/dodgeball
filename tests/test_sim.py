@@ -255,6 +255,69 @@ def test_early_dodge_is_wasted():
     assert not events(g, "dodge") and len(events(g, "hit")) == 1
 
 
+# ---------------------------------------------------------------- why a hit got through
+
+def _volley(gap, kind="deflect"):
+    """Two attackers throw at one defender, `gap` s apart. The defender meets the first ball with
+    `kind` just before it arrives, and does nothing about the second."""
+    g = Game(seed=7)
+    g.bots_each = 0
+    t = 100.0
+    a1, a2, d = g.add_player("A1", 0, t), g.add_player("A2", 0, t), g.add_player("D", 1, t)
+    t = play_now(g, t)
+    for p, (x, z) in ((a1, (-5.0, -1.0)), (a2, (-5.0, 1.0)), (d, (5.0, 0.0))):
+        p.x, p.z = p.prev_x, p.prev_z = x, z
+    for p, target in ((a1, d), (a2, d), (d, a1)):
+        aim_at(p, target)
+    g.events.clear()
+    g.start_charge(a1, t, t)
+    g.start_charge(a2, t, t)
+    t += C.CHARGE_TIME
+    g.throw(a1, t, t)
+    released, pressed = [], []
+
+    def each_tick(now):
+        if not released and now >= t + gap:
+            released.append(g.throw(a2, now, now))
+        for ball in list(g.balls.values()):
+            if not pressed and ball.state == "live" and ball.team != d.team:
+                tti, miss = bots.time_to_impact(ball, d, g.rules)
+                if tti is not None and tti <= 0.05 and miss < 1:
+                    pressed.append(g.start_action(d, kind, now, now))
+
+    run(g, t, 2.0, each_tick)
+    return g, [e for e in events(g, "hit") if e["p"] == d.id]
+
+
+def test_a_hit_after_a_press_that_ended_too_early_says_by_how_much():
+    g, a, d = exchange("deflect", lead=C.DEFLECT.window + 0.1)     # its window ended 0.1 s before the ball came
+    hit = events(g, "hit")
+    assert len(hit) == 1 and abs(hit[0]["early"] - 0.1) < 0.011 and "second" not in hit[0]
+    g, a, d = exchange("dodge", lead=C.DODGE.window + 0.3)
+    assert abs(events(g, "hit")[0]["early"] - 0.3) < 0.011
+    g, a, d = exchange("catch", lead=C.CATCH.window + 0.7)          # long before: not about this ball
+    assert "early" not in events(g, "hit")[0]
+
+
+def test_a_second_ball_right_after_a_defence_is_marked():
+    g, hits = _volley(gap=0.15)
+    assert len(events(g, "deflect")) == 1
+    assert len(hits) == 1 and hits[0].get("second") and "early" not in hits[0]
+    g, hits = _volley(gap=0.45, kind="dodge")       # the dash is over when the second ball comes...
+    assert len(events(g, "dodge")) == 1             # ...and it met a ball, so it wasn't "too early"
+    assert len(hits) == 1 and hits[0].get("second") and "early" not in hits[0]
+    g, hits = _volley(gap=1.0)                      # long after: just a hit
+    assert len(hits) == 1 and "second" not in hits[0] and "early" not in hits[0]
+
+
+def test_an_ordinary_hit_has_no_mark():
+    g, a, (d,), t = start_duel()
+    throw(g, a, d, t)
+    run(g, t + C.CHARGE_TIME, 2.0)
+    hit = events(g, "hit")
+    assert len(hit) == 1 and "early" not in hit[0] and "second" not in hit[0]
+
+
 # ---------------------------------------------------------------- network fairness
 
 def _late_press(view_time_offset, arrive_after_contact=0.04, rules=None):

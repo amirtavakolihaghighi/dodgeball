@@ -27,7 +27,7 @@ Quick facts:
   - Always pass `--no-browser` in tests, or windows open on the user's desktop.
   - Always pass `--fresh`, or tests load or overwrite the user's `saved_rules.json`.
   - Restart the server after Python changes, and between browser test suites (it keeps changed rules in memory).
-- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 50 must pass) and `tests\test_server.py` (all 6 must pass).
+- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 53 must pass) and `tests\test_server.py` (all 6 must pass).
 - **Session logs:**
   - Every server run writes `logs\<date_time>\` next to the app (`diag.py`). Every browser sends in its own log (`static/js/diag.js`; L marks a laggy moment).
   - The host downloads them all as one zip, and `tools\log_report.py <zip or folder>` turns them into a diagnosis. The user sends these zips to be analysed. Logs from before the rename are named `dodgeparry-...`; the report reads them the same way.
@@ -36,7 +36,7 @@ Quick facts:
   - See `tests/browser/README.md`.
   - Re-run the auto-defender after touching `net.js`, `main.js` threat detection or the pending/lag-compensation logic, `sidestep.json` (with `&lag=150`) after touching sidestep compensation or position reports, and `clock.json` after touching the clock estimate in `net.js`.
   - The lag study's fixes are settings under Network (advanced): view delay, press grace, sidestep compensation, the lockout scale. Defaults are in `config.py`.
-  - Re-run the lobby tests after touching the lobby, rules or host code, and `logs.json` after touching the logging.
+  - Re-run the lobby tests after touching the lobby, rules or host code, `logs.json` after touching the logging, and `why_hit.json` after touching the hit marks or the hit popup.
   - Kill test servers by their process tree (the venv's `python.exe` is a launcher with the server as its child).
 - **Standalone Windows app:** `build_exe.bat` produces `dist\Dodgeball-windows.zip`, with `Allow friends to connect.bat` (the firewall helper) next to the exe. Rebuild to ship any change; releases are built by GitHub Actions.
 - **Decisions:** don't change decisions the user made (marked **U** in `docs/PROJECT.md` section 5) without asking. Ask about genuine design forks; decide the obvious things yourself.

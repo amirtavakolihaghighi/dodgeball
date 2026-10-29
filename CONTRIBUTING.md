@@ -38,7 +38,7 @@ The game keeps two things between runs, next to `server.py`: the host's rules
 - Never point a test at a server that is hosting a real session.
 
 ```bash
-python tests/test_sim.py       # the rules: 50 tests, about a minute
+python tests/test_sim.py       # the rules: 53 tests, about a minute
 python tests/test_server.py    # the server over real WebSockets, the session logs, the log report
 ```
 

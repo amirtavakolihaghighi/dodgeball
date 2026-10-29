@@ -35,6 +35,9 @@ HAND_UP, HAND_FWD, HAND_RIGHT = 1.45, 0.3, 0.32
 DEAD_GRAVITY = 18.0                   # dead balls drop quickly out of the way
 DEAD_BALL_TIME = 1.6
 RECENT_TEAMS_KEPT = 64
+# Why a ball got through, for the hit popup. Labels only: they never change who gets hit.
+TOO_EARLY_WITHIN = 0.5               # their last press had ended at most this long before the ball came
+SECOND_BALL_WITHIN = 0.5             # they had stopped another ball at most this long before
 
 
 def clamp(v, lo, hi):
@@ -147,6 +150,9 @@ class Player:
     action_end: float = -99.0       # the action is over: window + recovery
     lockout_end: float = -99.0      # another defence (or a throw) may start: window + recovery, x LOCKOUT_SCALE
     perfect_paid: bool = False
+    press_end: float = -99.0        # when their latest press's window ended (view timeline), kept after it
+    press_met: bool = False         # that press dodged, caught or deflected a ball
+    defended_at: float = -99.0      # when they last dodged, caught or deflected a ball
     dash_dir: tuple = (0.0, 0.0)
     dodge_from: tuple = (0.0, 0.0)  # where a dodge started: a ball reaching it was dodged
     last_spend: float = -99.0
@@ -312,6 +318,7 @@ class Game:
         p.has_ball, p.ball_ready_at = True, now
         p.charging = False
         p.action, p.action_end, p.lockout_end = None, -99.0, -99.0
+        p.press_end, p.press_met, p.defended_at = -99.0, False, -99.0
         p.seen.clear()
         p.tp += 1
 
@@ -491,6 +498,7 @@ class Game:
         # The lockout may end before the window does (LOCKOUT_SCALE < 1): a new press then takes over.
         p.lockout_end = p.action_start + (spec.window + spec.recovery) * self.rules.LOCKOUT_SCALE
         p.perfect_paid = False
+        p.press_end, p.press_met = p.action_start + spec.window, False
         if kind == "dodge":
             fx, fz = forward(p.yaw)
             p.dash_dir = dash_dir or (-fx, -fz)
@@ -616,6 +624,7 @@ class Game:
             self._refund(p, spec.cost - spec.perfect_cost)
             self._earn(p, cash)
             p.stats["perfects"] += 1
+        p.press_met, p.defended_at = True, t
         self._event(t, "dodge", p=p.id, perfect=perfect, cash=cash, **self._graced(p, t))
 
     def _caught(self, b, p, t):
@@ -632,6 +641,7 @@ class Game:
         graced = self._graced(p, t)
         p.action, p.action_end, p.lockout_end = None, t, t     # hands are free again immediately
         self.balls.pop(b.id, None)
+        p.press_met, p.defended_at = True, t
         self._event(t, "catch", p=p.id, by=b.owner, perfect=perfect, rally=b.rally, cash=cash, **graced)
 
     def _deflected(self, b, p, t):
@@ -662,6 +672,7 @@ class Game:
         b.state = "live"
         graced = self._graced(p, t)
         p.action, p.action_end, p.lockout_end = None, t, t
+        p.press_met, p.defended_at = True, t
         self._event(t, "deflect", p=p.id, perfect=perfect, rally=b.rally, cash=cash, speed=round(speed, 1), **graced)
 
     def _hit(self, b, p, t, now):
@@ -685,9 +696,14 @@ class Game:
             p.stats["outs"] += 1
         bank = b.bounces > 0
         gap = None if p.bot else self._screen_gap(b, p, t, final=True)    # for the log: clear on their screen?
+        why = {}
+        if not p.press_met and 0 < t - p.press_end <= TOO_EARLY_WITHIN:
+            why["early"] = round(max(t - p.press_end, 0.01), 2)     # their press had just ended
+        elif 0 <= t - p.defended_at <= SECOND_BALL_WITHIN:
+            why["second"] = True      # right behind a ball they stopped: a catch or deflect stops only one
         self._kill(b, t, (-b.vx * 0.2, 2.5, -b.vz * 0.2))     # bounce off the body
         self._event(t, "hit", p=p.id, by=b.owner, b=b.id, dmg=dmg, ko=ko, rally=b.rally, cash=earned,
-                    speed=round(speed, 1), bank=bank, **({} if gap is None else {"gap": round(gap, 2)}))
+                    speed=round(speed, 1), bank=bank, **why, **({} if gap is None else {"gap": round(gap, 2)}))
 
     # ------------------------------------------------------------------ revive
 

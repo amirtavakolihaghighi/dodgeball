@@ -1,0 +1,12 @@
+[
+  {"eval": "document.getElementById('nameInput').value = 'WhyHit'; document.getElementById('playBtn').click(); 'joined'"},
+  {"waitFor": "dp.cfg && dp.net.latest && dp.me && !document.getElementById('startBtn').hidden", "timeout": 8000},
+  {"eval": "(() => { const enemy = dp.me.team === 0 ? 'BLUE' : 'RED', own = enemy === 'BLUE' ? 'RED' : 'BLUE'; dp.net.send({t: 'rules', reset: true}); dp.net.send({t: 'rules', set: {[`BOTS_${enemy}`]: 3, [`BOTS_${own}`]: 0, BOT_SKILL: 'hard', DEFLECT_COST: 0, DEFLECT_PERFECT_COST: 0, LOCKOUT_SCALE: 0}}); return `me on ${own}, 3 hard bots on ${enemy}, free deflects, no lockout`; })()"},
+  {"waitFor": "dp.rules.active.LOCKOUT_SCALE === 0 && dp.rules.active.DEFLECT_COST === 0", "timeout": 4000},
+  {"eval": "document.getElementById('startBtn').click(); 'match started'"},
+  {"waitFor": "dp.net.latest && dp.net.latest.r.s === 'play'", "timeout": 12000},
+  {"evalFile": "why_hit.js"},
+  {"wait": 40000},
+  {"eval": "__report()"},
+  {"shot": "why_hit.png"}
+]

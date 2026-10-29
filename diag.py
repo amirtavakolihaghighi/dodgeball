@@ -411,7 +411,8 @@ class Stats:
                 self.hits[e["p"]].append((e["t"], now))
                 self.log.write({"ty": "hit", "st": e["t"], "p": e["p"], "by": e["by"], "speed": e["speed"], "dmg": e["dmg"],
                                 "ko": e["ko"], "bank": e.get("bank"), "gap": e.get("gap"), "view_lag": ms(p.view_lag),
-                                "decided_ms": ms(now - e["t"]), "wall": wall_ms()})
+                                "decided_ms": ms(now - e["t"]), **{k: e[k] for k in ("early", "second") if k in e},
+                                "wall": wall_ms()})
             elif k == "sidestep" or (k in ("catch", "deflect", "dodge") and e.get("graced")):
                 # A ball that missed because the player had stepped clear on their screen, or a
                 # defence that counted only thanks to the press grace.

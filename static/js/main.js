@@ -792,7 +792,9 @@ function onEvent(e) {
       if (pos) world.burst(pos.x, 1.2, pos.z, 0xffffff, 1.8);
       if (mine) {
         hud.damage();
-        hud.popup(e.ko ? `KNOCKED OUT  −${e.dmg}` : `−${e.dmg} HP`, 'bad');
+        // Why it got through: your press had just ended, or you had just stopped another ball.
+        const why = e.early ? `TOO EARLY (${e.early.toFixed(2)} s)  ` : e.second ? 'SECOND BALL  ' : '';
+        hud.popup(`${why}${e.ko ? `KNOCKED OUT  −${e.dmg}` : `−${e.dmg} HP`}`, 'bad');
         sfx.hit();
         if (e.ko) sfx.ko();
       } else if (e.by === myId) {

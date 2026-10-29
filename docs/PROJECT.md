@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds).
+Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0).
 
 ## Contents
 
@@ -111,7 +111,7 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── js\sfx.js              synthesized sounds (WebAudio)
 │   └── vendor\                three.js 0.185.1: three.module.min.js + three.core.min.js
 ├── tests\
-│   ├── test_sim.py            50 rule tests: python tests\test_sim.py (or pytest)
+│   ├── test_sim.py            53 rule tests: python tests\test_sim.py (or pytest)
 │   ├── test_server.py         6 server tests (lobby protocol, the host's screen, saved rules, session logs, the log report)
 │   └── browser\               headless-Chrome end-to-end tests (cdp.js driver + step files, freeze_server.py)
 ├── logs\                      (made at runtime) one folder of session logs per server run; the 30 newest are kept
@@ -504,6 +504,31 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 
 **Evidence:** before the push, both test suites passed in a fresh clone installed from the lockfile (Python 3.14, and Python 3.10 through uv), the server booted and a match ran in headless Chrome with no page errors, the Windows app built and started, the privacy scan found nothing in any commit, and the line endings were checked in the staged files. CI's first run passed on Windows and Linux and in the browser, and failed on macOS: the tests that start a real server never saw its host link, because the server looked up the computer's own name before printing it, and on macOS that lookup can stall. Startup now waits at most 2 s for it (decision 71), and the second run passed on all three systems.
 
+### Phase 10: why a hit got through (2026-10-29)
+
+**The report:** a player said that a successful deflect turned their screen red, as if they had been hit and the deflect had failed. The user asked whether that was real, and whether the lag work caused it.
+
+**What the logs showed** (that player's browser logs from 25 and 28 Oct, then every player's):
+
+- The red flash comes only from a real hit: the server's `hit` event for that player.
+- **A second ball:** on 25 Oct the player's deflect worked five times and a different ball, from another thrower, hit them 0.16–0.25 s later (once two more balls within 0.23 s). A catch or a deflect is spent on the ball it meets (`_caught` and `_deflected` clear the action), so a ball right behind it finds no defence.
+- **Too early:** on 28 Oct, three of the player's hits came after deflect presses made 0.23–0.54 s before the ball reached them on their own screen; the 0.18 s window had ended first (the closest by 0.05 s).
+- **Not the lag settings:** across all players, 8% (25 Oct), 9% (27 Oct) and 8% (28 Oct) of successful catches and deflects were followed within 0.3 s by another ball's hit: the same before and after them. Three of the player's late presses on 25 Oct (0.01–0.02 s after contact on their screen) would now count, thanks to the press grace.
+
+**What got built** (the user chose to say what happened, option A, over a deflect that covers its whole window):
+
+- **The server marks each hit on a player:** `early` (seconds) when their last press, which met no ball, had ended at most 0.5 s before the ball came, measured in the same view timeline the press is judged in; `second` when they had dodged, caught or deflected another ball at most 0.5 s before. `Player.press_end`, `press_met` and `defended_at` keep what's needed after the action itself is cleared. The marks never change who gets hit.
+- **The hit popup says why:** "TOO EARLY (0.05 s)  −30 HP" or "SECOND BALL  −37 HP".
+- **Logs:** the server log's `hit` lines keep the marks, and the report's FAIRNESS section counts them per player.
+
+**Evidence:**
+
+- 53 rule tests pass, 3 of them new: too early, with the amount, and no mark for a press long before; a second ball after a deflect and after a dodge whose dash had ended, and no mark a second later; an ordinary hit with no mark. With the marks switched off, the new tests fail.
+- 6 server tests pass.
+- A new browser test (`why_hit.json`) plays against three hard bots and deflects every other ball about 0.27 s early. 10 hits: 6 marked too early and 3 second ball, and exactly those popups on screen.
+
+**Also:** the user deleted the old private repository, and every local backup of the old history was deleted and pruned. The old DodgeAndParry build was removed. Released as **v2.1.0**.
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -581,6 +606,8 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
 | 69 | The game's files live at the repository root (no `prototype/` folder); its manual is `docs/MANUAL.md` | U | "Bring out the content of the prototype folder into the root". The manual's new place: C |
 | 70 | The firewall helper treats the old "Dodge & Parry" rule as its own | C | Running it again (or `undo`) on a PC that ran the old helper replaces that rule instead of leaving it behind |
 | 71 | At startup the server waits at most 2 s for the lookup of the computer's own name before printing the join addresses; the 15 s watcher adds late ones | C | On macOS the lookup can stall: CI's first macOS run timed out waiting for the console's host link |
+| 72 | A hit says why it got through: "TOO EARLY (x s)" when the player's last press, which met no ball, had ended up to 0.5 s before the ball came; "SECOND BALL" when they had stopped another ball up to 0.5 s before | U | Option A, chosen over a deflect that covers its whole window. The 0.5 s limits and the wording: C. Labels only: who gets hit is unchanged |
+| 73 | This is version 2.1.0 (minor) | C | It adds something players see, and nothing they rely on changes |
 
 ## 6. Current features
 
@@ -624,7 +651,7 @@ Finally, the browser test tools were moved from a temporary folder into `prototy
   - A throw box (ball ready, cooldown, or speed/damage/cost while charging).
   - Action costs; team scores with alive pips; round timer; kill feed.
   - Name tags with HP and stamina; the aim-assist marker; the timing ring with a direction arrow.
-  - Popups (including "Still recovering" when a press comes during a recovery); gold and red screen flashes; a Tab scoreboard; a hint line in the lobby; a line saying what the host is doing.
+  - Popups (including "Still recovering" when a press comes during a recovery, and why a hit got through: "TOO EARLY (0.05 s)" or "SECOND BALL"); gold and red screen flashes; a Tab scoreboard; a hint line in the lobby; a line saying what the host is doing.
   - An Esc menu that doubles as the lobby: teams, match settings, the rules editor, your own settings (sensitivity, volume, ring), controls and join addresses.
 - Synthesized sounds.
 
@@ -891,7 +918,7 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 | Event | Fields |
 | --- | --- |
 | `throw` | `p, b, power, speed` |
-| `hit` | `p, by, b, dmg, ko, rally, cash, speed, bank, gap?` (bank = it had ricocheted; gap = how far clear of the ball they were on their own screen, m, negative = touching; people only) |
+| `hit` | `p, by, b, dmg, ko, rally, cash, speed, bank, early?, second?, gap?` (bank = it had ricocheted; early = their last press, which met no ball, had ended this many s before the ball came, up to 0.5; second = they had stopped another ball up to 0.5 s before; gap = how far clear of the ball they were on their own screen, m, negative = touching; people only) |
 | `sidestep` | `p, b`: the ball missed p because they had stepped clear on their own screen |
 | `catch` | `p, by, perfect, rally, cash` |
 | `deflect` | `p, perfect, rally, cash, speed` |
@@ -975,7 +1002,7 @@ Key methods:
   - `_ricochet_target`.
   - `_contact`: invulnerability, an active action defends, otherwise pending.
   - `_check_pending`: a late press (`_action_at`, with the press grace), sidestep compensation (`_screen_position`, `_screen_gap`, `_stepped_clear`, `_let_through`), else the hit at the deadline.
-  - `_defend` → `_dodged`, `_caught` or `_deflected`; `_hit`.
+  - `_defend` → `_dodged`, `_caught` or `_deflected` (each records `press_met` and `defended_at`); `_hit` (marks `early` or `second`: why it got through).
 - **Player actions:** `throw`, `_aimed_velocity`, `_assist_target` (with the `_is_bank_shot` rule), `start_action`, `revive`.
 - **Cash:** `cash_of` (own cash or the team's pot), `_earn` (in or, negative, out), `_regroup_cash` (team cash switched on or off), `revive_cost`.
 - **Players, bots and the court:** `_sync_bots` (exactly the host's count per team), `_fit_court`, `_spawn`, `_line_up` (everyone fresh in a row), `_remember_team`.
@@ -1135,7 +1162,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **A test server remembers rules** that tests changed until it restarts, so restart it between test suites.
 - **Hosting from the test PC:** the browser on the server's PC is the host. Add `?guest` to a tab's URL to see the guest view.
 
-**Rule tests** (all 50 must pass) and **server tests** (all 6 must pass):
+**Rule tests** (all 53 must pass) and **server tests** (all 6 must pass):
 
 ```powershell
 .venv\Scripts\python tests\test_sim.py
@@ -1162,6 +1189,7 @@ The rule tests cover:
 - floor and wall ricochets; one ricochet per throw; a deflect giving a fresh ricochet;
 - slow balls bending less per metre (0, 0.5 and 1); a bounce taking curve away (0.5 and 0);
 - the press grace (a press a hair late counts, and not with grace 0); sidestep compensation (a ball misses someone clear on their screen; off, it hits and the log shows the gap; moving too late is still a hit); the lockout (normal, 0 with the new press taking over, and a short lockout never cutting the window);
+- why a hit got through: a press that ended too early (with the amount; no mark for a press long before), a second ball right after a deflect or after a dodge's dash (no mark a second later), and an ordinary hit with no mark;
 - court growth and shrinking; the center line; knockout, revive and round end;
 - each team's bots set by the host, untouched by people joining or leaving, changed mid-match from the next round, gone with the last person; a full bots-only match;
 - the host spectating (only the host; never hit or revived; back from the next round; cancelling); shared team cash (earning, a teammate reviving from the pot, switching it off and on); cash carrying over while revive prices start over;
@@ -1191,6 +1219,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 - **The two-browser lobby test** (`lobby_host.json` with `lobby_guest.json`, run at the same time) is described in the browser tests' README.
 - **The clock test** (`clock.json`) makes the page's clock run fast (+300 ms over 10 s, like an OS time correction) and prints the frozen time per second. Healthy: the picture recovers as soon as the clock settles. Re-run it after touching the clock estimate in `net.js`.
 - **The sidestep test** (`sidestep.json` + `sidestep.js`, with `&lag=150`, and `&comp=0` for compensation off) walks out of every incoming ball's path and counts balls sidestepped, hits, and hits while clear on screen. Re-run it after touching sidestep compensation, position reports or the pending logic.
+- **The why-hit test** (`why_hit.json` + `why_hit.js`) plays against three hard bots and deflects every other ball about 0.27 s too early. Healthy: the hits marked `early` or `second` and the TOO EARLY and SECOND BALL popups on screen match one for one. Re-run it after touching the hit marks or the hit popup.
 
 **CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`; any page error fails it).
 
@@ -1281,7 +1310,7 @@ print(lengths, g.score, dict(counts))
 
 **Known limitations, by design or accepted for now:**
 
-- **Volleys:** one catch holds one ball, and a deflect is spent on the ball it meets. A second ball a fraction of a second behind still hits, and to the player it looks as if the defence failed: the red flash comes right after the CATCH or DEFLECT popup. In the office logs, 8–9% of successful catches and deflects were followed within 0.3 s by another ball's hit, at the same rate before and after the lag settings (25, 27 and 28 Oct). A dodge covers every ball during its dash, so dodge through volleys instead.
+- **Volleys:** one catch holds one ball, and a deflect is spent on the ball it meets. A second ball a fraction of a second behind still hits; that used to look as if the defence had failed (the red flash right after the CATCH or DEFLECT popup), so since v2.1.0 the hit says SECOND BALL. In the office logs, 8–9% of successful catches and deflects were followed within 0.3 s by another ball's hit, at the same rate before and after the lag settings (25, 27 and 28 Oct). A dodge covers every ball during its dash, so dodge through volleys instead.
 - **Close ricochets:** a ricochet bouncing right at someone's feet can be unreactable. Tune with `RICOCHET_CURVE_KEEP`, `RICOCHET_MIN_SPEED` and `RICOCHET_CONE_DEG` if it feels unfair.
 - **The perfect-dodge spin** starts when the server confirms it, about 0.1 s after the press, not instantly.
 - **Movement is trusted** to each browser within the court limits: fine among friends, not for strangers.
@@ -1324,6 +1353,7 @@ print(lengths, g.score, dict(counts))
 | **Press grace** | A person's dodge/catch/deflect counts from this long before the press (`PRESS_GRACE`, 0.02 s) |
 | **Sidestep compensation** | Stepping out of a ball's way judged by the player's own screen (`SIDESTEP_COMP`); a ball that misses that way gives a `sidestep` event |
 | **Gap (hit)** | How far clear of the ball the player was on their own screen at contact; negative = touching |
+| **Too early / second ball (hit marks)** | Why a hit got through, shown in the hit popup: the player's last press, which met no ball, had ended up to 0.5 s before the ball came (`early`, in seconds), or they had stopped another ball up to 0.5 s before (`second`). Labels only |
 | **Rally** | Number of deflections on a ball; each adds 15% speed and changes its color |
 | **Ricochet / bank shot** | A bounce off the floor or a side wall (one per throw), then curving toward an enemy ahead, with less curve than before the bounce |
 | **Assist** | Light aim assist: bending toward an enemy within the cone |

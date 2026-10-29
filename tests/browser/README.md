@@ -72,6 +72,14 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock&lag=150&comp=0" tests\b
 
 `sidestep.js` walks out of the way of every incoming ball (holds A or D away from its line from ~0.25 s before it arrives) and never presses a defence, against two hard BLUE bots. It prints how many balls it tried to avoid, how many missed it thanks to the compensation, the hits, and the hits that came while it was clear on its own screen. With 150 ms of simulated lag, expect with compensation on (the default) about half the balls sidestepped and no hits while clear; with `&comp=0`, nearly every hit is one while clear on screen (measured: on 26/13/7/0, off 16/0/14/14).
 
+## Why a hit got through
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\why_hit.json
+```
+
+`why_hit.js` plays alone against three hard bots, with free deflects and no lockout, and deflects every other incoming ball about 0.27 s too early (the rest on time). It prints the presses, the hits, how many hits the server marked `early` ("TOO EARLY") or `second` ("SECOND BALL"), and how many of those popups appeared on screen. Healthy: the marked hits and the popups match one for one (measured: 10 hits, 6 too early and 3 second ball, and the same 6 + 3 popups).
+
 ## The session logs
 
 `--fresh` turns logging off, so give the test server a log folder (`tests\browser\out\` is git-ignored):
