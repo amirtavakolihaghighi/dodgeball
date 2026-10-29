@@ -98,14 +98,23 @@ class Client:
             pass    # the socket closed; the receive loop notices and cleans up
 
 
-def lan_addresses() -> list[str]:
+def lan_addresses(wait: float | None = None) -> list[str]:
+    """This computer's addresses that others could join. `wait` caps the time spent looking up its
+    own name: on some systems (macOS asks the local network) that takes many seconds."""
     ips = set()
     with contextlib.suppress(OSError):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("10.255.255.255", 1))     # no packet is sent; this just picks the LAN interface
             ips.add(s.getsockname()[0])
-    with contextlib.suppress(OSError):
-        ips.update(socket.gethostbyname_ex(socket.gethostname())[2])
+    by_name = []
+
+    def look_up():
+        with contextlib.suppress(OSError):
+            by_name.extend(socket.gethostbyname_ex(socket.gethostname())[2])
+    lookup = threading.Thread(target=look_up, daemon=True)
+    lookup.start()
+    lookup.join(wait)
+    ips.update(list(by_name))
     # 127.x is this computer only and 169.254.x means "no network": nobody else can use them.
     # Home and office networks are usually 192.168.x or 10.x; VPN adapters often use 172.x, so
     # list the likely LAN address first.
@@ -439,7 +448,7 @@ def main():
         with contextlib.suppress(Exception):
             import ctypes
             ctypes.windll.winmm.timeBeginPeriod(1)   # 1 ms timer resolution for a steady 60 Hz loop
-    own_ips = lan_addresses()
+    own_ips = lan_addresses(wait=2.0)    # don't hold the console up; the watcher adds late ones
     watch_addresses()
     print("\n  DODGEBALL server")
     print(f"    this computer : http://localhost:{port}    <- you're the host here: set up the lobby, then Start")

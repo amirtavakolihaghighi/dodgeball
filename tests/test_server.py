@@ -136,13 +136,14 @@ def running_server(*extra):
     lines = queue.Queue()
     threading.Thread(target=lambda: [lines.put(line) for line in proc.stdout], daemon=True).start()
     try:
-        key = None
+        key, printed = None, []
         deadline = time.time() + 20
         while key is None and time.time() < deadline:
             with contextlib.suppress(queue.Empty):
-                found = re.search(r"\?host=(\S+)", lines.get(timeout=0.5))
+                printed.append(lines.get(timeout=0.5))
+                found = re.search(r"\?host=(\S+)", printed[-1])
                 key = found.group(1) if found else None
-        assert key, "the console never showed the host link"
+        assert key, "the console never showed the host link. It printed:\n" + "".join(printed[-30:])
         for _ in range(100):
             with socket.socket() as s:
                 if s.connect_ex(("127.0.0.1", port)) == 0:
