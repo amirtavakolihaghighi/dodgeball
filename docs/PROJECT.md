@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0).
+Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it).
 
 ## Contents
 
@@ -61,6 +61,7 @@ Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules edito
 - **Plays with coworkers in the office** (6–10 people, office Wi-Fi; several on Linux laptops). Some of them had lag; see `LAG_ANALYSIS.md`. The user collects the session logs and drops them in `testlog\` (git-ignored) for analysis.
 - **Works in development cycles:** a stable version on `main`, then a batch of requested changes, then the user tests.
 - **Wants to discuss before building** when a topic is open-ended (the lag plan was discussed first, then built as settings: phase 7).
+- **Isn't a developer, SRE or devops person.** Explain setup and infrastructure in plain steps. A friend who is a developer sets up servers (internet mode's test server, phase 14).
 
 ## 3. Folder map
 
@@ -641,6 +642,36 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 
 **Released as v2.2.0**, with phases 11 and 12, after the user had tested it all ("everything okay").
 
+### Phase 14: internet mode, on its own branch (2026-10-29)
+
+This is the short version, kept on `main` while internet mode waits on its branch. This file on the branch `internet-mode` has the full record: what was built, how it was tested, decisions 102–111, pitfalls, and the setup guide `docs/INTERNET.md`. The code isn't on `main` yet.
+
+**Where it started:** the user asked what it would take to run the game on a server on the internet instead of the office Wi-Fi, and how to get there step by step. It was discussed before anything was built:
+
+- The game already works over the internet: it's a web page plus a server. What was missing was protection, because on a LAN the game trusts everyone who can reach it.
+- **Measured on a throwaway server:** through a tunnel or proxy on the same computer, every stranger became the host and could download everyone's logs. One oversized message stalled the game for everyone for 361 ms.
+- **Ping, in player terms:** your own movement stays instant, and what the server confirms comes about one ping later. Presses are judged fairly up to about 150 ms of ping.
+
+**The user's choices** (decisions 102 and 111): friends with a password, on a cloud server; and the work on its own branch until a friend of the user's has tried it on a real server.
+
+**What internet mode is** (`server.py --internet`):
+
+- a password to join; the host types the host password in the same box (nobody is the host because of where they connect from);
+- limits against abuse that friends never notice: at most 16 people, a minute's wait after wrong passwords, few connections per address, a cap on what a connection may send;
+- HTTPS in front of the game (Caddy), and a log folder per game night with players' addresses kept only in part;
+- `docs/INTERNET.md`, a step-by-step guide for a cloud server (Ubuntu, Caddy, the game as a service), opening with a technical summary for whoever sets up the server.
+
+**Its purpose:** to let friends who aren't on the same Wi-Fi play together. First it has to be tried on a real server: the user isn't a developer, so a friend of theirs who is sets up the test server.
+
+**Where it stands:** on the branch `internet-mode`, pushed to GitHub and not merged. All its tests pass (CI, started by hand on the branch: all 16 jobs). The Linux setup and Caddy in front of the game haven't been run on a real server yet: that's the friend's test.
+
+**The plan:**
+
+1. The friend sets up a test server from the branch's `docs/INTERNET.md`. Anything that doesn't work as written gets fixed on the branch.
+2. The first internet game night. Its logs show the real lag (what to read: `docs/LAG_ANALYSIS.md` on the branch, Update 4).
+3. The merge into `main`, when the user says so. In the merge's conflicts keep the branch's versions: its full phase 14 and decisions 102–111 replace this short entry and the placeholder row. Also take `--branch internet-mode` (and the sentence after it) out of the guide's clone command.
+4. A release, if the user wants one (the routine is in `CONTRIBUTING.md`).
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -748,6 +779,9 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 | 99 | Standing still = within 2 cm of where you stopped; turning, throwing and defending don't count | C | Measured from where you stopped, so slow creeping counts as moving |
 | 100 | Hurt bots stand still to regenerate (a Bots rule, on by default; a bot can have its own) | U | "Yes, when hurt". How (stop wandering, no sidesteps, still defend and throw): C |
 | 101 | Phases 11–13 are version 2.2.0 (minor) | C | They add features; settings saved by older versions still load, and nothing players rely on changes (bots' new names aside) |
+| 102 | Playing over the internet: friends with a password, on a cloud server | U | Chosen over "anyone" (which would need cheat checks and a kick button) and over the user's own PC through a tunnel |
+| 103–110 | Internet mode's own design: the host by password only, the limits, where it listens, logs per game night, the message size limit, refusals, the cloud setup | C | Recorded in this file on the branch `internet-mode` (phase 14) |
+| 111 | Internet mode waits on its own branch, `internet-mode` (pushed, not merged), until the user's friend has tried it on a cloud server; it goes into main only when the user says so | U | "Commit to a separate branch dedicated for this feature… then if it's okay, I tell you to merge." The user isn't a developer; the friend is |
 
 ## 6. Current features
 
