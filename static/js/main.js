@@ -10,7 +10,7 @@ import { Net } from './net.js';
 import { Input } from './input.js';
 import { World, TEAM_COLORS } from './world.js';
 import { Hud, TEAM, TEAM_CLASS, regenLimit } from './hud.js';
-import { Sfx } from './sfx.js';
+import { Sfx, KINDS, LEVELS } from './sfx.js';
 import { Lobby } from './lobby.js';
 import { RulesEditor } from './rules_ui.js';
 import { launchVelocity } from './physics.js';
@@ -67,10 +67,13 @@ const settings = { sens: 1, volume: 0.6, ring: true, follow: true, graphics: 'au
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('dp.settings') || '{}'));
 } catch { /* private mode etc: defaults are fine */ }
+settings.levels = { ...LEVELS, ...settings.levels };     // the volume of each kind of sound
 const saveSettings = () => {
   try { localStorage.setItem('dp.settings', JSON.stringify(settings)); } catch { /* ignore */ }
 };
 sfx.setVolume(settings.volume);
+for (const kind of KINDS) sfx.setLevel(kind, settings.levels[kind]);
+sfx.onLoaded = (error) => diag.log('sound', error ? { error } : { ok: 1, sounds: Object.keys(sfx.bank.sounds).length });
 
 // Shake, jolts and the charge zoom (juice.js): applied after the aim, to the picture only.
 const camFx = new CameraFx(world.camera);
@@ -259,6 +262,15 @@ editor.onStopFollowing = () => {        // closing the editor that followed the 
 };
 $('sensInput').addEventListener('input', (e) => { settings.sens = Number(e.target.value); saveSettings(); });
 $('volInput').addEventListener('input', (e) => { settings.volume = Number(e.target.value); sfx.setVolume(settings.volume); saveSettings(); });
+for (const kind of KINDS) {
+  const slider = $(`vol-${kind}`);
+  slider.value = settings.levels[kind];
+  slider.addEventListener('input', () => {
+    settings.levels[kind] = Number(slider.value);
+    sfx.setLevel(kind, settings.levels[kind]);
+    saveSettings();
+  });
+}
 $('ringInput').addEventListener('change', (e) => { settings.ring = e.target.checked; saveSettings(); });
 $('saveLogBtn').addEventListener('click', () => {
   const bytes = diag.download();
@@ -462,6 +474,7 @@ function tryAction(kind, at = performance.now()) {
     local.dashDir = dodgeDirection();
     local.dashUntil = t + cfg.dash.time;
     dir = local.dashDir.map((v) => round(v, 3));
+    sfx.dash();         // the moment you press, ball or no ball
   }
   const wt = net.viewTimeAt(at);
   net.send({ t: 'act', a: kind, wt: round(wt, 4), dir, aim: aim.point, tg: aim.tg });
@@ -889,9 +902,30 @@ function posOf(id) {
   return p ? { x: p.x, z: p.z } : null;
 }
 
-function volumeFor(id) {
-  const p = posOf(id);
-  return p ? clamp(1 - Math.hypot(p.x - local.x, p.z - local.z) / 30, 0.25, 1) : 0.5;
+/** Somewhere 15 m ahead: for a sound whose player isn't in the latest update. */
+function somewhere() {
+  return { x: sfx.ear.x + sfx.ear.fx * 15, z: sfx.ear.z + sfx.ear.fz * 15 };
+}
+
+/** The announcer names the round, a whistle and "Fight!" start it, and a long whistle, the crowd
+ *  and (at the end of a match) the announcer end it. */
+function roundSound(e) {
+  const r = net.latest?.r;
+  if (e.s === 'count') {
+    const decider = r?.win > 0 && r.score[0] === r.win - 1 && r.score[1] === r.win - 1;
+    sfx.say(decider ? 'final' : e.n <= 5 ? `round${e.n}` : 'ready', 0.3);
+  } else if (e.s === 'play') {
+    sfx.roundStart();
+  } else if (e.s === 'over') {
+    sfx.whistle(true);
+    if (e.m !== undefined) {
+      sfx.crowd('big');
+      sfx.say(myTeam === e.m ? 'win' : myTeam === 0 || myTeam === 1 ? 'lose' : 'over', 0.9);
+    } else if (e.w === -1) {
+      sfx.crowd('applause');
+      sfx.say('tie', 0.9);
+    } else sfx.crowd('cheer');
+  }
 }
 
 /** 1 right where you are, down to 0 at `range` metres (for shakes from things near you). */
@@ -907,7 +941,7 @@ function onEvent(e) {
     case 'throw':
       if (!mine) {
         world.man(e.p)?.playThrow();
-        sfx.throw(e.power, volumeFor(e.p) * 0.6);
+        sfx.throw(e.power, pos ?? somewhere());
       }
       break;
     case 'hit': {
@@ -933,12 +967,11 @@ function onEvent(e) {
         // e.bar: team health, it came off the team's bar (and a knockout takes the whole team down)
         const out = e.bar ? `YOUR TEAM IS OUT  −${e.dmg}` : `KNOCKED OUT  −${e.dmg}`;
         hud.popup(`${why}${e.ko ? out : `−${e.dmg} ${e.bar ? 'team health' : 'HP'}`}`, 'bad');
-        sfx.hit();
-        if (e.ko) sfx.ko();
+        sfx.hit(null, { mine: true, ko: e.ko, who: e.p });
       } else if (e.by === myId) {
         hud.popup(`${e.bank ? 'RICOCHET ' : ''}${e.ko ? (e.bar ? 'TEAM KNOCKOUT' : 'KNOCKOUT') : 'HIT'}  +${e.cash}`, 'good');
-        sfx.hit(0.8);
-      } else sfx.hit(volumeFor(e.p) * 0.5);
+        sfx.hit(pos ?? somewhere(), { ko: e.ko, mineThrew: true, who: e.p });
+      } else sfx.hit(pos ?? somewhere(), { ko: e.ko, who: e.p });
       const team = net.latest?.players.get(e.p)?.team ?? 0;
       const victim = e.ko && e.bar ? [`${TEAM[team]}, the whole team`, TEAM_CLASS[team]] : who(e.p);
       hud.feed([
@@ -950,7 +983,7 @@ function onEvent(e) {
     case 'heal':          // team health: someone spent cash on health for their team's bar
       hud.feed([who(e.p), [` bought +${e.hp} team health (${e.cost} cash)`]]);
       if (mine) hud.popup(`+${e.hp} TEAM HEALTH  −${e.cost} cash`, 'good');
-      if (mine || e.team === myTeam) sfx.revive();
+      if (mine || e.team === myTeam) sfx.heal();
       break;
     case 'sidestep':      // it missed: on my screen I had already stepped out of its way
       if (mine) hud.popup('SIDESTEPPED', 'dim');
@@ -959,7 +992,7 @@ function onEvent(e) {
       world.spark(e.x, e.y, e.z, 0xffffff, e.y < 0.5);
       world.burstOf(e.x, Math.max(e.y, 0.05), e.z, 0xfff2c0, 12, { speed: 5, up: e.y < 0.5 ? 0.8 : 0.3, life: 0.4 });
       camFx.shake(0.25 * nearMe(e, 10) ** 2);
-      sfx.ricochet(clamp(1 - Math.hypot(e.x - local.x, e.z - local.z) / 30, 0.2, 1));
+      sfx.bounce(e, e.y < 0.5);
       break;
     case 'catch':
       // Your own catches/deflects get the popup and gold flash; a ring at the camera would blind you.
@@ -972,7 +1005,7 @@ function onEvent(e) {
         hud.popup(`${e.perfect ? 'PERFECT CATCH' : 'CATCH'}  +${e.cash}`, e.perfect ? 'perfect' : 'good');
         if (e.perfect) hud.perfect();
       }
-      sfx.catch(e.perfect && mine, mine ? 1 : volumeFor(e.p) * 0.5);
+      sfx.catch(mine ? null : pos ?? somewhere(), e.perfect && mine);
       if (e.perfect || e.rally) hud.feed([who(e.p), [e.perfect ? ' perfectly caught ' : ' caught '], who(e.by), ["'s ball"]]);
       break;
     case 'deflect':
@@ -985,7 +1018,7 @@ function onEvent(e) {
         hud.popup(`${e.perfect ? 'PERFECT ' : ''}DEFLECT ×${e.rally}  +${e.cash}`, e.perfect ? 'perfect' : 'good');
         if (e.perfect) hud.perfect();
       }
-      sfx.deflect(e.rally, e.perfect && mine, mine ? 1 : volumeFor(e.p) * 0.6);
+      sfx.deflect(mine ? null : pos ?? somewhere(), e.rally, e.perfect && mine);
       if (e.rally >= 2) hud.feed([who(e.p), [` deflected: rally ×${e.rally}, ${e.speed} m/s`, 'gold']]);
       break;
     case 'dodge':
@@ -997,21 +1030,21 @@ function onEvent(e) {
       if (mine) {
         hud.popup(e.perfect ? `PERFECT DODGE  +${e.cash}` : 'DODGED', e.perfect ? 'perfect' : 'dim');
         if (e.perfect) hud.perfect();
-        sfx.dodge(e.perfect);
-      }
+        if (e.perfect) sfx.perfect(0.8);     // the dash itself sounded when you pressed
+      } else sfx.dash(pos ?? somewhere());   // someone else's dash took them out of a ball's way
       break;
     case 'revive':
       hud.feed([who(e.by), [' revived '], who(e.p)]);
       if (mine) hud.popup('REVIVED', 'good');
-      if (mine || e.by === myId) sfx.revive();
+      sfx.revive(myTeam < 0 || net.latest?.players.get(e.p)?.team === myTeam);   // everyone hears it: an entrance or a danger
       break;
     case 'deny':
       if (mine) denied(DENY[e.why] || 'Not now');
       break;
     case 'round':
+      roundSound(e);
       if (e.s === 'play') {
         hud.banner('FIGHT!', '', '', 900);
-        sfx.beep(true);
       } else if (e.s === 'over') {
         if (e.m !== undefined) hud.banner(`${TEAM[e.m]} WINS THE MATCH`, `Round ${e.n}`, TEAM_CLASS[e.m], 3800);
         else hud.banner(e.w === -1 ? 'DRAW' : `${TEAM[e.w]} WINS`, `Round ${e.n}`, e.w === -1 ? '' : TEAM_CLASS[e.w], 3500);
@@ -1093,6 +1126,7 @@ function updateHud(t) {
   } else lastCount = -1;
   hud.showScores(scoresHeld, players, myId);
   hud.setNet(`${Math.round(net.rtt)} ms · ${Math.round(fps)} fps · ${LEVEL_NAMES[graphics.level]}`);
+  sfx.setMusic(myId === null ? null : r.s === 'lobby' ? 'lobby' : r.s === 'play' ? 'duck' : 'match');
   const lobbyOn = r.s === 'lobby';
   const spectating = watching();
   hud.setWatching(spectating);
@@ -1280,6 +1314,11 @@ function drawFrame(tMs) {
   world.updateFx(dt, t);
   camFx.update(dt, me && me.alive && local.charging ? chargePower(t) : 0);
   camFx.apply(world.camera);      // after the aim and the threat: the picture moves, the aim doesn't
+  const m = world.camera.matrixWorld.elements;       // sounds come from where they happen, heard from the camera
+  const h = Math.hypot(m[8], m[10]) || 1;
+  sfx.setEar(m[12], m[14], -m[8] / h, -m[10] / h);
+  const maxStamina = me ? ownValue(me.name, 'MAX_STAMINA') : 0;     // out of breath under 35% stamina
+  sfx.breathe(me?.alive && !watching() && maxStamina ? clamp((0.35 - me.stamina / maxStamina) / 0.35, 0, 1) : 0);
   updateHud(t);
   shareHostView(t);
   world.render();
@@ -1289,7 +1328,7 @@ requestAnimationFrame(frame);
 
 // Handle for automated tests and console poking.
 window.dp = {
-  net, input, local, aim, world, lobby, editor, rules, diag, graphics, camFx, placeCamera, computeAim, showMenu, spec, followNext,
+  net, input, local, aim, world, lobby, editor, rules, diag, graphics, camFx, sfx, placeCamera, computeAim, showMenu, spec, followNext,
   exportSettings, importSetupText, settingsFile, ownValue, ballColorOf,
   get hostView() { return hostView; },
   get me() { return me; }, get threat() { return threat; }, get view() { return view; }, get cfg() { return cfg; }, get isHost() { return isHost; },

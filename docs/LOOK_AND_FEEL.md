@@ -52,11 +52,11 @@ The game should look and feel professionally made: juice and good art, both. We 
 | 1 | **Style samples:** two or three directions, rendered; the user picks | Done. Round 1: the sports hall (decisions 124–126). Round 2: the hall in vibrant colour and light, and athletes towards Fortnite-like humanoids; both versions, with and without the helmet, picked at random for each player (decisions 127–128) |
 | 2 | **Smooth and fair:** a graphics setting that scales itself down when the frame rate drops (D1); a warning when Chrome draws without the graphics card (D2); presses timed from the key event (B4); every effect prepared in the lobby; the host's tab on a lower setting by default | Done (decisions 129–130): Auto, High, Medium, Low; the warning; presses timed from the key; no shader built mid-match (3 before); the host's Auto at most Medium. Real laptops are measured in step 10 |
 | 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | Done (decision 131). The user: the zoom while charging a little more (now 7°), the rest good |
-| 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | To do |
+| 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | Built (decision 132). The user: the dodge redone, everything else good; added at their request: voices when hit, panting when tired, revive sounds, a lower match music (decision 133) |
 | 5 | **The arena:** floor, walls, stands and a crowd; lighting baked in Blender | To do |
 | 6 | **The ball and effects art** | To do |
 | 7 | **The characters:** the model in both versions, with the helmet and without it, one picked at random for each player who joins (decision 128); team colours; a lighter version for low settings | To do |
-| 8 | **Animation:** running from CC0 motion capture; throws, catches, deflects and dodges in code, fitted to the host's timings; knockouts by physics (ragdolls) | To do |
+| 8 | **Animation:** running from CC0 motion capture; throws, catches, deflects and dodges in code, fitted to the host's timings; knockouts by physics (ragdolls). The user's dodges (decision 134): a perfect dodge is a butterfly twist, a corkscrew or an aerial side flip, picked at random each time, with afterimages; a normal dodge is a ghost dash or an MMA fighter's dash footwork | To do |
 | 9 | **The HUD and menus** | To do |
 | 10 | **An office session:** the logs measure frame rates, freezes and the first download on real laptops | To do |
 | 11 | **The merge into `main`**, when the user says so. In the merge's conflicts, keep this branch's phase 15 and decision rows. Rewrite CLAUDE.md's opening section (about this branch) as plain notes for `main` | Not yet |
@@ -74,6 +74,14 @@ Step 2 comes before anything heavy, and steps 3 and 4 can follow right after ste
   "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --factory-startup --python art\<script>.py -- <options>
   ```
 
+- **The sounds** (decision 132): `art/sounds.py` downloads the CC0 recordings into `art/out/sound-sources/`, cuts and levels them, and writes `static/sounds/`. Run it from the repository's root:
+
+  ```text
+  uv run --no-project --with numpy --with soundfile --with py7zr python art/sounds.py
+  ```
+
+  - Claude can't hear: the cuts come from measurements and pictures (`--sheets`, with `--with matplotlib`, draws them into `art/out/sound-sheets/`).
+  - The user listens on the "Hear every sound" page (`/static/sounds.html`, linked under the volume sliders).
 - **The user's open Blender** (through the MCP, decision 121) is for looking: results are loaded there so the user can turn them around.
   - Scripts sent through the MCP run in safe mode: `bpy`, `bmesh`, `mathutils`, `math`, `random`, and no files, programs or network.
 - **Conventions:**
@@ -93,7 +101,7 @@ Step 2 comes before anything heavy, and steps 3 and 4 can follow right after ste
 These are starting targets, to be checked on an office laptop and adjusted:
 
 - 60 fps on the default setting on recent built-in graphics (Intel Iris Xe class), and the lowest setting for older laptops;
-- under about 30 MB for the whole first download (about 1 MB today);
+- under about 30 MB for the whole first download (about 1 MB before the sounds, about 4.2 MB with them: 1 MB of sounds and 2.2 MB of music);
 - a character: about 5,000–10,000 triangles, one or two materials, textures no bigger than 1024 px;
 - the arena: lighting baked into textures, with real-time shadows only for players and balls.
 
@@ -277,3 +285,16 @@ These are starting targets, to be checked on an office laptop and adjusted:
 - **2026-10-30:**
   - Step 3, juice (decision 131): an impact freeze on the hit player, specks, stretching and spinning balls with seams, camera shake, jolts and a charge zoom, and a Screen shake slider. None of it moves the aim, as the new `juice.json` test shows.
     - The user's verdict: the zoom while charging a little more (4.5° became 7°); the rest is good.
+  - Step 4, sound (decision 132): CC0 recordings in place of the synthesized sounds.
+    - **The sources:** BigSoundBank's real recordings (a ball, punches, slaps, whooshes, shoe squeaks, a whistle, a crowd), Kenney's announcer and interface sounds, and MintoDog's "Sunny City" for the music. Kenney's Impact Sounds pack was out of reach: kenney.nl refuses scripted downloads.
+    - **Chosen without hearing them:** from measurements and pictures of every recording; `art/sounds.py` cuts and levels them into one file.
+    - **In the game:** layered and varied, from the side they happen on and quieter far away, with the hall's echo; an announcer, a whistle and a crowd for the rounds; music in the lobby and in matches; a volume for each kind; a "Hear every sound" page.
+    - **A surprise:** Internet Download Manager on this PC grabbed the browser's requests for `.ogg` files, so the page got nothing. The files are named `.oga` instead.
+    - **Tested:** the new `sound.json` listens to the output; the juice, graphics, logs and smoke tests and the Python tests pass.
+    - The user's verdict: "dodge sound I think is bad; everything else, good". Built at their request (decision 133):
+      - the dodge as a whoosh and feet landing hard, played the moment you press (it used to wait for a dodged ball);
+      - grunts when hit and cries when knocked out, in four voices, one per player, and a body falling;
+      - panting when your stamina is low;
+      - revives everyone hears: an entrance for one team, a danger for the other;
+      - the match music lower (45% between rounds, 22% during play), and a Back button on the sound page.
+    - For step 8, the user's dodges (decision 134): perfect ones as a butterfly twist, corkscrew or aerial side flip at random, with afterimages; normal ones as a ghost dash or MMA dash footwork.

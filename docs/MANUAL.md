@@ -131,6 +131,21 @@ Each player picks their own in the menu (Esc), under **Your settings › Graphic
 - **The camera** shakes when you're hit (harder for a knockout) and when a ball ricochets near you. It jolts when you throw (harder throws kick more), catch or deflect, punches in on a perfect press and on your own hits, and zooms in a little while you charge a throw.
 - **Esc › Your settings › Screen shake** scales all of that camera motion; all the way left turns it off. It only moves the picture: your aim, the crosshair's target and the timing ring never move with it.
 
+## Sound
+
+- **Recorded sounds,** each with several takes and a little variation every time: a ball's thump and a body's smack on a hit, a slap on a catch, a crisp punch on a deflect (higher as the rally grows), and bounces off the floor and the walls.
+- **Your dodge** whooshes the moment you press it, and your feet land hard as the dash ends. You hear other players' dashes when they dodge a ball.
+- **Players have voices:** a grunt when hit, a cry and a fall when knocked out. Each player keeps one of four voices.
+- **You pant when you're out of breath** (under about a third of your stamina), harder the more tired you are.
+- **A revive is heard by everyone:** a grand entrance for that player's team, a sound of danger for the other team.
+- **From where they happen:** sounds come from their side and get quieter far away, with the echo of a sports hall. Your own throw landing stays loud wherever it lands.
+- **The rounds:** the announcer names the round, a whistle and "Fight!" start it, and a long whistle and the crowd end it. At the end of a match the announcer says "You win" or "You lose".
+- **Music:** one tune in the lobby, and a faster version in the background during a match, quieter still while a round is played.
+- **Esc › Your settings** has a volume for each kind: Volume (all of it), Music, Effects (including voices and breathing), Announcer, Interface (the incoming-ball tick, the countdown, the perfect chime and "not now") and Crowd. All the way left turns a kind off.
+- **Hear every sound** (the link under the sliders) opens a page that plays every moment of the game and every recording, with your volumes. "Back to the game" closes it.
+- **Only the focused tab or window makes sound,** so several test tabs on one computer don't all play at once.
+- **If you hear only simple beeps and tones,** the recordings didn't load. The game then uses its old synthesized sounds, and the session log notes it.
+
 ## Controls
 
 | Input | Action |
@@ -262,7 +277,7 @@ The tests cover:
 
 - Laptop/desktop only (keyboard and mouse), no touch controls yet.
 - Movement is trusted to each browser, within the court limits. That's fine for friends on a LAN, not for strangers on the internet.
-- No obstacles yet, and no sound files: the effects are synthesized.
+- No obstacles yet.
 - One catch holds one ball. Against two balls arriving together, dodge instead (you can't be hit during the dash).
 - Players' own settings go by name, so two people with the same name share them.
 - Uneven teams stay uneven: a team of 2 bots loses nearly every round to a team of 4, and team health with a fixed bar size hardly changes that (the bigger team throws twice as many balls).

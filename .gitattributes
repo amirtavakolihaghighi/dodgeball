@@ -12,6 +12,7 @@
 *.gif binary
 *.zip binary
 *.exe binary
+*.oga binary
 
 # Vendored libraries are kept byte-for-byte as published upstream.
 static/vendor/** -text

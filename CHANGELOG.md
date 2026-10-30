@@ -22,12 +22,22 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
   - Balls that stretch with speed and spin (they have seams now).
   - A camera that shakes and jolts on impacts and zooms in slightly while you charge.
 - **Screen shake** (Esc › Your settings) scales the camera motion, down to none. It never moves your aim.
+- **Recorded sounds** in place of the synthesized ones (all CC0; see `THIRD_PARTY_NOTICES.md`):
+  - hits, throws, catches, deflects and bounces, each with several takes, a little different every time, from the side they happen on and quieter far away, with the echo of a sports hall;
+  - a dodge that whooshes the moment you press it and lands hard as the dash ends;
+  - players' voices (a grunt when hit, a cry and a fall when knocked out; each player keeps one of four voices), and your panting when your stamina is low;
+  - revives everyone hears: an entrance for that player's team, a danger for the other;
+  - an announcer and a referee's whistle for the rounds, and a crowd that cheers or applauds at their end;
+  - music in the lobby, and lower in the background during a match.
+- **A volume for each kind of sound** (Esc › Your settings): Music, Effects, Announcer, Interface and Crowd, under the main Volume.
+- **A "Hear every sound" page**, linked under the sliders, that plays every moment of the game and every recording.
 
 ### Changed
 
 - **Presses are timed from the key itself,** not from when the page got round to them: a slow laptop no longer loses up to a frame (50 ms at 20 frames a second) on every dodge, catch, deflect and throw.
 - **Every effect is prepared while the game loads,** so none freezes the picture the first time it appears in a match. A rebuilt court (when the teams change size) no longer builds its shaders again either.
 - The log report notes automatic graphics changes, and presses the browser held for a while.
+- The incoming-ball tick is louder, so it stands out among the recorded sounds. The old synthesized sounds remain as a fallback, and the log report notes a browser whose recordings didn't load.
 
 ## [2.2.0] - 2026-10-29
 

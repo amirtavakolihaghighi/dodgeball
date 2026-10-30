@@ -9,6 +9,20 @@ to everyone behind it.
 | --- | --- | --- |
 | [three.js](https://threejs.org) r185 | `static/vendor/` | MIT. Copyright 2010-2026 Three.js Authors. The licence header is kept at the top of both files. |
 
+## Sounds and music
+
+All CC0 (public domain): no credit is required, but they deserve it. `art/sounds.py` downloads
+them, cuts and levels them, and writes what the game loads into `static/sounds/`.
+
+| Source | What the game uses it for | Licence |
+| --- | --- | --- |
+| [BigSoundBank](https://bigsoundbank.com) (LaSonotheque), recorded by Joseph Sardin: #1044 Ball kicked, #1045 Ball rebounds, #1825 and #1826 Ball against a wall, #0444 Punches, #2459–#2468 Punch #4–#13, #0597 Slaps, #1795–#1802 Whooshes, #0165 Man footsteps on the wooden floor, #1835 and #1836 Jumping on concrete, #1841 and #1842 Jumping on wooden pontoon, #2452–#2456 Body fall, #1103 Breathless man, #2339 and #2341 Bass tom, #2366 and #2367 Nepalese cymbal, #2520 and #2522 Horn, #1017 Plastic whistle, #0236 and #0237 Shouts and applause of teens, #2363 Applause, #0019 Applause: 150 people | Hits, throws, catches, deflects, bounces, the dodge's dash, knockouts, breathing when tired, revives, the referee's whistle and the crowd | CC0 |
+| qubodup: [15 vocal male strain/hurt/pain/jump sounds](https://opengameart.org/content/15-vocal-male-strainhurtpainjump-sounds) (OpenGameArt) | One of the players' four voices: grunts when hit, cries when knocked out | CC0 |
+| HaelDB: [Male Grunt/Yelling sounds](https://opengameart.org/content/male-gruntyelling-sounds) (OpenGameArt; offered under CC0 or OGA-BY 3.0, used under CC0) | Three of the players' four voices | CC0 |
+| [Kenney](https://kenney.nl): Voiceover Pack: Fighter | The announcer ("Round 1", "Fight!", "You win", ...) | CC0 |
+| [Kenney](https://kenney.nl): Interface Sounds | "Not now", reviving and buying team health | CC0 |
+| MintoDog: [Sunny City](https://opengameart.org/content/sunny-city) and its climax version (OpenGameArt) | The music in the lobby and in a match | CC0 |
+
 ## Installed when you run the game
 
 Installed by `pip install -r requirements.txt` (exact versions there), and bundled

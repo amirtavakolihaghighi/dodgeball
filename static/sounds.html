@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dodgeball: every sound</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23ffc940'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { overflow: auto; background: #10141f; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 60px; color: var(--text); font-size: 14px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 15px; margin: 26px 0 8px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .item { background: #171d2c; border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; }
+  .item b { display: block; margin-bottom: 4px; }
+  .item .src { color: var(--dim); font-size: 11.5px; line-height: 1.4; margin-top: 6px; }
+  .item button { margin: 2px 3px 2px 0; padding: 4px 9px; font-size: 12.5px; }
+  .levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 14px; max-width: 760px; }
+  .levels label { display: grid; gap: 3px; font-size: 13px; }
+  #state { color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <p><button id="backBtn" class="small">← Back to the game</button></p>
+  <h1>Every sound</h1>
+  <p class="note">Each button plays what the game plays at that moment, with the same volumes as your settings in the game.
+    Most sounds have several recordings and a little pitch change each time, so press a button a few times.
+    “From the left”, “From the right” and “Far away” show how a sound changes with where it happens.
+    <span id="state">Click any button to start the sound.</span></p>
+  <div class="levels" id="levels"></div>
+
+  <h2>Moments in the game</h2>
+  <div class="grid" id="moments"></div>
+
+  <h2>Music</h2>
+  <div class="grid" id="music"></div>
+
+  <h2>Each recording</h2>
+  <p class="note">Every recording, one button per variant, with where it comes from (all CC0).</p>
+  <div class="grid" id="sounds"></div>
+</main>
+<script type="module" src="/static/js/sound_check.js"></script>
+</body>
+</html>

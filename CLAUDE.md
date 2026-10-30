@@ -2,13 +2,14 @@
 
 **Read `docs/PROJECT.md` before changing anything.** It holds the full history, every design decision and who made it, the architecture, network protocol, rules and numbers, how to run, test and build, and known pitfalls.
 
-**This is the branch `look-and-feel`** (graphics, juice and sound; phase 15 and decisions 112–131 in `docs/PROJECT.md`). It's checked out in its own folder, `Dodgeball-look-and-feel`, next to the main folder `Dodgeball`. The main folder belongs to the user's other work (`main`, `internet-mode`): never switch its branch or edit there from this branch's sessions.
+**This is the branch `look-and-feel`** (graphics, juice and sound; phase 15 and decisions 112–134 in `docs/PROJECT.md`). It's checked out in its own folder, `Dodgeball-look-and-feel`, next to the main folder `Dodgeball`. The main folder belongs to the user's other work (`main`, `internet-mode`): never switch its branch or edit there from this branch's sessions.
 
 - **The working plan is `docs/LOOK_AND_FEEL.md`:** the plan with each step's status, the art conventions, the budgets, the style samples and the log. Update it after each step, and keep phase 15 in `docs/PROJECT.md` as the record.
 - **Making art:**
   - Scripts in `art/` build it in Blender, run in the background. From Bash in this worktree, the guard refuses a quoted path with spaces, so put Blender's folder on the PATH: `PATH="/c/Program Files/Blender Foundation/Blender 5.2:$PATH" blender.exe --background --factory-startup --python art/<script>.py -- <options>`.
   - Blender 5.2's pitfalls (black haze, mirrored lamp blobs, the slow crowd, the compositor, beams that won't show, hills that hide the sun, loading into the user's Blender) are in section 14 of `docs/PROJECT.md`.
   - Their output (renders and `.blend` files) goes to `art/out/`, which is git-ignored. What the game loads is exported as glTF into `static/`.
+- **Making sound:** `art/sounds.py` downloads the CC0 recordings into `art/out/sound-sources/`, cuts and levels them, and writes `static/sounds/` (run it with `uv run --no-project --with numpy --with soundfile --with py7zr python art/sounds.py`; `--sheets`, with `--with matplotlib`, draws each cut into `art/out/sound-sheets/`). Claude can't hear: choose from measurements and those pictures, and ask the user to listen on the "Hear every sound" page (`/static/sounds.html`). The files are `.oga`, because Internet Download Manager on this PC (and maybe players' PCs) empties Chrome's requests for `.ogg`, `.mp3`, `.wav` and `.zip`.
 - **The user's open Blender** is reached through the MCP tools `mcp__blender__*`:
   - `look` shows it, and `get_scene_info` describes it.
   - `execute_blender_code` runs in safe mode: `bpy`, `bmesh`, `mathutils`, `math` and `random` only, with no `os`, `open`, files or network; files go through bpy's own import, export and save.
@@ -59,6 +60,7 @@ Quick facts:
   - The lag study's fixes are settings under Network (advanced): view delay, press grace, sidestep compensation, the lockout scale. Defaults are in `config.py`.
   - Re-run the lobby tests after touching the lobby, rules or host code, `logs.json` after touching the logging, and `why_hit.json` after touching the hit marks or the hit popup.
   - Re-run `graphics.json` after touching `graphics.js`, the effects or `warmUp()` in `world.js`, or press timing (`input.js eventTime`), and `juice.json` after touching `juice.js`, where the camera is placed or the aim worked out, or the effects in `onEvent`.
+  - Re-run `sound.json` after touching `sfx.js`, the sound calls in `main.js`, or `static/sounds/`.
   - Re-run `team_health.json` after touching team health, `regen.json` after touching health regeneration or the lobby's round-time buttons, `still.json` after touching standing still (what counts as walking, the dodge's dash, the hint), and `own_settings.json` after touching players' own settings, the ball colours or the settings files (export/import).
   - Kill test servers by their process tree (the venv's `python.exe` is a launcher with the server as its child).
 - **Standalone Windows app:** `build_exe.bat` produces `dist\Dodgeball-windows.zip`, with `Allow friends to connect.bat` (the firewall helper) next to the exe. Rebuild to ship any change; releases are built by GitHub Actions.

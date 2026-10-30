@@ -174,6 +174,26 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\juice.js
 - **The impact freeze:** frozen right after, shuddering about 1.7 cm, over by 0.4 s, the figure back in place.
 - **A 25 s match** deflecting, dodging and catching every ball: the fastest balls stretch to the 30% cap, specks peak, and no shader is built mid-match.
 
+## Sound: what comes out
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\sound.json
+```
+
+`sound.json` (+ `sound.js`) taps the output after the limiter with an analyser on each channel. Claude can't hear, so this checks that sound really comes out; whether it sounds good is the user's call, on the "Hear every sound" page.
+
+- **The recordings load:** 43 sounds, 134 variants, decoded at 48 kHz; the six volume sliders exist.
+- **Every moment makes sound** (−4 to −23 dBFS at the default volumes), and it's silent afterwards. The music is turned off first, or the meter would hear it.
+- **The volumes:** the Announcer slider at 0 makes "Fight!" silent (−125 dB) while a hit still plays; the levels are saved.
+- **Sides:** a bounce 6 m to the left is 14 dB louder on the left channel, and one to the right on the right.
+- **A pile-up:** 300 bounces at once play as 2 (the same sound twice within 25 ms plays once), and at most 40 at once when forced, with no slower frames.
+- **Breathing:** tired for 1.5 s, the panting sounds; it stops by itself a few seconds after.
+- **The music:** the lobby track playing in the lobby; during play, the match track at 22%.
+- **A 25 s match with bots and the auto-defender** (`graphics.js`): the announcer, the whistle, throws, hits with grunts, bounces, catches and your own dashes all play.
+- **The sound check page** (`/static/sounds.html`) loads and lists all 43 recordings.
+
+On this PC, Internet Download Manager gives Chrome an empty answer for `.ogg` files (and `.mp3`, `.wav`, `.zip`, ...), even headless and with extensions off. That's why the sounds are `.oga`. If the test reports `EncodingError: Unable to decode audio data`, look for that first.
+
 ## The session logs
 
 `--fresh` turns logging off, so give the test server a log folder (`tests\browser\out\` is git-ignored):

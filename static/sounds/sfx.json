@@ -1,0 +1,849 @@
+{
+ "rate": 48000,
+ "sounds": {
+  "throw": [
+   [
+    0.08,
+    0.39963
+   ],
+   [
+    0.55963,
+    0.39969
+   ],
+   [
+    1.03931,
+    0.30669
+   ],
+   [
+    1.426,
+    0.27258
+   ],
+   [
+    1.77858,
+    0.3065
+   ],
+   [
+    2.16508,
+    0.39773
+   ],
+   [
+    2.64281,
+    0.39769
+   ],
+   [
+    3.1205,
+    0.25725
+   ]
+  ],
+  "hit.thump": [
+   [
+    3.45775,
+    0.0936
+   ],
+   [
+    3.63135,
+    0.0969
+   ],
+   [
+    3.80825,
+    0.08023
+   ],
+   [
+    3.96848,
+    0.09994
+   ],
+   [
+    4.14842,
+    0.10923
+   ]
+  ],
+  "hit.body": [
+   [
+    4.33765,
+    0.16775
+   ],
+   [
+    4.5854,
+    0.19069
+   ],
+   [
+    4.85608,
+    0.17715
+   ],
+   [
+    5.11323,
+    0.21448
+   ],
+   [
+    5.40771,
+    0.18181
+   ],
+   [
+    5.66952,
+    0.20596
+   ],
+   [
+    5.95548,
+    0.22725
+   ],
+   [
+    6.26273,
+    0.19221
+   ],
+   [
+    6.53494,
+    0.1844
+   ]
+  ],
+  "deflect": [
+   [
+    6.79933,
+    0.22
+   ],
+   [
+    7.09933,
+    0.22
+   ],
+   [
+    7.39933,
+    0.22
+   ],
+   [
+    7.69933,
+    0.22
+   ],
+   [
+    7.99933,
+    0.22
+   ],
+   [
+    8.29933,
+    0.22
+   ],
+   [
+    8.59933,
+    0.22
+   ],
+   [
+    8.89933,
+    0.22
+   ],
+   [
+    9.19933,
+    0.21994
+   ],
+   [
+    9.49927,
+    0.21996
+   ]
+  ],
+  "catch": [
+   [
+    9.79923,
+    0.15385
+   ],
+   [
+    10.03308,
+    0.13723
+   ],
+   [
+    10.25031,
+    0.14235
+   ],
+   [
+    10.47267,
+    0.12294
+   ],
+   [
+    10.6756,
+    0.1411
+   ],
+   [
+    10.89671,
+    0.15367
+   ],
+   [
+    11.13038,
+    0.14779
+   ],
+   [
+    11.35817,
+    0.1354
+   ],
+   [
+    11.57356,
+    0.13469
+   ],
+   [
+    11.78825,
+    0.16
+   ],
+   [
+    12.02825,
+    0.15894
+   ],
+   [
+    12.26719,
+    0.1499
+   ],
+   [
+    12.49708,
+    0.14852
+   ]
+  ],
+  "bounce.floor": [
+   [
+    12.7256,
+    0.06946
+   ],
+   [
+    12.87506,
+    0.03815
+   ],
+   [
+    12.99321,
+    0.06779
+   ],
+   [
+    13.141,
+    0.02958
+   ],
+   [
+    13.25058,
+    0.07233
+   ],
+   [
+    13.40292,
+    0.0334
+   ]
+  ],
+  "bounce.wall": [
+   [
+    13.51631,
+    0.177
+   ],
+   [
+    13.77331,
+    0.15369
+   ]
+  ],
+  "dash.whoosh": [
+   [
+    14.007,
+    0.29992
+   ],
+   [
+    14.38692,
+    0.3
+   ],
+   [
+    14.76692,
+    0.3
+   ],
+   [
+    15.14692,
+    0.29975
+   ]
+  ],
+  "dash.push": [
+   [
+    15.52667,
+    0.2
+   ],
+   [
+    15.80667,
+    0.2
+   ],
+   [
+    16.08667,
+    0.2
+   ],
+   [
+    16.36667,
+    0.19996
+   ],
+   [
+    16.64663,
+    0.2
+   ]
+  ],
+  "dash.land": [
+   [
+    16.92663,
+    0.13792
+   ],
+   [
+    17.14454,
+    0.20167
+   ],
+   [
+    17.42621,
+    0.21267
+   ],
+   [
+    17.71888,
+    0.22812
+   ]
+  ],
+  "hurt.0": [
+   [
+    18.027,
+    0.41481
+   ],
+   [
+    18.52181,
+    0.45
+   ],
+   [
+    19.05181,
+    0.44019
+   ],
+   [
+    19.572,
+    0.37042
+   ],
+   [
+    20.02242,
+    0.30012
+   ],
+   [
+    20.40254,
+    0.44477
+   ]
+  ],
+  "ko.0": [
+   [
+    20.92731,
+    0.63277
+   ],
+   [
+    21.64008,
+    0.69679
+   ],
+   [
+    22.41688,
+    0.71535
+   ]
+  ],
+  "hurt.1": [
+   [
+    23.21223,
+    0.45
+   ],
+   [
+    23.74223,
+    0.44996
+   ],
+   [
+    24.27219,
+    0.45
+   ],
+   [
+    24.80219,
+    0.38
+   ],
+   [
+    25.26219,
+    0.44998
+   ]
+  ],
+  "ko.1": [
+   [
+    25.79217,
+    1.74594
+   ],
+   [
+    27.6181,
+    1.26385
+   ],
+   [
+    28.96196,
+    1.1931
+   ]
+  ],
+  "hurt.2": [
+   [
+    30.23506,
+    0.44106
+   ],
+   [
+    30.75613,
+    0.45
+   ],
+   [
+    31.28612,
+    0.23385
+   ],
+   [
+    31.59998,
+    0.35327
+   ],
+   [
+    32.03325,
+    0.45
+   ]
+  ],
+  "ko.2": [
+   [
+    32.56325,
+    1.09225
+   ],
+   [
+    33.7355,
+    1.01877
+   ],
+   [
+    34.83427,
+    1.07983
+   ]
+  ],
+  "hurt.3": [
+   [
+    35.9941,
+    0.45
+   ],
+   [
+    36.5241,
+    0.45
+   ],
+   [
+    37.0541,
+    0.45
+   ]
+  ],
+  "ko.3": [
+   [
+    37.5841,
+    1.06483
+   ],
+   [
+    38.72894,
+    1.01575
+   ],
+   [
+    39.82469,
+    0.6641
+   ]
+  ],
+  "bodyfall": [
+   [
+    40.56879,
+    0.7
+   ],
+   [
+    41.34879,
+    0.69927
+   ],
+   [
+    42.12806,
+    0.7
+   ],
+   [
+    42.90806,
+    0.6999
+   ],
+   [
+    43.68796,
+    0.69983
+   ]
+  ],
+  "breath": [
+   [
+    44.46779,
+    8.46
+   ]
+  ],
+  "revive.boom": [
+   [
+    53.00779,
+    1.59352
+   ],
+   [
+    54.68131,
+    1.6
+   ]
+  ],
+  "revive.shine": [
+   [
+    56.36131,
+    2.5
+   ],
+   [
+    58.94131,
+    2.49996
+   ]
+  ],
+  "revive.horn": [
+   [
+    61.52127,
+    1.4
+   ],
+   [
+    63.00127,
+    1.4
+   ]
+  ],
+  "whistle.short": [
+   [
+    64.48127,
+    0.32558
+   ],
+   [
+    64.88685,
+    0.21896
+   ],
+   [
+    65.18581,
+    0.19452
+   ]
+  ],
+  "whistle.long": [
+   [
+    65.46033,
+    0.80494
+   ],
+   [
+    66.34527,
+    0.7914
+   ],
+   [
+    67.21667,
+    0.9881
+   ]
+  ],
+  "voice.round1": [
+   [
+    68.28477,
+    1.29438
+   ]
+  ],
+  "voice.round2": [
+   [
+    69.65915,
+    1.38275
+   ]
+  ],
+  "voice.round3": [
+   [
+    71.1219,
+    1.3565
+   ]
+  ],
+  "voice.round4": [
+   [
+    72.5584,
+    1.6104
+   ]
+  ],
+  "voice.round5": [
+   [
+    74.24879,
+    1.58473
+   ]
+  ],
+  "voice.final": [
+   [
+    75.91352,
+    1.61129
+   ]
+  ],
+  "voice.ready": [
+   [
+    77.60481,
+    0.98106
+   ]
+  ],
+  "voice.fight": [
+   [
+    78.66587,
+    0.81756
+   ]
+  ],
+  "voice.win": [
+   [
+    79.56344,
+    1.17867
+   ]
+  ],
+  "voice.lose": [
+   [
+    80.8221,
+    1.32633
+   ]
+  ],
+  "voice.tie": [
+   [
+    82.22844,
+    1.29504
+   ]
+  ],
+  "voice.over": [
+   [
+    83.60348,
+    1.70456
+   ]
+  ],
+  "crowd.cheer": [
+   [
+    85.38804,
+    3.64273
+   ],
+   [
+    89.11077,
+    4.0
+   ]
+  ],
+  "crowd.applause": [
+   [
+    93.19077,
+    4.5
+   ]
+  ],
+  "crowd.big": [
+   [
+    97.77077,
+    7.503
+   ]
+  ],
+  "ui.deny": [
+   [
+    105.35377,
+    0.24254
+   ]
+  ],
+  "ui.revive": [
+   [
+    105.67631,
+    0.48506
+   ]
+  ],
+  "ui.heal": [
+   [
+    106.24138,
+    0.28771
+   ]
+  ]
+ },
+ "from": {
+  "throw": [
+   "BigSoundBank #1795, Whoosh #3 (Joseph Sardin, CC0)",
+   "BigSoundBank #1796, Whoosh #4 (Joseph Sardin, CC0)",
+   "BigSoundBank #1797, Whoosh #5 (Joseph Sardin, CC0)",
+   "BigSoundBank #1798, Whoosh #10 (Joseph Sardin, CC0)",
+   "BigSoundBank #1799, Whoosh #6 (Joseph Sardin, CC0)",
+   "BigSoundBank #1800, Whoosh #7 (Joseph Sardin, CC0)",
+   "BigSoundBank #1801, Whoosh #8 (Joseph Sardin, CC0)",
+   "BigSoundBank #1802, Whoosh #9 (Joseph Sardin, CC0)"
+  ],
+  "hit.thump": [
+   "BigSoundBank #1044, Ball kicked (Joseph Sardin, CC0)",
+   "BigSoundBank #1044, Ball kicked (Joseph Sardin, CC0)",
+   "BigSoundBank #1044, Ball kicked (Joseph Sardin, CC0)",
+   "BigSoundBank #1044, Ball kicked (Joseph Sardin, CC0)",
+   "BigSoundBank #1044, Ball kicked (Joseph Sardin, CC0)"
+  ],
+  "hit.body": [
+   "BigSoundBank #0444, Punches (Joseph Sardin, CC0)",
+   "BigSoundBank #0444, Punches (Joseph Sardin, CC0)",
+   "BigSoundBank #0444, Punches (Joseph Sardin, CC0)",
+   "BigSoundBank #0444, Punches (Joseph Sardin, CC0)",
+   "BigSoundBank #0444, Punches (Joseph Sardin, CC0)",
+   "BigSoundBank #0444, Punches (Joseph Sardin, CC0)",
+   "BigSoundBank #0444, Punches (Joseph Sardin, CC0)",
+   "BigSoundBank #0444, Punches (Joseph Sardin, CC0)",
+   "BigSoundBank #0444, Punches (Joseph Sardin, CC0)"
+  ],
+  "deflect": [
+   "BigSoundBank #2459, Punch #4 (Joseph Sardin, CC0)",
+   "BigSoundBank #2460, Punch #5 (Joseph Sardin, CC0)",
+   "BigSoundBank #2461, Punch #6 (Joseph Sardin, CC0)",
+   "BigSoundBank #2462, Punch #7 (Joseph Sardin, CC0)",
+   "BigSoundBank #2463, Punch #8 (Joseph Sardin, CC0)",
+   "BigSoundBank #2464, Punch #9 (Joseph Sardin, CC0)",
+   "BigSoundBank #2465, Punch #10 (Joseph Sardin, CC0)",
+   "BigSoundBank #2466, Punch #11 (Joseph Sardin, CC0)",
+   "BigSoundBank #2467, Punch #12 (Joseph Sardin, CC0)",
+   "BigSoundBank #2468, Punch #13 (Joseph Sardin, CC0)"
+  ],
+  "catch": [
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)",
+   "BigSoundBank #0597, Slaps (Joseph Sardin, CC0)"
+  ],
+  "bounce.floor": [
+   "BigSoundBank #1045, Ball rebounds (Joseph Sardin, CC0)",
+   "BigSoundBank #1045, Ball rebounds (Joseph Sardin, CC0)",
+   "BigSoundBank #1045, Ball rebounds (Joseph Sardin, CC0)",
+   "BigSoundBank #1045, Ball rebounds (Joseph Sardin, CC0)",
+   "BigSoundBank #1045, Ball rebounds (Joseph Sardin, CC0)",
+   "BigSoundBank #1045, Ball rebounds (Joseph Sardin, CC0)"
+  ],
+  "bounce.wall": [
+   "BigSoundBank #1825, Ball against a wall #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #1826, Ball against a wall #2 (Joseph Sardin, CC0)"
+  ],
+  "dash.whoosh": [
+   "BigSoundBank #1795, Whoosh #3 (Joseph Sardin, CC0)",
+   "BigSoundBank #1796, Whoosh #4 (Joseph Sardin, CC0)",
+   "BigSoundBank #1800, Whoosh #7 (Joseph Sardin, CC0)",
+   "BigSoundBank #1801, Whoosh #8 (Joseph Sardin, CC0)"
+  ],
+  "dash.push": [
+   "BigSoundBank #0165, Man footsteps on the wooden floor (Joseph Sardin, CC0)",
+   "BigSoundBank #0165, Man footsteps on the wooden floor (Joseph Sardin, CC0)",
+   "BigSoundBank #0165, Man footsteps on the wooden floor (Joseph Sardin, CC0)",
+   "BigSoundBank #0165, Man footsteps on the wooden floor (Joseph Sardin, CC0)",
+   "BigSoundBank #0165, Man footsteps on the wooden floor (Joseph Sardin, CC0)"
+  ],
+  "dash.land": [
+   "BigSoundBank #1835, Jumping on concrete #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #1836, Jumping on concrete #2 (Joseph Sardin, CC0)",
+   "BigSoundBank #1841, Jumping on wooden pontoon #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #1842, Jumping on wooden pontoon #2 (Joseph Sardin, CC0)"
+  ],
+  "hurt.0": [
+   "qubodup, 15 vocal male strain/hurt/pain/jump sounds: slightscream-01.flac (OpenGameArt, CC0)",
+   "qubodup, 15 vocal male strain/hurt/pain/jump sounds: slightscream-03.flac (OpenGameArt, CC0)",
+   "qubodup, 15 vocal male strain/hurt/pain/jump sounds: slightscream-06.flac (OpenGameArt, CC0)",
+   "qubodup, 15 vocal male strain/hurt/pain/jump sounds: slightscream-08.flac (OpenGameArt, CC0)",
+   "qubodup, 15 vocal male strain/hurt/pain/jump sounds: slightscream-11.flac (OpenGameArt, CC0)",
+   "qubodup, 15 vocal male strain/hurt/pain/jump sounds: slightscream-14.flac (OpenGameArt, CC0)"
+  ],
+  "ko.0": [
+   "qubodup, 15 vocal male strain/hurt/pain/jump sounds: slightscream-05.flac (OpenGameArt, CC0)",
+   "qubodup, 15 vocal male strain/hurt/pain/jump sounds: slightscream-10.flac (OpenGameArt, CC0)",
+   "qubodup, 15 vocal male strain/hurt/pain/jump sounds: slightscream-15.flac (OpenGameArt, CC0)"
+  ],
+  "hurt.1": [
+   "HaelDB, Male Grunt/Yelling sounds: 1yell6.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 1yell7.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 1yell8.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 1yell14.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 1yell15.wav (OpenGameArt, CC0)"
+  ],
+  "ko.1": [
+   "HaelDB, Male Grunt/Yelling sounds: 1yell3.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 1yell11.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 1yell12.wav (OpenGameArt, CC0)"
+  ],
+  "hurt.2": [
+   "HaelDB, Male Grunt/Yelling sounds: 3grunt1.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 3grunt3.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 3grunt4.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 3grunt5.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 3yell4.wav (OpenGameArt, CC0)"
+  ],
+  "ko.2": [
+   "HaelDB, Male Grunt/Yelling sounds: 3grunt6.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 3yell11.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: 3yell14.wav (OpenGameArt, CC0)"
+  ],
+  "hurt.3": [
+   "HaelDB, Male Grunt/Yelling sounds: yell7.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: yell12.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: yell13.wav (OpenGameArt, CC0)"
+  ],
+  "ko.3": [
+   "HaelDB, Male Grunt/Yelling sounds: yell3.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: yell4.wav (OpenGameArt, CC0)",
+   "HaelDB, Male Grunt/Yelling sounds: yell6.wav (OpenGameArt, CC0)"
+  ],
+  "bodyfall": [
+   "BigSoundBank #2452, Body fall #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #2453, Body fall #2 (Joseph Sardin, CC0)",
+   "BigSoundBank #2454, Body fall #3 (Joseph Sardin, CC0)",
+   "BigSoundBank #2455, Body fall #4 (Joseph Sardin, CC0)",
+   "BigSoundBank #2456, Body fall #5 (Joseph Sardin, CC0)"
+  ],
+  "breath": [
+   "BigSoundBank #1103, Breathless man (Joseph Sardin, CC0)"
+  ],
+  "revive.boom": [
+   "BigSoundBank #2339, Bass tom #2 (Joseph Sardin, CC0)",
+   "BigSoundBank #2341, Bass tom #4 (Joseph Sardin, CC0)"
+  ],
+  "revive.shine": [
+   "BigSoundBank #2366, Nepalese cymbal #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #2367, Nepalese cymbal #2 (Joseph Sardin, CC0)"
+  ],
+  "revive.horn": [
+   "BigSoundBank #2520, Horn #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #2522, Horn #3 (Joseph Sardin, CC0)"
+  ],
+  "whistle.short": [
+   "BigSoundBank #1017, Plastic whistle #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #1017, Plastic whistle #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #1017, Plastic whistle #1 (Joseph Sardin, CC0)"
+  ],
+  "whistle.long": [
+   "BigSoundBank #1017, Plastic whistle #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #1017, Plastic whistle #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #1017, Plastic whistle #1 (Joseph Sardin, CC0)"
+  ],
+  "voice.round1": [
+   "Kenney, Voiceover Pack: Fighter: round_1.ogg (CC0)"
+  ],
+  "voice.round2": [
+   "Kenney, Voiceover Pack: Fighter: round_2.ogg (CC0)"
+  ],
+  "voice.round3": [
+   "Kenney, Voiceover Pack: Fighter: round_3.ogg (CC0)"
+  ],
+  "voice.round4": [
+   "Kenney, Voiceover Pack: Fighter: round_4.ogg (CC0)"
+  ],
+  "voice.round5": [
+   "Kenney, Voiceover Pack: Fighter: round_5.ogg (CC0)"
+  ],
+  "voice.final": [
+   "Kenney, Voiceover Pack: Fighter: final_round.ogg (CC0)"
+  ],
+  "voice.ready": [
+   "Kenney, Voiceover Pack: Fighter: ready.ogg (CC0)"
+  ],
+  "voice.fight": [
+   "Kenney, Voiceover Pack: Fighter: fight.ogg (CC0)"
+  ],
+  "voice.win": [
+   "Kenney, Voiceover Pack: Fighter: you_win.ogg (CC0)"
+  ],
+  "voice.lose": [
+   "Kenney, Voiceover Pack: Fighter: you_lose.ogg (CC0)"
+  ],
+  "voice.tie": [
+   "Kenney, Voiceover Pack: Fighter: it's_a_tie.ogg (CC0)"
+  ],
+  "voice.over": [
+   "Kenney, Voiceover Pack: Fighter: game_over.ogg (CC0)"
+  ],
+  "crowd.cheer": [
+   "BigSoundBank #0236, Shouts and applause of teens #1 (Joseph Sardin, CC0)",
+   "BigSoundBank #0237, Shouts and applause of teens #2 (Joseph Sardin, CC0)"
+  ],
+  "crowd.applause": [
+   "BigSoundBank #2363, Applause #1 (Joseph Sardin, CC0)"
+  ],
+  "crowd.big": [
+   "BigSoundBank #0019, Applause: 150 people (Joseph Sardin, CC0)"
+  ],
+  "ui.deny": [
+   "Kenney, Interface Sounds: error_006.ogg (CC0)"
+  ],
+  "ui.revive": [
+   "Kenney, Interface Sounds: confirmation_004.ogg (CC0)"
+  ],
+  "ui.heal": [
+   "Kenney, Interface Sounds: confirmation_001.ogg (CC0)"
+  ]
+ }
+}

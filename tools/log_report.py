@@ -137,6 +137,8 @@ class Player:
         # The graphics setting (graphics.js): what they chose, and Auto's own changes, with why.
         self.gfx_choice = self.env.get("graphics")
         self.gfx_auto = [r for r in records if r.get("ty") == "gfx" and r.get("why")]
+        # The recorded sounds (sfx.js): why they didn't load, if they didn't.
+        self.sound_error = next((r.get("error") for r in records if r.get("ty") == "sound" and r.get("error")), None)
         # How long the browser held each press before the game's code saw it (ms): a busy page.
         self.held = [r["held"] for r in records if r.get("ty") == "press" and r.get("held") is not None]
         self.late_presses = []      # filled from the server log
@@ -434,6 +436,9 @@ def verdicts(p):
         out.append(f"Auto graphics went from {str(r.get('from')).capitalize()} to {str(r.get('to')).capitalize()}: {r.get('why')}.")
     if len(p.gfx_auto) > 3:
         out.append(f"...and {len(p.gfx_auto) - 3} more automatic graphics change(s).")
+    if p.sound_error:
+        out.append(f"the recorded sounds didn't load ({p.sound_error}), so they heard the simple synthesized ones."
+                   " A download manager in the browser (such as IDM) can do this.")
     held = pct(p.held, 0.95)
     if held is not None and held >= 30:
         out.append(f"the browser held their presses up to {held:.0f} ms (p95) before the game saw them: a busy page."

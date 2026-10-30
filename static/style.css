@@ -72,6 +72,9 @@ button.danger:hover { background: rgba(255, 90, 90, 0.18); }
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
 .menu label { display: grid; gap: 4px; margin: 8px 0; font-size: 14px; }
 .menu label.check { display: flex; align-items: center; gap: 8px; }
+.soundMix { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.soundMix label { margin: 4px 0; font-size: 13px; }
+.note a { color: var(--gold); }
 .menu select, .rules select { font: inherit; background: #1b2235; color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 5px; }
 .menu .row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 9px 0; flex-wrap: wrap; }
 .menu .row b { min-width: 18px; text-align: center; }
