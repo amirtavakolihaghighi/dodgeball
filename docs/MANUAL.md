@@ -102,6 +102,14 @@ To read a session: `python tools\log_report.py <the zip or a session folder>`. I
 - the numbers just before every L;
 - when Auto graphics changed a player's level and why, and players whose browser held their key presses for a while (a busy computer).
 
+## The hall
+
+- **You play in a sports hall** with tall windows, a low golden sun and a crowd in the stands. Its sunlight was worked out once, in advance, so drawing it costs laptops very little.
+- **The court is painted on the hall's wooden floor**, in the team colours, and the hall stays the same whatever the court's size. A court too big for it (the host's settings) makes the whole hall bigger.
+- **The crowd** sways, and jumps when a round ends or someone is knocked out.
+- **Walls never hide you:** back up to your end wall, or stand at a side and turn, and the camera ends up behind a wall or in the stands. They then fade until you can see through them, with a faint outline showing where the wall is, and come back when you step away.
+- **Until the hall has loaded** (a second or two), or if it can't load, the game draws the plain dark court of before.
+
 ## Graphics
 
 Each player picks their own in the menu (Esc), under **Your settings › Graphics**:
@@ -111,7 +119,7 @@ Each player picks their own in the menu (Esc), under **Your settings › Graphic
 | **Auto** (the default) | Starts at High and lowers itself when the game gets choppy |
 | **High** | The sharpest picture and every effect |
 | **Medium** | A softer picture (3/4 of the sharpness) and every effect |
-| **Low** | A soft picture (half the sharpness) and fewer decorative effects: no afterimages after a perfect dodge, half as many behind deflected balls |
+| **Low** | A soft picture (half the sharpness) and fewer decorative effects: no afterimages after a perfect dodge, half as many behind deflected balls, a third of the crowd (standing still), no shafts of sunlight |
 
 - **Auto** steps down a level when the frame rate stays under 45 a second for 3 seconds.
   - A step that doesn't help is undone, and Auto then leaves things alone: the game is held back by something else, like battery saver or a busy computer, and a softer picture wouldn't help.

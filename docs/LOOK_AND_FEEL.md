@@ -53,7 +53,7 @@ The game should look and feel professionally made: juice and good art, both. We 
 | 2 | **Smooth and fair:** a graphics setting that scales itself down when the frame rate drops (D1); a warning when Chrome draws without the graphics card (D2); presses timed from the key event (B4); every effect prepared in the lobby; the host's tab on a lower setting by default | Done (decisions 129–130): Auto, High, Medium, Low; the warning; presses timed from the key; no shader built mid-match (3 before); the host's Auto at most Medium. Real laptops are measured in step 10 |
 | 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | Done (decision 131). The user: the zoom while charging a little more (now 7°), the rest good |
 | 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | Done (decision 132). The user: the dodge redone, everything else good; added at their request: voices when hit, panting when tired, revive sounds, a lower match music (decision 133); the incoming ball's whoosh (decision 135) |
-| 5 | **The arena:** floor, walls, stands and a crowd; lighting baked in Blender | To do |
+| 5 | **The arena:** floor, walls, stands and a crowd; lighting baked in Blender | Built (decision 136): the round 2 hall with its light baked, the court painted on its floor, stands and a crowd, the sun's shafts. The user: good; walls and stands behind the camera now turn see-through (decision 137) |
 | 6 | **The ball and effects art** | To do |
 | 7 | **The characters:** the model in both versions, with the helmet and without it, one picked at random for each player who joins (decision 128); team colours; a lighter version for low settings | To do |
 | 8 | **Animation:** running from CC0 motion capture; throws, catches, deflects and dodges in code, fitted to the host's timings; knockouts by physics (ragdolls). The user's dodges (decision 134): a perfect dodge is a butterfly twist, a corkscrew or an aerial side flip, picked at random each time, with afterimages; a normal dodge is a ghost dash or an MMA fighter's dash footwork | To do |
@@ -82,6 +82,7 @@ Step 2 comes before anything heavy, and steps 3 and 4 can follow right after ste
 
   - Claude can't hear: the cuts come from measurements and pictures (`--sheets`, with `--with matplotlib`, draws them into `art/out/sound-sheets/`).
   - The user listens on the "Hear every sound" page (`/static/sounds.html`, linked under the volume sliders).
+- **The arena** (decision 136): `art/arena.py` builds the hall, bakes its light with Cycles on the graphics card and writes `static/arena/` (about 3½ minutes; `--quick` in 10 seconds, small and noisy, to check the look).
 - **The user's open Blender** (through the MCP, decision 121) is for looking: results are loaded there so the user can turn them around.
   - Scripts sent through the MCP run in safe mode: `bpy`, `bmesh`, `mathutils`, `math`, `random`, and no files, programs or network.
 - **Conventions:**
@@ -101,7 +102,7 @@ Step 2 comes before anything heavy, and steps 3 and 4 can follow right after ste
 These are starting targets, to be checked on an office laptop and adjusted:
 
 - 60 fps on the default setting on recent built-in graphics (Intel Iris Xe class), and the lowest setting for older laptops;
-- under about 30 MB for the whole first download (about 1 MB before the sounds, about 4.2 MB with them: 1 MB of sounds and 2.2 MB of music);
+- under about 30 MB for the whole first download (about 1 MB before the sounds; about 6 MB now: 1 MB of sounds, 2.2 MB of music, 1.8 MB for the hall);
 - a character: about 5,000–10,000 triangles, one or two materials, textures no bigger than 1024 px;
 - the arena: lighting baked into textures, with real-time shadows only for players and balls.
 
@@ -300,3 +301,9 @@ These are starting targets, to be checked on an office laptop and adjusted:
     - The incoming-ball tick, which the user hadn't noticed, became a setting: by default a whoosh from the ball's side, loudest as it arrives; or a louder tick; or off (decision 135).
     - Committed after the user's "tested, everything is good".
     - For step 8, the user's dodges (decision 134): perfect ones as a butterfly twist, corkscrew or aerial side flip at random, with afterimages; normal ones as a ghost dash or MMA dash footwork.
+  - Step 5, the arena (decision 136): the round 2 hall in the game.
+    - `art/arena.py` builds it in Blender, bakes its sunlight, sky and bounce light into lightmaps (Cycles on the graphics card, about 3½ minutes) and renders the outside as the background.
+    - The game paints the court on the hall's wooden floor under the baked light, and makes the court's walls, the stands, a crowd that cheers, and the sun's shafts.
+    - Fixed along the way: the leaves crowding the walls out of one lightmap (they got their own); shafts so bright they washed out the far end (a third as strong now); thin rails on the glass that read as wires (gone); a cheaper crowd that looked faceted (round again; Low draws a third of it).
+    - About 6 MB to download in all now. Headless Chrome draws Low at about 30 frames a second instead of 50: real laptops are measured in step 10.
+    - The user: "it was good", but backing up to the end wall hid their own character behind it. Now a wall between the camera and the court turns see-through with a faint outline (decision 137); the side boards and the stands too, for when the camera ends up in them.

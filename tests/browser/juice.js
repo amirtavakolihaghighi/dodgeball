@@ -33,6 +33,36 @@
     });
   };
 
+  /** Backing into your end wall puts the camera behind it: the wall turns see-through, with its
+   *  outline showing, and comes back when you step away. The same at a side, where the camera
+   *  ends up in the stands. */
+  window.__seeThrough = async () => {
+    const w = dp.world;
+    if (!w.arena) return JSON.stringify({ skipped: 'no hall (noarena)' });
+    const [L, W] = w.courtSize;
+    const team = dp.me.team === 1 ? 1 : 0;
+    const s = team === 1 ? 1 : -1;                       // red's end is at -L, blue's at +L
+    const end = w.wallMats.end[team];
+    const outline = w.wallMats.edge[team];
+    const place = async (x, z, yaw) => {
+      dp.local.x = x;
+      dp.local.z = z;
+      dp.local.yaw = yaw;
+      await wait(900);
+    };
+    const facing = s > 0 ? -Math.PI / 2 : Math.PI / 2;  // towards the middle
+    await place(s * (L - 0.5), 0, facing);
+    const back = { wall: +end.opacity.toFixed(2), outline: +outline.opacity.toFixed(2), cameraX: +w.camera.position.x.toFixed(1) };
+    await place(s * L / 2, 0, facing);
+    const middle = { wall: +end.opacity.toFixed(2), outline: +outline.opacity.toFixed(2) };
+    await place(s * L / 2, -(W - 0.5), 0);                // at the -z side, facing across the court
+    const side = { boards: +w.wallMats.side[0][0].opacity.toFixed(2), stands: +w.standMats.step[0].opacity.toFixed(2),
+      crowd: +w.standMats.body[0].opacity.toFixed(2), otherSide: +w.standMats.step[1].opacity.toFixed(2), cameraZ: +w.camera.position.z.toFixed(1) };
+    await place(s * L / 2, 0, facing);
+    const away = { boards: +w.wallMats.side[0][0].opacity.toFixed(2), stands: +w.standMats.step[0].opacity.toFixed(2) };
+    return JSON.stringify({ team, court: [L, W], back, middle, side, away });
+  };
+
   /** The Screen shake slider at 0: nothing moves. */
   window.__shakeOff = async () => {
     const input = document.getElementById('shakeInput');

@@ -1,5 +1,6 @@
 // Three.js scene: the court, stick figures, balls, trails and effects.
 import * as THREE from 'three';
+import { GLTFLoader } from '/static/vendor/addons/loaders/GLTFLoader.js';
 
 export const TEAM_COLORS = [0xff4d5e, 0x3fa9ff];
 // Ball colour by rally (number of deflections): a distinct hue per level, ending white-hot. A ball
@@ -168,14 +169,136 @@ const visorMat = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.
 
 function disposeTree(obj) {
   obj.traverse((o) => {
-    if (o.geometry) o.geometry.dispose();
+    if (o.isInstancedMesh) o.dispose();     // its per-instance buffers (the crowd)
+    if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose();
     if (o.material) {
       for (const m of [].concat(o.material)) {
+        if (m.userData.keep) continue;      // shared by every court: its shader stays built
         if (m.map) m.map.dispose();
         m.dispose();
       }
     }
   });
+}
+
+// ------------------------------------------------------------------ the sports hall
+// Built and lit in Blender (art/arena.py): its sunlight is baked into textures, so drawing it
+// costs no lighting at all. The court's paint, its walls, the stands and the crowd follow the
+// court's size, so they're made here. Until the hall has loaded (or if it can't), the plain
+// court of before is drawn.
+const ARENA = '/static/arena/';
+const FLOOR_PPM = 32;                     // the hall floor's canvas: pixels a metre
+const PALETTE = [0x16c4b4, 0xffc93c, 0x6dd04e, 0x8b6cff, 0xff9f43];    // the hall's (style samples, round 2)
+const PAINT = ['#e33f4f', '#2a79c2'];     // the court's halves: satin team paint
+const STANDS = { gap: 2.5, rows: 6, depth: 0.85, rise: 0.45 };   // behind the court's side walls
+const SHAFT_GLOW = 0.035;                 // how brightly the sun's shafts glow (they add up where they cross)
+const LOW_CROWD = 3;                      // Low graphics: one fan in this many, standing still
+
+const keep = (thing) => {
+  thing.userData.keep = true;
+  return thing;
+};
+const unitBox = keep(new THREE.BoxGeometry(1, 1, 1));
+
+/** A repeatable random sequence (mulberry32), so the planks and the crowd look the same each time. */
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Honey-coloured wooden boards over the whole canvas (ppm: pixels a metre). */
+function paintWood(c, w, h, ppm) {
+  c.fillStyle = '#c98a4c';                                 // the gaps between boards
+  c.fillRect(0, 0, w, h);
+  const rnd = seeded(7);
+  const width = 0.14 * ppm;
+  const length = 2.4 * ppm;
+  const tones = ['#efb46c', '#eaab62', '#e3a35d', '#dc9a52', '#f2bb75'];
+  for (let y = 0, row = 0; y < h; y += width, row++) {
+    for (let x = -((row * 0.37) % 1) * length; x < w; x += length) {
+      c.fillStyle = tones[Math.floor(rnd() * tones.length)];
+      c.fillRect(x, y, length - Math.max(1, ppm * 0.01), width - Math.max(0.5, ppm * 0.008));
+    }
+  }
+}
+
+/** The court from its top-left corner (-L, -W): the halves, a 1 m grid, the no-go strip, the lines. */
+function paintCourt(c, L, W, gap, ppm, hall) {
+  const cw = 2 * L * ppm;
+  const ch = 2 * W * ppm;
+  const line = (x1, y1, x2, y2) => { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); };
+  c.fillStyle = hall ? PAINT[0] : '#3b2531';
+  c.fillRect(0, 0, cw / 2, ch);
+  c.fillStyle = hall ? PAINT[1] : '#1f2e49';
+  c.fillRect(cw / 2, 0, cw / 2, ch);
+  c.strokeStyle = `rgba(255,255,255,${hall ? 0.1 : 0.06})`;     // 1 m grid: helps judge distance in 3D
+  c.lineWidth = 0.05 * ppm;
+  for (let i = 1; i < 2 * L; i++) line(i * ppm, 0, i * ppm, ch);
+  for (let j = 1; j < 2 * W; j++) line(0, j * ppm, cw, j * ppm);
+  c.fillStyle = `rgba(0,0,0,${hall ? 0.25 : 0.4})`;             // no-go strip around the centre line
+  c.fillRect(cw / 2 - gap * ppm, 0, 2 * gap * ppm, ch);
+  c.save();
+  c.beginPath();
+  c.rect(cw / 2 - gap * ppm, 0, 2 * gap * ppm, ch);
+  c.clip();
+  c.strokeStyle = `rgba(255,255,255,${hall ? 0.14 : 0.08})`;
+  c.lineWidth = 0.15 * ppm;
+  for (let y = -ch; y < ch * 2; y += 0.85 * ppm) line(cw / 2 - gap * ppm, y, cw / 2 + gap * ppm, y + 2 * gap * ppm);
+  c.restore();
+  c.strokeStyle = 'rgba(255,255,255,0.35)';
+  c.lineWidth = 0.1 * ppm;
+  line(cw / 2 - (L / 2) * ppm, 0, cw / 2 - (L / 2) * ppm, ch);
+  line(cw / 2 + (L / 2) * ppm, 0, cw / 2 + (L / 2) * ppm, ch);
+  c.strokeStyle = 'rgba(255,255,255,0.9)';
+  c.lineWidth = 0.2 * ppm;
+  c.strokeRect(0.1 * ppm, 0.1 * ppm, cw - 0.2 * ppm, ch - 0.2 * ppm);
+  line(cw / 2, 0, cw / 2, ch);
+}
+
+/** Soft shafts of sunlight from the window panes to the floor: see-through, glowing more where
+ *  you look across them than along their edges, and fading towards the floor. */
+function sunShafts(panes, toward, color) {
+  const d = new THREE.Vector3(...toward).negate();         // the sunlight's direction
+  const pos = [];
+  const fade = [];
+  const index = [];
+  for (const quad of panes) {
+    const base = pos.length / 3;
+    for (const [x, y, z] of quad) {
+      const k = y / -d.y;                                  // down to the floor
+      pos.push(x, y, z, x + d.x * k, 0, z + d.z * k);
+      fade.push(1, 0);
+    }
+    for (let i = 0; i < 4; i++) {
+      const a = base + 2 * i;
+      const b = base + 2 * ((i + 1) % 4);
+      index.push(a, b, b + 1, a, b + 1, a + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('fade', new THREE.Float32BufferAttribute(fade, 1));
+  geo.setIndex(index);
+  geo.computeVertexNormals();
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { color: { value: new THREE.Color(color) }, glow: { value: SHAFT_GLOW } },
+    vertexShader: `attribute float fade; varying float vFade; varying vec3 vN; varying vec3 vV;
+      void main() { vFade = fade; vN = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 color; uniform float glow; varying float vFade; varying vec3 vN; varying vec3 vV;
+      void main() { float facing = abs(dot(normalize(vN), normalize(vV)));
+        gl_FragColor = vec4(color * glow * vFade * facing * facing * facing, 1.0); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 2;
+  return mesh;
 }
 
 export class World {
@@ -201,6 +324,7 @@ export class World {
     const fill = new THREE.DirectionalLight(0x9fb8ff, 0.55);
     fill.position.set(-10, 8, -12);
     this.scene.add(hemi, sun, fill);
+    this.lights = { hemi, sun, fill };
 
     // Throw preview: dotted arc plus a ring where it would ricochet.
     this.previewPos = new Float32Array(160 * 3);
@@ -217,8 +341,110 @@ export class World {
     this.court = null;
     this.ballScale = 1;     // the lobby's ball radius over the 0.2 m the meshes are built for
     this.quality = 'high';  // the graphics level (graphics.js): Low draws fewer decorative effects
+    this.arena = null;      // the sports hall, once loaded
+    this.courtSize = null;
+    this.crowd = [];        // per side: { fans, bodies, heads }
+    this.crowdT = -1;
+    this.occluders = [];    // what turns see-through when the camera is behind it
+    this.cheering = 0;
     addEventListener('resize', () => this.resize());
     this.resize();
+    // ?noarena: the plain court, for comparing frame rates (like ?nowarm for the warm-up)
+    this.ready = false;     // the hall has loaded, or won't
+    this.loading = (new URLSearchParams(location.search).has('noarena') ? Promise.resolve() : this.loadArena())
+      .then(() => { this.ready = true; });
+  }
+
+  /** Loads the hall (art/arena.py's output) and puts the court in it. */
+  async loadArena() {
+    try {
+      const info = await (await fetch(`${ARENA}arena.json`)).json();
+      const loader = new THREE.TextureLoader();
+      const texture = (file, flipY = true) => loader.loadAsync(ARENA + file).then((t) => {
+        t.flipY = flipY;                         // glTF's UVs run top-down, the floor's bottom-up
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 4;
+        return t;
+      });
+      const [gltf, floorLight, hallLight, leavesLight, sky] = await Promise.all([
+        new GLTFLoader().loadAsync(ARENA + info.walls.model),
+        texture(info.floor.light), texture(info.walls.light.hall, false), texture(info.walls.light.leaves, false),
+        texture(info.sky),
+      ]);
+      const lit = Math.PI / info.lightScale;       // the lightmaps hold light x lightScale
+      const group = new THREE.Group();
+      const isLeaves = (o) => { for (let q = o; q; q = q.parent) if (q.name.startsWith('leaves')) return true; return false; };
+      gltf.scene.traverse((o) => {
+        if (!o.isMesh) return;
+        const light = isLeaves(o) ? leavesLight : hallLight;
+        const made = [].concat(o.material).map((m) => {
+          const flat = m.name.startsWith('emit_')    // the scoreboard glows: no light needed
+            ? new THREE.MeshBasicMaterial({ color: m.emissive.clone().multiplyScalar(m.emissiveIntensity) })
+            : new THREE.MeshBasicMaterial({ color: m.color, lightMap: light, lightMapIntensity: lit });
+          m.dispose();
+          return flat;
+        });
+        o.material = Array.isArray(o.material) ? made : made[0];
+      });
+      group.add(gltf.scene);
+      const [fw, fd] = info.floor.size;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(fw * FLOOR_PPM);
+      canvas.height = Math.round(fd * FLOOR_PPM);
+      const floorTex = new THREE.CanvasTexture(canvas);
+      floorTex.colorSpace = THREE.SRGBColorSpace;
+      floorTex.anisotropy = 8;
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(fw, fd),
+        new THREE.MeshBasicMaterial({ map: floorTex, lightMap: floorLight, lightMapIntensity: lit }));
+      floor.rotation.x = -Math.PI / 2;
+      group.add(floor);
+      const shafts = sunShafts(info.panes, info.sun.toward, info.sun.color);
+      shafts.visible = this.quality !== 'low';
+      group.add(shafts);
+      sky.mapping = THREE.EquirectangularReflectionMapping;
+      this.scene.background = sky;
+      this.scene.fog = null;
+      // the players and balls: the same sun as the bake, and the sky and the warm floor around them
+      const { hemi, sun, fill } = this.lights;
+      sun.color.set(info.sun.color);
+      sun.intensity = info.sun.strength;
+      sun.position.set(...info.sun.toward).multiplyScalar(60);
+      hemi.color.set(0xa9d2ff);
+      hemi.groundColor.set(0xd39a62);
+      hemi.intensity = 1.2;
+      fill.intensity = 0;
+      this.renderer.toneMapping = THREE.NeutralToneMapping;
+      this.renderer.toneMappingExposure = 0.55;
+      this.scene.add(group);
+      this.arena = { info, group, canvas, floorTex, shafts };
+      if (this.courtSize) this.buildCourt(...this.courtSize);
+      this.renderer.compile(this.scene, this.camera);     // its shaders now, not in the first round
+    } catch (err) {
+      console.warn('The sports hall could not be loaded; the plain court stays.', err);
+    }
+  }
+
+  /** The hall around a court this size: scaled up if the court and its stands don't fit, with the
+   *  court painted on its floor (so the court gets the hall's baked sunlight). */
+  fitArena(L, W, gap) {
+    const a = this.arena;
+    const [hl, hw] = a.info.hall.half;
+    const reach = W + STANDS.gap + STANDS.rows * STANDS.depth + 1.5;
+    const scale = Math.max(1, reach / hw, (L + 8) / hl);
+    a.group.scale.setScalar(scale);
+    const c = a.canvas.getContext('2d');
+    const ppm = a.canvas.width / (2 * hl * scale);
+    paintWood(c, a.canvas.width, a.canvas.height, ppm);
+    c.save();
+    c.translate(a.canvas.width / 2 - L * ppm, a.canvas.height / 2 - W * ppm);
+    paintCourt(c, L, W, gap, ppm, true);
+    c.restore();
+    a.floorTex.needsUpdate = true;
+  }
+
+  /** The crowd cheers: 1 at the end of a round, less for a knockout. */
+  cheer(amount = 1) {
+    this.cheering = Math.max(this.cheering, amount);
   }
 
   resize() {
@@ -230,6 +456,8 @@ export class World {
   /** The graphics level and how many render pixels to draw per page pixel (graphics.js). */
   setQuality(level, pixelRatio) {
     this.quality = level;
+    if (this.arena) this.arena.shafts.visible = level !== 'low';
+    this.crowdSize();
     if (pixelRatio !== this.renderer.getPixelRatio()) {
       this.renderer.setPixelRatio(pixelRatio);
       this.resize();
@@ -271,6 +499,7 @@ export class World {
   }
 
   buildCourt(L, W, gap) {
+    this.courtSize = [L, W, gap];
     const old = this.court;
     if (old) {
       // Disposed only after the new court has been drawn once: the new court's materials then
@@ -280,53 +509,14 @@ export class World {
     }
     const g = (this.court = new THREE.Group());
     this.scene.add(g);
-
-    // Floor markings drawn on a canvas: canvas x -> world x, canvas y -> world z.
-    const ppm = 40;
-    const cw = Math.round(2 * L * ppm);
-    const ch = Math.round(2 * W * ppm);
-    const cv = document.createElement('canvas');
-    cv.width = cw;
-    cv.height = ch;
-    const c = cv.getContext('2d');
-    const line = (x1, y1, x2, y2) => { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); };
-    c.fillStyle = '#3b2531';
-    c.fillRect(0, 0, cw / 2, ch);
-    c.fillStyle = '#1f2e49';
-    c.fillRect(cw / 2, 0, cw / 2, ch);
-    c.strokeStyle = 'rgba(255,255,255,0.06)';      // 1 m grid: helps judge distance in 3D
-    c.lineWidth = 2;
-    for (let i = 1; i < 2 * L; i++) line(i * ppm, 0, i * ppm, ch);
-    for (let j = 1; j < 2 * W; j++) line(0, j * ppm, cw, j * ppm);
-    c.fillStyle = 'rgba(0,0,0,0.4)';                // no-go strip around the centre line
-    c.fillRect(cw / 2 - gap * ppm, 0, 2 * gap * ppm, ch);
-    c.save();
-    c.beginPath();
-    c.rect(cw / 2 - gap * ppm, 0, 2 * gap * ppm, ch);
-    c.clip();
-    c.strokeStyle = 'rgba(255,255,255,0.08)';
-    c.lineWidth = 6;
-    for (let y = -ch; y < ch * 2; y += 34) line(cw / 2 - gap * ppm, y, cw / 2 + gap * ppm, y + 2 * gap * ppm);
-    c.restore();
-    c.strokeStyle = 'rgba(255,255,255,0.35)';
-    c.lineWidth = 4;
-    line(cw / 2 - (L / 2) * ppm, 0, cw / 2 - (L / 2) * ppm, ch);
-    line(cw / 2 + (L / 2) * ppm, 0, cw / 2 + (L / 2) * ppm, ch);
-    c.strokeStyle = 'rgba(255,255,255,0.9)';
-    c.lineWidth = 8;
-    c.strokeRect(4, 4, cw - 8, ch - 8);
-    line(cw / 2, 0, cw / 2, ch);
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(2 * L, 2 * W), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
-    floor.rotation.x = -Math.PI / 2;
-    g.add(floor);
-
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshStandardMaterial({ color: 0x121a2b, roughness: 1 }));
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.02;
-    g.add(ground);
+    if (this.arena) this.fitArena(L, W, gap);
+    else this.plainFloor(g, L, W, gap);
+    if (this.arena) {
+      this.occluders = [];
+      this.courtWalls(g, L, W);
+      this.stands(g, L, W);
+      return;
+    }
 
     // Side walls are bouncy glass (balls ricochet); the team-coloured end walls stop balls.
     const kick = new THREE.MeshStandardMaterial({ color: 0x283149, roughness: 0.7 });
@@ -363,6 +553,177 @@ export class World {
         step.position.set(0, height / 2, side * (W + 2.2 + i * 0.9));
         g.add(step);
       }
+    }
+  }
+
+  /** The court before the hall has loaded: its markings on a dark floor. */
+  plainFloor(g, L, W, gap) {
+    // Floor markings drawn on a canvas: canvas x -> world x, canvas y -> world z.
+    const ppm = 40;
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(2 * L * ppm);
+    cv.height = Math.round(2 * W * ppm);
+    paintCourt(cv.getContext('2d'), L, W, gap, ppm, false);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(2 * L, 2 * W), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
+    floor.rotation.x = -Math.PI / 2;
+    g.add(floor);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshStandardMaterial({ color: 0x121a2b, roughness: 1 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.02;
+    g.add(ground);
+  }
+
+  /** The court's walls in the hall: padded boards in the hall's palette along the sides (balls
+   *  ricochet off them), the team's colour at the ends (balls stop there), glass above both: the
+   *  walls go up as high as any ball. Each end and each side has materials of its own, so it can
+   *  turn see-through on its own when the camera is behind it (seeThrough). */
+  courtWalls(g, L, W) {
+    const M = (this.wallMats ??= {
+      side: [0, 1].map(() => PALETTE.map((c) => keep(new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, transparent: true })))),
+      end: TEAM_COLORS.map((c) => keep(new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, emissive: c, emissiveIntensity: 0.12, transparent: true }))),
+      stripe: [0, 1].map(() => keep(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, transparent: true }))),
+      glass: keep(new THREE.MeshBasicMaterial({ color: 0xbfefff, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false })),
+      // the outline left showing while a wall is see-through: red end, blue end, the two sides
+      edge: [0, 1, 2, 3].map(() => keep(new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }))),
+    });
+    const edges = (this.unitEdges ??= keep(new THREE.EdgesGeometry(unitBox)));
+    const box = (mat, sx, sy, sz, x, y, z, outline = false) => {
+      const m = outline ? new THREE.LineSegments(edges, mat) : new THREE.Mesh(unitBox, mat);
+      m.scale.set(sx, sy, sz);
+      m.position.set(x, y, z);
+      g.add(m);
+    };
+    const n = Math.max(2, Math.round((2 * L) / 3.5));
+    [-1, 1].forEach((s, k) => {
+      const z = s * (W + 0.13);
+      for (let i = 0; i < n; i++) box(M.side[k][(i + k) % PALETTE.length], (2 * L) / n - 0.04, 1.0, 0.26, -L + ((i + 0.5) * 2 * L) / n, 0.5, z);
+      box(M.edge[2 + k], 2 * L, 1.0, 0.26, 0, 0.5, z, true);
+      box(M.glass, 2 * L, 3.6, 0.02, 0, 2.8, z);
+      this.addOccluder({ mats: M.side[k], edge: M.edge[2 + k], min: 0.2, test: (c) => s * c.z > W + 0.05 });
+    });
+    [-1, 1].forEach((s, t) => {
+      const x = s * (L + 0.13);
+      box(M.end[t], 0.26, 2.0, 2 * W + 0.52, x, 1.0, 0);
+      box(M.stripe[t], 0.28, 0.2, 2 * W + 0.54, x, 1.45, 0);
+      box(M.edge[t], 0.28, 2.0, 2 * W + 0.54, x, 1.0, 0, true);
+      box(M.glass, 0.02, 2.6, 2 * W, x, 3.3, 0);
+      this.addOccluder({ mats: [M.end[t], M.stripe[t]], edge: M.edge[t], min: 0.15, test: (c) => s * c.x > L + 0.05 });
+    });
+  }
+
+  /** Stands along the long sides, behind the court's walls, and a crowd on them: per side, two
+   *  instanced meshes (bodies and heads), a few hundred fans in four draw calls. Each side has
+   *  materials of its own, so it can turn see-through when the camera is in it (seeThrough). */
+  stands(g, L, W) {
+    const M = (this.standMats ??= {
+      step: [0, 1].map(() => keep(new THREE.MeshLambertMaterial({ color: 0x2c3550, transparent: true }))),
+      front: [1, 0].map((i) => keep(new THREE.MeshLambertMaterial({ color: PALETTE[i], transparent: true }))),
+      body: [0, 1].map(() => keep(new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true }))),
+      head: [0, 1].map(() => keep(new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true }))),
+    });
+    const len = 2 * L + 6;
+    const rnd = seeded(9);
+    const bodyGeo = (this.fanBody ??= keep(new THREE.CapsuleGeometry(0.2, 0.32, 2, 8)));    // round, never blocky
+    const headGeo2 = (this.fanHead ??= keep(new THREE.SphereGeometry(0.115, 8, 5)));
+    const shirts = [...TEAM_COLORS, ...TEAM_COLORS, ...PALETTE, 0xffffff, 0x2b2f3a];
+    const skins = [0xf1c8a5, 0xd9a07a, 0xa86f4c, 0x6e4430, 0xf5d7bd];
+    const color = new THREE.Color();
+    this.crowd = [];
+    [-1, 1].forEach((s, k) => {
+      const fans = [];
+      for (let i = 0; i < STANDS.rows; i++) {
+        const z = s * (W + STANDS.gap + (i + 0.5) * STANDS.depth);
+        const top = 0.5 + i * STANDS.rise;
+        const step = new THREE.Mesh(unitBox, M.step[k]);
+        step.scale.set(len, top, STANDS.depth);
+        step.position.set(0, top / 2, z);
+        g.add(step);
+        for (let x = -len / 2 + 0.4; x < len / 2 - 0.3; x += 0.62 + rnd() * 0.12) {
+          if (rnd() < 0.12) continue;                    // an empty seat
+          fans.push({ x: x + (rnd() - 0.5) * 0.1, y: top, z: z + (rnd() - 0.5) * 0.12, s: 0.9 + rnd() * 0.2, phase: rnd() * 6.28, r: rnd(), q: rnd() });
+        }
+      }
+      const front = new THREE.Mesh(unitBox, M.front[k]);
+      front.scale.set(len, 0.7, 0.12);
+      front.position.set(0, 0.35, s * (W + STANDS.gap - 0.06));
+      g.add(front);
+      for (let i = fans.length - 1; i > 0; i--) {         // shuffled: Low shows the first third
+        const j = Math.floor(rnd() * (i + 1));
+        [fans[i], fans[j]] = [fans[j], fans[i]];
+      }
+      const bodies = new THREE.InstancedMesh(bodyGeo, M.body[k], fans.length);
+      const heads = new THREE.InstancedMesh(headGeo2, M.head[k], fans.length);
+      fans.forEach((f, i) => {
+        bodies.setColorAt(i, color.set(shirts[Math.floor(f.r * shirts.length)]));
+        heads.setColorAt(i, color.set(skins[Math.floor(f.q * skins.length)]));
+      });
+      bodies.instanceColor.needsUpdate = true;
+      heads.instanceColor.needsUpdate = true;
+      g.add(bodies, heads);
+      this.crowd.push({ fans, bodies, heads });
+      this.addOccluder({ mats: [M.step[k], M.front[k], M.body[k], M.head[k]], min: 0.15, test: (c) => s * c.z > W + STANDS.gap - 0.6 });
+    });
+    this.crowdT = -1;
+    this.crowdSize();
+    this.moveCrowd(0);
+  }
+
+  /** All the fans, or a third of them on Low graphics. */
+  crowdSize() {
+    for (const c of this.crowd) c.bodies.count = c.heads.count = this.quality === 'low' ? Math.ceil(c.fans.length / LOW_CROWD) : c.fans.length;
+  }
+
+  /** The crowd sways a little, and jumps when it cheers (cheer()). Not on Low graphics. */
+  moveCrowd(t) {
+    if (!this.crowd.length || (this.crowdT >= 0 && this.quality === 'low')) return;
+    if (t - this.crowdT < 1 / 30) return;               // 30 times a second is plenty
+    this.crowdT = t;
+    const m = new THREE.Matrix4();
+    const jump = this.cheering;
+    for (const c of this.crowd) {
+      c.fans.forEach((f, k) => {
+        const bob = 0.03 * Math.sin(t * 2.1 + f.phase) + jump * 0.28 * Math.max(0, Math.sin(t * 9 + f.phase));
+        m.makeScale(f.s, f.s, f.s).setPosition(f.x, f.y + 0.36 * f.s + bob, f.z);
+        c.bodies.setMatrixAt(k, m);
+        m.setPosition(f.x, f.y + 0.82 * f.s + bob, f.z);
+        c.heads.setMatrixAt(k, m);
+      });
+      c.bodies.instanceMatrix.needsUpdate = true;
+      c.heads.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  /** A wall, a side's boards or a side's stands that turns see-through when the camera is behind it. */
+  addOccluder(o) {
+    o.fade = 0;
+    for (const m of o.mats) {
+      m.opacity = 1;
+      m.depthWrite = true;
+    }
+    if (o.edge) o.edge.opacity = 0;
+    this.occluders.push(o);
+  }
+
+  /** Every frame, once the camera is placed: a wall, a side's boards or a side's stands between the
+   *  camera and the court fades until you can see through it, with a faint outline left showing,
+   *  so you never lose sight of yourself when you back into a wall. Only the picture changes: the
+   *  aim is worked out before, from where the camera would be anyway. */
+  seeThrough(dt) {
+    const c = this.camera.position;
+    for (const o of this.occluders) {
+      const want = o.test(c) ? 1 : 0;
+      if (o.fade === want) continue;
+      o.fade += (want - o.fade) * (1 - Math.exp(-12 * dt));
+      if (Math.abs(o.fade - want) < 0.01) o.fade = want;
+      const opacity = 1 - (1 - o.min) * o.fade;
+      for (const m of o.mats) {
+        m.opacity = opacity;
+        m.depthWrite = o.fade < 0.5;        // see-through: what's behind it shows
+      }
+      if (o.edge) o.edge.opacity = 0.55 * o.fade;
     }
   }
 
@@ -473,6 +834,8 @@ export class World {
 
   updateFx(dt, t) {
     this.particles.update(dt);
+    this.cheering = Math.max(0, this.cheering - dt * 0.5);
+    this.moveCrowd(t);
     this.fx = this.fx.filter((f) => {
       f.t += dt;
       const k = f.t / f.dur;

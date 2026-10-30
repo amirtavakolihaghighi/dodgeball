@@ -1,6 +1,6 @@
 [
   {"eval": "document.getElementById('nameInput').value = 'JuiceTest'; document.getElementById('playBtn').click(); 'joined'"},
-  {"waitFor": "dp.cfg && dp.net.latest && dp.net.latest.r.s === 'lobby' && dp.me && dp.me.alive", "timeout": 8000},
+  {"waitFor": "dp.cfg && dp.net.latest && dp.net.latest.r.s === 'lobby' && dp.me && dp.me.alive && dp.world.ready", "timeout": 8000},
   {"eval": "document.getElementById('resumeBtn').click(); 'in the game'"},
   {"wait": 1500},
   {"evalFile": "juice.js"},
@@ -10,6 +10,7 @@
   {"eval": "__shakeOff()"},
   {"eval": "__specks()"},
   {"eval": "__freeze()"},
+  {"eval": "__seeThrough()"},
   {"eval": "document.getElementById('startBtn').click(); 'match started'"},
   {"waitFor": "dp.net.latest && dp.net.latest.r.s === 'play'", "timeout": 10000},
   {"eval": "__watch()"},

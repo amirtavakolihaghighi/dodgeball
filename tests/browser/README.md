@@ -145,6 +145,8 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\graphics
 node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock&nowarm" tests\browser\graphics.json
 ```
 
+Add `&noarena` to any test to draw the plain court instead of the sports hall, for comparing frame rates. With the hall, headless Chrome draws Low at about 30 frames a second (about 50 without).
+
 `graphics.json` (+ `graphics.js`) checks:
 
 - **In the lobby:** the warning for drawing without the graphics card (headless Chrome draws in software, so it shows), Auto starting at Low at half the sharpness, and the host's ceiling of Medium.
@@ -172,6 +174,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\juice.js
 - **The Screen shake slider at 0:** the camera doesn't move, the view stays at 62°, and the setting is saved.
 - **The pooled specks** appear (20 of 40 on Low: half) and are all gone 1.6 s later.
 - **The impact freeze:** frozen right after, shuddering about 1.7 cm, over by 0.4 s, the figure back in place.
+- **See-through walls** (with the hall): at your end wall the camera is behind it, and the wall fades to 15% with its outline at 55%; in the middle it's solid again. At a side wall, facing across, that side's boards (20%), stands and crowd (15%) fade and the other side's don't. Skipped with `&noarena`.
 - **A 25 s match** deflecting, dodging and catching every ball: the fastest balls stretch to the 30% cap, specks peak, and no shader is built mid-match.
 
 ## Sound: what comes out

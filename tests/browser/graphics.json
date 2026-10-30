@@ -1,6 +1,6 @@
 [
   {"eval": "document.getElementById('nameInput').value = 'GfxTest'; document.getElementById('playBtn').click(); 'joined'"},
-  {"waitFor": "dp.cfg && dp.net.latest && dp.net.latest.r.s === 'lobby' && !document.getElementById('startBtn').hidden", "timeout": 8000},
+  {"waitFor": "dp.cfg && dp.net.latest && dp.net.latest.r.s === 'lobby' && !document.getElementById('startBtn').hidden && dp.world.ready", "timeout": 8000},
   {"wait": 1500},
   {"evalFile": "graphics.js"},
   {"eval": "__start()"},

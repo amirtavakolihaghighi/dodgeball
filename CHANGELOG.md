@@ -31,6 +31,7 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
   - music in the lobby, and lower in the background during a match.
 - **A volume for each kind of sound** (Esc › Your settings): Music, Effects, Announcer, Interface and Crowd, under the main Volume.
 - **A "Hear every sound" page**, linked under the sliders, that plays every moment of the game and every recording.
+- **A sports hall to play in:** tall windows with a low golden sun and soft shafts of light, sky and hills outside, a wooden floor with the court painted on it, padded boards in bright colours, and stands with a crowd that cheers. Its light is worked out in advance, so it's cheap to draw; Low graphics draw a third of the crowd and no shafts. A wall or stand between the camera and you turns see-through, with a faint outline, so you never lose sight of yourself.
 - **The incoming-ball sound** (Esc › Your settings): a whoosh that comes from the ball's side and is loudest as it arrives (the default), a tick, or nothing.
 
 ### Changed

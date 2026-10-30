@@ -4,7 +4,7 @@
   {"eval": "document.getElementById('resumeBtn').click(); 'in the game'"},
   {"evalFile": "sound.js"},
   {"eval": "__soundLoaded()"},
-  {"wait": 1000},
+  {"eval": "__musicLevel(0.5)"},
   {"eval": "__music()"},
   {"eval": "__musicLevel(0)"},
   {"eval": "__soundFlows()"},

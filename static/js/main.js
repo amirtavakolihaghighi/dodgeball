@@ -925,6 +925,7 @@ function roundSound(e) {
     sfx.roundStart();
   } else if (e.s === 'over') {
     sfx.whistle(true);
+    world.cheer(1);
     if (e.m !== undefined) {
       sfx.crowd('big');
       sfx.say(myTeam === e.m ? 'win' : myTeam === 0 || myTeam === 1 ? 'lose' : 'over', 0.9);
@@ -953,6 +954,7 @@ function onEvent(e) {
       break;
     case 'hit': {
       world.man(e.p)?.impact(e.ko ? 0.15 : 0.085);     // an impact freeze on the hit player only
+      if (e.ko) world.cheer(0.5);                          // the crowd jumps at a knockout
       if (pos) {
         world.burst(pos.x, 1.2, pos.z, 0xffffff, 1.8);
         const team = TEAM_COLORS[net.latest?.players.get(e.p)?.team ?? 0];
@@ -1324,6 +1326,7 @@ function drawFrame(tMs) {
   const m = world.camera.matrixWorld.elements;       // sounds come from where they happen, heard from the camera
   const h = Math.hypot(m[8], m[10]) || 1;
   sfx.setEar(m[12], m[14], -m[8] / h, -m[10] / h);
+  world.seeThrough(dt);             // a wall between the camera and you turns see-through
   const maxStamina = me ? ownValue(me.name, 'MAX_STAMINA') : 0;     // out of breath under 35% stamina
   sfx.breathe(me?.alive && !watching() && maxStamina ? clamp((0.35 - me.stamina / maxStamina) / 0.35, 0, 1) : 0);
   updateHud(t);
