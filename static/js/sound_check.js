@@ -113,7 +113,11 @@ card(M, 'Dodge (the dash)', [['Your dash', () => sfx.dash()], ['Perfect dodge', 
 card(M, 'Out of breath (low stamina)', [['Very tired, 4 s', () => tiredFor(1, 4000)], ['A little tired, 4 s', () => tiredFor(0.3, 4000)]]);
 card(M, 'Someone is revived', [['On your team', () => sfx.revive(true)], ['On the other team', () => sfx.revive(false)]]);
 card(M, 'Ball bounces', [['Floor, near', () => sfx.bounce({ x: 1, z: 3 }, true)], ['Floor, far', () => sfx.bounce(FAR, true)], ['Wall, left', () => sfx.bounce(LEFT, false)]]);
-card(M, 'Interface', [['Incoming ball', () => sfx.warn()], ['Countdown', () => sfx.beep(false)], ['Not now', () => sfx.deny()], ['Team health bought', () => sfx.heal()]]);
+card(M, 'A ball coming at you (under a second away)', [
+  ['Whoosh, from the left', () => sfx.incoming('whoosh', 0.7, LEFT)], ['Whoosh, from the right', () => sfx.incoming('whoosh', 0.7, RIGHT)],
+  ['Whoosh, very close', () => sfx.incoming('whoosh', 0.25, { x: 0.5, z: 4 })], ['Tick', () => sfx.incoming('tick')],
+]);
+card(M, 'Interface', [['Countdown', () => sfx.beep(false)], ['Not now', () => sfx.deny()], ['Team health bought', () => sfx.heal()]]);
 card(M, 'A round', [
   ['Round 1', () => sfx.say('round1')], ['Final round', () => sfx.say('final')], ['Start', () => sfx.roundStart()],
   ['Won', () => { sfx.whistle(true); sfx.crowd('cheer'); }],

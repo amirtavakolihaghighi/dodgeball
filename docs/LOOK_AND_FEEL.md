@@ -52,7 +52,7 @@ The game should look and feel professionally made: juice and good art, both. We 
 | 1 | **Style samples:** two or three directions, rendered; the user picks | Done. Round 1: the sports hall (decisions 124–126). Round 2: the hall in vibrant colour and light, and athletes towards Fortnite-like humanoids; both versions, with and without the helmet, picked at random for each player (decisions 127–128) |
 | 2 | **Smooth and fair:** a graphics setting that scales itself down when the frame rate drops (D1); a warning when Chrome draws without the graphics card (D2); presses timed from the key event (B4); every effect prepared in the lobby; the host's tab on a lower setting by default | Done (decisions 129–130): Auto, High, Medium, Low; the warning; presses timed from the key; no shader built mid-match (3 before); the host's Auto at most Medium. Real laptops are measured in step 10 |
 | 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | Done (decision 131). The user: the zoom while charging a little more (now 7°), the rest good |
-| 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | Built (decision 132). The user: the dodge redone, everything else good; added at their request: voices when hit, panting when tired, revive sounds, a lower match music (decision 133) |
+| 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | Done (decision 132). The user: the dodge redone, everything else good; added at their request: voices when hit, panting when tired, revive sounds, a lower match music (decision 133); the incoming ball's whoosh (decision 135) |
 | 5 | **The arena:** floor, walls, stands and a crowd; lighting baked in Blender | To do |
 | 6 | **The ball and effects art** | To do |
 | 7 | **The characters:** the model in both versions, with the helmet and without it, one picked at random for each player who joins (decision 128); team colours; a lighter version for low settings | To do |
@@ -297,4 +297,6 @@ These are starting targets, to be checked on an office laptop and adjusted:
       - panting when your stamina is low;
       - revives everyone hears: an entrance for one team, a danger for the other;
       - the match music lower (45% between rounds, 22% during play), and a Back button on the sound page.
+    - The incoming-ball tick, which the user hadn't noticed, became a setting: by default a whoosh from the ball's side, loudest as it arrives; or a louder tick; or off (decision 135).
+    - Committed after the user's "tested, everything is good".
     - For step 8, the user's dodges (decision 134): perfect ones as a butterfly twist, corkscrew or aerial side flip at random, with afterimages; normal ones as a ghost dash or MMA dash footwork.

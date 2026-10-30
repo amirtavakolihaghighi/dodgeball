@@ -87,7 +87,8 @@
       koOther: () => s.hit(near, { ko: true, who: 2 }),
       reviveAlly: () => s.revive(true),
       reviveEnemy: () => s.revive(false),
-      warn: () => s.warn(),
+      incomingWhoosh: () => s.incoming('whoosh', 0.3, near),     // its peak falls inside the measurement
+      incomingTick: () => s.incoming('tick'),
       deny: () => s.deny(),
       revive: () => s.revive(),
       heal: () => s.heal(),
@@ -151,7 +152,14 @@
       const e = await t(400);
       res[name] = +(10 * Math.log10((e.l + 1e-12) / (e.r + 1e-12))).toFixed(1);     // dB louder on the left
     }
-    return JSON.stringify({ leftMinusRightDb: res });
+    const incoming = {};        // the incoming-ball whoosh comes from the ball's side too
+    for (const [name, k] of [['left', 1], ['right', -1]]) {
+      await silence();
+      s.incoming('whoosh', 0.5, at(k));
+      const e = await t(700);
+      incoming[name] = +(10 * Math.log10((e.l + 1e-12) / (e.r + 1e-12))).toFixed(1);
+    }
+    return JSON.stringify({ leftMinusRightDb: res, incomingLeftMinusRightDb: incoming });
   };
 
   /** Out of breath for a second: the panting sounds, then stops by itself a few seconds after. */

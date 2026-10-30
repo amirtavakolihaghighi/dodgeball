@@ -17,6 +17,7 @@ const RANGE = 30;               // metres: quieter with distance, down to a quar
 const MATCH_MUSIC = 0.45;       // the match music's level between rounds (the lobby's is 1)...
 const DUCK = 0.22;              // ...and while a round is played: low, in the background (the user's call)
 const VOICES = 4;               // players' voices (hurt.0..3, ko.0..3); each player keeps one
+const INCOMING = 1.6;           // the incoming-ball whoosh's peak: filtered noise is quiet, and it must be heard
 const RESTART_AFTER = 20000;    // ms: music stopped this long starts over from the top
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -185,14 +186,10 @@ export class Sfx {
     if (variant < 0 && list.length > 1 && i === this.last[name]) i = (i + 1) % list.length;
     this.last[name] = i;
     let far = 0;
-    let pan = 0;
+    const pan = this.panOf(pos);
     if (pos) {
-      const dx = pos.x - this.ear.x;
-      const dz = pos.z - this.ear.z;
-      const d = Math.hypot(dx, dz);
-      far = Math.min(1, d / RANGE);
+      far = Math.min(1, Math.hypot(pos.x - this.ear.x, pos.z - this.ear.z) / RANGE);
       gain *= Math.max(floor, 1 - far);
-      if (d > 0.5) pan = 0.75 * clamp((dz * this.ear.fx - dx * this.ear.fz) / d, -1, 1);
     }
     if (vary) {                         // no two alike: a little pitch and level each time
       rate *= 1 + (Math.random() - 0.5) * 0.08;
@@ -221,6 +218,15 @@ export class Sfx {
     src.onended = () => this.voices--;
     this.count[name] = (this.count[name] || 0) + 1;
     return true;
+  }
+
+  /** Left (−) or right (+) of the camera, up to 75%; 0 for no position. */
+  panOf(pos) {
+    if (!pos) return 0;
+    const dx = pos.x - this.ear.x;
+    const dz = pos.z - this.ear.z;
+    const d = Math.hypot(dx, dz);
+    return d > 0.5 ? 0.75 * clamp((dz * this.ear.fx - dx * this.ear.fz) / d, -1, 1) : 0;
   }
 
   /** How loud a synthesized fallback is from where it happens (as the recordings are). */
@@ -341,7 +347,38 @@ export class Sfx {
     this.tone(1980, 0.45, { gain: 0.1 * vol, delay: 0.05, kind: 'interface' });
   }
 
-  warn() { this.tone(900, 0.05, { type: 'square', gain: 0.12, kind: 'interface' }); }   // louder than before: the recordings are fuller
+  /** A ball coming at you, tti seconds away (once per ball). style, the player's choice:
+   *  'whoosh': air swelling from the ball's side, loudest as it arrives, the moment to press;
+   *  'tick': a short beep; 'off': nothing. */
+  incoming(style, tti = 0.6, pos = null) {
+    if (style === 'tick') return this.tone(900, 0.07, { type: 'square', gain: 0.2, kind: 'interface' });
+    if (style !== 'whoosh' || !this.ok) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const dur = clamp(tti, 0.2, 0.9);
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const band = ctx.createBiquadFilter();       // the pitch rises as it closes in
+    band.type = 'bandpass';
+    band.Q.value = 0.9;
+    band.frequency.setValueAtTime(350, t);
+    band.frequency.exponentialRampToValueAtTime(1600, t + dur);
+    const g = ctx.createGain();                // from 30 dB under its peak: heard from the start
+    g.gain.setValueAtTime(INCOMING / 30, t);
+    g.gain.exponentialRampToValueAtTime(INCOMING, t + dur);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.12);
+    let out = src.connect(band).connect(g);
+    const pan = this.panOf(pos);
+    if (pan) {
+      const p = ctx.createStereoPanner();
+      p.pan.value = pan;
+      out = out.connect(p);
+    }
+    out.connect(this.dry.interface);
+    src.start(t, Math.random() * 0.4);
+    src.stop(t + dur + 0.15);
+    this.count.incoming = (this.count.incoming || 0) + 1;
+  }
 
   deny() {
     if (!this.play('ui.deny', { kind: 'interface', gain: 0.5, vary: false }) && !this.bank) {

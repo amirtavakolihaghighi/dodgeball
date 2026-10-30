@@ -185,7 +185,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\sound.js
 - **The recordings load:** 43 sounds, 134 variants, decoded at 48 kHz; the six volume sliders exist.
 - **Every moment makes sound** (−4 to −23 dBFS at the default volumes), and it's silent afterwards. The music is turned off first, or the meter would hear it.
 - **The volumes:** the Announcer slider at 0 makes "Fight!" silent (−125 dB) while a hit still plays; the levels are saved.
-- **Sides:** a bounce 6 m to the left is 14 dB louder on the left channel, and one to the right on the right.
+- **Sides:** a bounce 6 m to the left is 14 dB louder on the left channel, and one to the right on the right. So is the incoming-ball whoosh.
 - **A pile-up:** 300 bounces at once play as 2 (the same sound twice within 25 ms plays once), and at most 40 at once when forced, with no slower frames.
 - **Breathing:** tired for 1.5 s, the panting sounds; it stops by itself a few seconds after.
 - **The music:** the lobby track playing in the lobby; during play, the match track at 22%.

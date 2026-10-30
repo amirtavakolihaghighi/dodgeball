@@ -128,13 +128,18 @@
           <label title="In the lobby, and quieter while a round is played">Music <input id="vol-music" type="range" min="0" max="1" step="0.05"></label>
           <label title="Throws, hits, catches, deflects, bounces and squeaks">Effects <input id="vol-effects" type="range" min="0" max="1" step="0.05"></label>
           <label title="The announcer and the referee's whistle">Announcer <input id="vol-announcer" type="range" min="0" max="1" step="0.05"></label>
-          <label title="The incoming-ball warning, the countdown, the perfect chime, and “not now”">Interface <input id="vol-interface" type="range" min="0" max="1" step="0.05"></label>
+          <label title="The incoming-ball sound, the countdown, the perfect chime, and “not now”">Interface <input id="vol-interface" type="range" min="0" max="1" step="0.05"></label>
           <label title="Cheers and applause when a round ends">Crowd <input id="vol-crowd" type="range" min="0" max="1" step="0.05"></label>
         </div>
         <p class="note"><a href="/static/sounds.html" target="_blank">Hear every sound</a> (opens a new tab)</p>
         <label>Screen shake <input id="shakeInput" type="range" min="0" max="1" step="0.05"
           title="Shake, jolts and the zoom while charging. They move the picture, never your aim. All the way left turns them off."></label>
         <label class="check"><input id="ringInput" type="checkbox"> Timing ring for incoming balls (H)</label>
+        <label title="When a ball is less than a second from reaching you">Incoming-ball sound
+          <select id="incomingSelect">
+            <option value="whoosh">Whoosh from where it comes (recommended)</option>
+            <option value="tick">Tick</option><option value="off">Off</option>
+          </select></label>
         <label>Graphics
           <select id="gfxSelect">
             <option value="auto">Auto (recommended)</option><option value="high">High</option>

@@ -141,7 +141,8 @@ Each player picks their own in the menu (Esc), under **Your settings › Graphic
 - **From where they happen:** sounds come from their side and get quieter far away, with the echo of a sports hall. Your own throw landing stays loud wherever it lands.
 - **The rounds:** the announcer names the round, a whistle and "Fight!" start it, and a long whistle and the crowd end it. At the end of a match the announcer says "You win" or "You lose".
 - **Music:** one tune in the lobby, and a faster version in the background during a match, quieter still while a round is played.
-- **Esc › Your settings** has a volume for each kind: Volume (all of it), Music, Effects (including voices and breathing), Announcer, Interface (the incoming-ball tick, the countdown, the perfect chime and "not now") and Crowd. All the way left turns a kind off.
+- **A ball coming at you** (under a second away) whooshes from its side, loudest as it arrives: that's the moment to press. **Esc › Your settings › Incoming-ball sound** can make it a short tick instead, or turn it off.
+- **Esc › Your settings** has a volume for each kind: Volume (all of it), Music, Effects (including voices and breathing), Announcer, Interface (the incoming-ball sound, the countdown, the perfect chime and "not now") and Crowd. All the way left turns a kind off.
 - **Hear every sound** (the link under the sliders) opens a page that plays every moment of the game and every recording, with your volumes. "Back to the game" closes it.
 - **Only the focused tab or window makes sound,** so several test tabs on one computer don't all play at once.
 - **If you hear only simple beeps and tones,** the recordings didn't load. The game then uses its old synthesized sounds, and the session log notes it.

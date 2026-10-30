@@ -63,7 +63,7 @@ const lobby = new Lobby(net, {
 });
 editor.onMessage = (text, cls) => hud.popup(text, cls);
 
-const settings = { sens: 1, volume: 0.6, ring: true, follow: true, graphics: 'auto', shake: 1 };
+const settings = { sens: 1, volume: 0.6, ring: true, follow: true, graphics: 'auto', shake: 1, incoming: 'whoosh' };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('dp.settings') || '{}'));
 } catch { /* private mode etc: defaults are fine */ }
@@ -272,6 +272,13 @@ for (const kind of KINDS) {
   });
 }
 $('ringInput').addEventListener('change', (e) => { settings.ring = e.target.checked; saveSettings(); });
+$('incomingSelect').value = settings.incoming;
+$('incomingSelect').addEventListener('change', (e) => {
+  settings.incoming = e.target.value;
+  saveSettings();
+  sfx.unlock();
+  sfx.incoming(settings.incoming, 0.5);     // let them hear what they picked
+});
 $('saveLogBtn').addEventListener('click', () => {
   const bytes = diag.download();
   hud.popup(`Log saved to your Downloads folder (${Math.max(1, Math.round(bytes / 1024))} KB)`, 'good');
@@ -860,7 +867,7 @@ function showThreat() {
   const key = `${b.id}:${b.rally}`;
   if (!warned.has(key) && tti < 0.9) {
     warned.add(key);
-    sfx.warn();
+    sfx.incoming(settings.incoming, tti, b.pos);
     if (warned.size > 60) warned.clear();
   }
   if (!settings.ring) return hud.setThreat(b.rally ? { radius: 0, level: '', arrow: null, text: `RALLY ×${b.rally}` } : null);

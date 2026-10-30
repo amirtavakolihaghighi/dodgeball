@@ -31,13 +31,14 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
   - music in the lobby, and lower in the background during a match.
 - **A volume for each kind of sound** (Esc › Your settings): Music, Effects, Announcer, Interface and Crowd, under the main Volume.
 - **A "Hear every sound" page**, linked under the sliders, that plays every moment of the game and every recording.
+- **The incoming-ball sound** (Esc › Your settings): a whoosh that comes from the ball's side and is loudest as it arrives (the default), a tick, or nothing.
 
 ### Changed
 
 - **Presses are timed from the key itself,** not from when the page got round to them: a slow laptop no longer loses up to a frame (50 ms at 20 frames a second) on every dodge, catch, deflect and throw.
 - **Every effect is prepared while the game loads,** so none freezes the picture the first time it appears in a match. A rebuilt court (when the teams change size) no longer builds its shaders again either.
 - The log report notes automatic graphics changes, and presses the browser held for a while.
-- The incoming-ball tick is louder, so it stands out among the recorded sounds. The old synthesized sounds remain as a fallback, and the log report notes a browser whose recordings didn't load.
+- The incoming-ball tick is louder, so it stands out among the recorded sounds (it's now an option; the default is the whoosh). The old synthesized sounds remain as a fallback, and the log report notes a browser whose recordings didn't load.
 
 ## [2.2.0] - 2026-10-29
 

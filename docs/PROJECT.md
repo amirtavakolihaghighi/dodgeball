@@ -877,7 +877,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
 - **Music:** "Sunny City" in the lobby, and its faster version through a match, quieter while a round is played.
 - **A volume for each kind** under Your settings, each saved: Volume (all of it), Music, Effects, Announcer, Interface and Crowd.
 - **Hear every sound:** a page (`/static/sounds.html`, linked under the sliders) plays every moment of the game and every recording, so they can be judged.
-- **Kept synthesized:** the incoming-ball warning (louder, to stand out among the recordings), the countdown beeps and the perfect chime. Every old sound stays as the fallback while the recordings load, or if they can't.
+- **Kept synthesized:** the incoming-ball warning (louder, to stand out among the recordings; later a whoosh, decision 135), the countdown beeps and the perfect chime. Every old sound stays as the fallback while the recordings load, or if they can't.
 - **Internet Download Manager:** on this PC it grabbed the browser's requests for `.ogg` files, so the page got nothing (an empty 204; section 14).
   - The files are named `.oga` (the standard name for Ogg audio), which it leaves alone.
   - A failed load is logged, and the log report says so.
@@ -897,7 +897,10 @@ This is the short version, kept on `main` while internet mode waits on its branc
   - **Revives:** everyone hears one now. For the revived player's team, an entrance: a deep drum, a ringing bell-like cymbal and the rising chime. For the other team, a danger: the drum lower, a horn an octave down, and a rumble.
   - **The music:** "in the main menu ok; in the game it can be lower, in the background". The match music is now 45% between rounds and 22% during play (it was 100% and 45%).
   - **"There is no back on the Hear every sound page":** it has a "Back to the game" button now, which closes the page's tab.
-  - **"Incoming-ball tick? What is that?":** the short beep when a ball is less than a second from reaching you, as the timing ring appears. The user hadn't noticed it, which says it's too quiet or unclear. Explained, with an offer to change it.
+  - **"Incoming-ball tick? What is that?":** the short beep when a ball is less than a second from reaching you, as the timing ring appears. The user hadn't noticed it, so it wasn't doing its job.
+    - Claude suggested the ball's own whoosh instead, from its direction; the user said to do it (decision 135).
+    - Now a setting, "Incoming-ball sound": a whoosh that swells from the ball's side and is loudest as it arrives, the moment to press (the default); a louder tick; or off.
+  - **Committed** as the sound step after the user's "tested, everything is good". They saw an error in the server's window during the test, which the session log doesn't keep and a rerun didn't reproduce: they'll send its text next time.
 - **The sounds file** grew to 1.0 MB: 134 variants of 43 sounds, about 20 MB once decoded.
 - **For later, the dodge's animation** (decision 134, step 8): a perfect dodge as a butterfly twist, a corkscrew or an aerial side flip, picked at random each time, with afterimages; a normal dodge as a ghost dash or an MMA fighter's dash footwork.
 - **Tests:** `sound.json` covers the new sounds (each makes sound, the breathing stops by itself) and plays a match with the auto-defender, so the dashes sound for real. Re-run and passing: `juice.json`, `graphics.json` and the smoke test.
@@ -1044,6 +1047,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
 | 132 | Sound: CC0 recordings (BigSoundBank's by Joseph Sardin; Kenney's announcer and interface sounds; MintoDog's music), cut and levelled by `art/sounds.py` into one file. Layered and varied, placed left and right and by distance, with one shared hall echo and a limiter. A volume for each kind: Music, Effects, Announcer, Interface, Crowd. The announcer and a whistle frame each round, and the crowd ends it. Music: Sunny City in the lobby, its faster version in a match, quieter during play. Kept synthesized: the incoming-ball warning, the countdown and the perfect chime, and every old sound as the fallback. The files are named `.oga` | C | Phase 15's plan (step 4). CC0 only (decision 119). BigSoundBank's are real recordings by one recordist, so they match in quality. Claude can't hear, so the choices come from measurements and pictures, and the user judges them on the sound check page. The warning and the countdown stay simple tones: they're signals, not sounds of the world. A download manager (IDM) grabbed `.ogg` requests on this PC |
 | 133 | Sound, after listening: the dodge is a whoosh and feet landing hard, played when you press (no shoe squeaks); players grunt when hit and cry out when knocked out (four voices, one per player), and a knocked-out body falls; you pant when your stamina is low; everyone hears a revive: an entrance for that player's team, a danger for the other; the match music lower (45% between rounds, 22% during play); a Back button on the sound page | U | The user: "dodge sound I think is bad, everything else good"; "a human reaction sound like akh when got hit", "heavy breathing when low stamina", for a revive "something drastic... between an epic entrance or a new danger"; "in the game [the music] can be lower in the background" |
 | 134 | The dodge's animation (step 8): a perfect dodge is a butterfly twist, a corkscrew or an aerial side flip, picked at random each time, with afterimages; a normal dodge is a ghost dash or an MMA fighter's dash footwork | U | The user, for the future |
+| 135 | The incoming-ball sound is each player's setting: a whoosh swelling from the ball's side, loudest as it arrives (the default), a louder tick, or off | U | The user hadn't noticed the tick. Claude suggested the whoosh, which also says where the ball comes from and when it arrives, and the user said to do it; both stay as a setting, the user's standing preference for two good designs |
 
 ## 6. Current features
 
@@ -1338,6 +1342,7 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 - **Voices:** four (`hurt.0`–`3`, `ko.0`–`3`); a player's is their id modulo 4, at 0.94–1.06× speed (from the id), so they keep it. A grunt plays 0.03 s after the hit; a knockout's body fall 0.45 s after (the 0.15 s freeze, then a 0.4 s fall).
 - **The dash:** a whoosh (×1.1 speed) and a push-off step at once, the landing 0.18 s later with a 62 Hz thump under it; someone else's at 70% and from where they are.
 - **Breathing:** under 35% stamina, a loop of panting at 0.35–1 by how far under (and up to 12% faster); 0.3 for 2.5 s after you recover, then a 2.5 s fade.
+- **The incoming ball** (once per ball, when it's under 0.9 s away; the Interface volume): the whoosh is noise through a band-pass sweeping 350 → 1600 Hz, swelling from 30 dB under its peak to the predicted arrival (0.2–0.9 s), then gone in 0.12 s, panned to the ball's side. The tick: a 900 Hz square beep, 0.07 s. Measured peaks at the default volumes: −9 and −19 dBFS.
 - **Revives:** for that player's team, the tom, the cymbal and the rising chime; for the other team, the tom at 0.72× speed, the horn at 0.5× (an octave down) and a 48 Hz rumble.
 - **The music:** in the lobby, the lobby track; from the first countdown to the end of a match, the match track, at 45% between rounds and 22% while a round is played. A track stopped for more than 20 s starts from the top. It plays only after the page has had a click, and pauses with the tab out of focus.
 - **Only the focused tab makes sound**, so test tabs on one computer don't all play at once.
@@ -1661,7 +1666,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 **`sfx.js`:** the sound (the numbers in section 8).
 - `Sfx.unlock()` (on a click) builds the audio graph, loads `sfx.oga` and the music, and resumes.
 - `play(name, {kind, pos, gain, rate, delay, vary, floor, variant})` plays one variant of a recording.
-- The game's moments: `throw`, `hit` (with `who` for the voice), `bounce`, `catch`, `deflect`, `dash`, `perfect`, `warn`, `deny`, `revive(ally)`, `heal`, `beep`, `say` (the announcer), `whistle`, `crowd`, `roundStart`, and `breathe(level)` every frame. Each falls back to a synthesized sound while the recordings aren't loaded. `voiceOf(id)` gives a player's voice.
+- The game's moments: `throw`, `hit` (with `who` for the voice), `bounce`, `catch`, `deflect`, `dash`, `perfect`, `incoming(style, tti, pos)`, `deny`, `revive(ally)`, `heal`, `beep`, `say` (the announcer), `whistle`, `crowd`, `roundStart`, and `breathe(level)` every frame. Each falls back to a synthesized sound while the recordings aren't loaded. `voiceOf(id)` gives a player's voice.
 - `setMusic(null | 'lobby' | 'match' | 'duck')`, `setEar(x, z, fx, fz)` (every frame, from the camera), `setVolume`, `setLevel(kind, v)`, and `onLoaded(error)` (logged as a `sound` line).
 - `main.js` saves the volumes in `dp.settings` (`volume`, `levels`), calls the moments from `onEvent` (`roundSound` for the rounds) and sets the music from the round's state.
 
@@ -1794,7 +1799,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
   - the recordings load and decode (43 sounds, 134 variants) and the six sliders exist;
   - every moment makes sound (−4 to −23 dBFS at the default volumes), and it's silent after;
   - a kind at 0 is silent while the others play (−125 dB), and the volumes are saved;
-  - a bounce to the left is 14 dB louder on the left, and to the right on the right;
+  - a bounce to the left is 14 dB louder on the left, and to the right on the right; the incoming-ball whoosh too;
   - 300 bounces at once: 2 voices (the 25 ms rule), and 40 at most when forced; no slower frames;
   - the music: the lobby track in the lobby, the match track at 22% during play;
   - breathing sounds while tired and stops by itself a few seconds after;
