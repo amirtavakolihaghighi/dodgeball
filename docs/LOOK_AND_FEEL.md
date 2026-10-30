@@ -1,6 +1,6 @@
 # The look and feel: the working plan
 
-This is the working plan for the branch `look-and-feel`. Why the branch exists, the analysis behind it and every decision are in phase 15 and decisions 112–127 of [PROJECT.md](PROJECT.md). This file holds:
+This is the working plan for the branch `look-and-feel`. Why the branch exists, the analysis behind it and every decision are in phase 15 and decisions 112–130 of [PROJECT.md](PROJECT.md). This file holds:
 
 - the goal;
 - the plan and where each step stands;
@@ -49,13 +49,13 @@ The game should look and feel professionally made: juice and good art, both. We 
 
 | # | Step | Status |
 | --- | --- | --- |
-| 1 | **Style samples:** two or three directions, rendered; the user picks | Done. Round 1: the sports hall (decisions 124–126). Round 2: the hall in vibrant colour and light, and athletes towards Fortnite-like humanoids; the helmet, for now (decision 127) |
-| 2 | **Smooth and fair:** a graphics setting that scales itself down when the frame rate drops (D1); a warning when Chrome draws without the graphics card (D2); presses timed from the key event (B4); every effect prepared in the lobby; the host's tab on a lower setting by default | To do |
+| 1 | **Style samples:** two or three directions, rendered; the user picks | Done. Round 1: the sports hall (decisions 124–126). Round 2: the hall in vibrant colour and light, and athletes towards Fortnite-like humanoids; both versions, with and without the helmet, picked at random for each player (decisions 127–128) |
+| 2 | **Smooth and fair:** a graphics setting that scales itself down when the frame rate drops (D1); a warning when Chrome draws without the graphics card (D2); presses timed from the key event (B4); every effect prepared in the lobby; the host's tab on a lower setting by default | Done (decisions 129–130): Auto, High, Medium, Low; the warning; presses timed from the key; no shader built mid-match (3 before); the host's Auto at most Medium. Real laptops are measured in step 10 |
 | 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | To do |
 | 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | To do |
 | 5 | **The arena:** floor, walls, stands and a crowd; lighting baked in Blender | To do |
 | 6 | **The ball and effects art** | To do |
-| 7 | **The characters:** the model, team colours, a lighter version for low settings | To do |
+| 7 | **The characters:** the model in both versions, with the helmet and without it, one picked at random for each player who joins (decision 128); team colours; a lighter version for low settings | To do |
 | 8 | **Animation:** running from CC0 motion capture; throws, catches, deflects and dodges in code, fitted to the host's timings; knockouts by physics (ragdolls) | To do |
 | 9 | **The HUD and menus** | To do |
 | 10 | **An office session:** the logs measure frame rates, freezes and the first download on real laptops | To do |
@@ -236,6 +236,7 @@ These are starting targets, to be checked on an office laptop and adjusted:
 **The user's pick** (decision 127):
 
 - **The helmet, for now:** "Helmet is ok for now." The face version is set aside.
+- **Then both** (decision 128, the same day): "I want with and without helmet both, when a player joins the game randomly picks a model and uses that."
 - **The bodies are "mostly okay", but the lats looked abnormally big.** They were: the lat shapes leaned the wrong way and flared out under the arms. They were slimmed and re-tilted, the shirt's drape narrowed to match, and the round was rendered again. The pictures above are the new ones.
 - **The user will look for free models later.** CC0 candidates Claude checked on their official pages:
   - [Quaternius Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html): CC0, "superhero" proportions, about 13,000 triangles, with a skeleton made for the Universal Animation Library. The free download has 2 base models and 5 hairstyles; the full set costs money.
@@ -262,6 +263,13 @@ These are starting targets, to be checked on an office laptop and adjusted:
       - **The face:** sleepy, then staring eyes; a hair "helmet", then a "beanie".
       - **The mesher:** long streaks from a bug.
     - The lessons are in section 14 of `PROJECT.md`.
-  - The user's pick: the helmet, for now (decision 127).
+  - The user's pick: the helmet, for now (decision 127), then both versions, one picked at random for each player who joins (decision 128).
     - The lats looked abnormally big, so they were slimmed and the round rendered again. The scene was reopened in the user's Blender, after a copy of their open file was saved as `art/out/style-samples-2-before-slimmer-lats.blend`.
     - The `Models` folder of "free" Fortnite and Call of Duty character downloads was checked (no licences; copies of those games' characters) and removed at the user's request.
+  - Step 2, smooth and fair (decisions 129–130):
+    - **D1:** a graphics setting with Auto.
+    - **D2:** the no-graphics-card warning.
+    - **B4:** presses timed from their key.
+    - **No first-use freezes:** every effect prepared while the game loads.
+    - **The host:** Auto stays at Medium or lower on the host's computer.
+    - **Tested:** the new `graphics.json` and the earlier browser and Python tests. In 35 s of every kind of effect, no shader was built mid-match (3 without the warm-up).

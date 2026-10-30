@@ -13,6 +13,7 @@
 //   {"waitFor": "js condition", "timeout": 8000}   poll until true (prints how long it took)
 //   {"wait": 500}                       sleep (ms)
 //   {"shot": "out.png"}                 screenshot (path relative to the current directory)
+//   {"shot": "part.png", "clip": {"x": 0, "y": 0, "width": 400, "height": 300, "scale": 2}}   part of the page, zoomed
 //   {"key": "KeyW"} / {"key": "KeyW", "down": false}        key down / up (KeyboardEvent.code)
 //   {"mouse": "down"|"up"|"move", "button": "left"|"right", "x": 640, "y": 360}
 // Page console output and exceptions are printed at the end.
@@ -96,7 +97,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }
     if (s.wait) await sleep(s.wait);
     if (s.shot) {
-      const r = await send('Page.captureScreenshot', { format: 'png' });
+      const clip = s.clip ? { clip: { scale: 1, ...s.clip } } : {};     // {x, y, width, height, scale}: a part, zoomed
+      const r = await send('Page.captureScreenshot', { format: 'png', ...clip });
       fs.writeFileSync(s.shot, Buffer.from(r.result.data, 'base64'));
       console.log('saved', s.shot);
     }

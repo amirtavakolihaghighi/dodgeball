@@ -107,6 +107,7 @@ export class World {
 
     this.court = null;
     this.ballScale = 1;     // the lobby's ball radius over the 0.2 m the meshes are built for
+    this.quality = 'high';  // the graphics level (graphics.js): Low draws fewer decorative effects
     addEventListener('resize', () => this.resize());
     this.resize();
   }
@@ -117,10 +118,56 @@ export class World {
     this.camera.updateProjectionMatrix();
   }
 
+  /** The graphics level and how many render pixels to draw per page pixel (graphics.js). */
+  setQuality(level, pixelRatio) {
+    this.quality = level;
+    if (pixelRatio !== this.renderer.getPixelRatio()) {
+      this.renderer.setPixelRatio(pixelRatio);
+      this.resize();
+    }
+  }
+
+  /** Builds every kind of effect once, out of sight, so their shaders exist before play starts:
+   *  building one in the middle of a match freezes the picture for a moment, which looks just
+   *  like lag. One of each stays (hidden), or three.js would throw the shaders away again. */
+  warmUp() {
+    if (this.warm) return;
+    const at = { x: 0, y: -40, z: 0 };
+    const first = this.fx.length;
+    this.burst(at.x, at.y, at.z, 0xffffff);
+    this.ring(at.x, at.y, at.z, 0xffffff);
+    this.spark(at.x, at.y, at.z, 0xffffff, true);
+    this.ghostBall(at, 0xffffff);
+    const mine = new Stickman(this, 0, true);       // a figure with the ring under your own feet
+    const faded = new Stickman(this, 1, false);     // one fading out (near the camera, or blinking)
+    for (const m of faded.fadeMats) {
+      m.transparent = true;
+      m.opacity = 0.5;
+    }
+    const quality = this.quality;
+    this.quality = 'high';
+    this.ghostMan(mine);                            // a perfect dodge's afterimage
+    this.quality = quality;
+    const ball = new BallView(this);                // a deflected ball: glow, shadow and trail
+    ball.update({ pos: at, state: 1, rally: 1, color: '#ffffff' }, 0);
+    ball.update({ pos: { x: 0.5, y: at.y, z: 0 }, state: 1, rally: 1, color: '#ffffff' }, 0.01);
+    const kept = this.fx.splice(first);
+    for (const root of [mine.root, faded.root]) root.position.y = at.y;
+    const objects = [...kept.map((f) => f.obj), mine.root, faded.root, ball.mesh, ball.glow, ball.shadow, ball.trail.mesh];
+    this.preview.visible = this.bounceMark.visible = true;     // the throw preview, too
+    this.renderer.compile(this.scene, this.camera);
+    this.preview.visible = this.bounceMark.visible = false;
+    for (const o of objects) o.visible = false;
+    this.warm = { kept, mine, faded, ball };
+  }
+
   buildCourt(L, W, gap) {
-    if (this.court) {
-      this.scene.remove(this.court);
-      disposeTree(this.court);
+    const old = this.court;
+    if (old) {
+      // Disposed only after the new court has been drawn once: the new court's materials then
+      // reuse the old ones' shaders instead of building them again (a hitch as a round starts).
+      this.scene.remove(old);
+      requestAnimationFrame(() => requestAnimationFrame(() => disposeTree(old)));
     }
     const g = (this.court = new THREE.Group());
     this.scene.add(g);
@@ -294,8 +341,10 @@ export class World {
     this.fx.push({ obj: mesh, t: 0, dur: 0.22, fade: 0.5 });
   }
 
-  /** A fading glowing copy of a stick figure's current pose (perfect-dodge afterimage). */
+  /** A fading glowing copy of a stick figure's current pose (perfect-dodge afterimage). Low
+   *  graphics skip it: each copies the whole figure, and the popup and sound say "perfect" too. */
   ghostMan(man) {
+    if (this.quality === 'low') return;
     const group = new THREE.Group();
     group.position.copy(man.root.position);
     group.rotation.copy(man.root.rotation);
@@ -782,7 +831,7 @@ class BallView {
         this.trailRally = b.rally;
       }
       this.trail.add(p.x, p.y, p.z, t);
-      if (b.rally && t - this.ghostAt > 0.035) {
+      if (b.rally && t - this.ghostAt > (this.world.quality === 'low' ? 0.07 : 0.035)) {   // Low: half as many
         this.ghostAt = t;
         this.world.ghostBall(p, col);
       }

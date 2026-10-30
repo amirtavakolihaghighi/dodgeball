@@ -8,6 +8,15 @@ const KEY_ACTIONS = {
 };
 const MOUSE_ACTIONS = { 0: 'throw', 2: 'catch' };
 
+/** When the key or button really went down (ms, the performance.now clock). The browser can hold
+ *  an event while it finishes drawing a frame, up to a whole frame on a slow laptop (50 ms at
+ *  20 fps), and the server judges a press by the moment it happened, not when it was handled. */
+function eventTime(e) {
+  const now = performance.now();
+  const t = e.timeStamp;
+  return t > 0 && t <= now && now - t < 1000 ? t : now;
+}
+
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
@@ -62,22 +71,22 @@ export class Input {
     if (e.code === 'Tab' || (e.code === 'Space' && this.active)) e.preventDefault();
     const action = KEY_ACTIONS[e.code];
     if (!down) {
-      if (this.keys.delete(e.code) && action) this.onRelease(action);
+      if (this.keys.delete(e.code) && action) this.onRelease(action, eventTime(e));
       return;
     }
     if (this.keys.has(e.code) || (!this.active && e.code !== 'Tab')) return;   // ignore auto-repeat
     this.keys.add(e.code);
-    if (action) this.onPress(action);
+    if (action) this.onPress(action, eventTime(e));
   }
 
   button(e, down) {
     const action = MOUSE_ACTIONS[e.button];
     if (!action) return;
     if (!down) {
-      if (this.buttons.delete(action)) this.onRelease(action);
+      if (this.buttons.delete(action)) this.onRelease(action, eventTime(e));
     } else if (this.active && !this.buttons.has(action)) {
       this.buttons.add(action);
-      this.onPress(action);
+      this.onPress(action, eventTime(e));
     }
   }
 

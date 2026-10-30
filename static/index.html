@@ -125,6 +125,13 @@
         <label>Mouse sensitivity <input id="sensInput" type="range" min="0.3" max="2.5" step="0.05"></label>
         <label>Volume <input id="volInput" type="range" min="0" max="1" step="0.05"></label>
         <label class="check"><input id="ringInput" type="checkbox"> Timing ring for incoming balls (H)</label>
+        <label>Graphics
+          <select id="gfxSelect">
+            <option value="auto">Auto (recommended)</option><option value="high">High</option>
+            <option value="medium">Medium</option><option value="low">Low</option>
+          </select></label>
+        <p class="note" id="gfxNote"></p>
+        <p class="warn" id="gpuWarn" hidden>Your browser is drawing the game without the graphics card, so it will be choppy. In Chrome or Edge, open Settings › System, switch on “Use graphics acceleration when available”, and restart the browser.</p>
       </section>
       <section>
         <h3>Controls</h3>
@@ -191,6 +198,7 @@
     <p class="tag">Schoolyard dodgeball with Souls-style stamina. Throw hard, read the ball, then dodge, catch or deflect at the last moment.</p>
     <label class="field">Name <input id="nameInput" maxlength="16" autocomplete="off"></label>
     <button id="playBtn" class="primary">Join game</button>
+    <p class="warn" id="gpuWarnJoin" hidden>Your browser is drawing the game without the graphics card, so it will be choppy. In Chrome or Edge, open Settings › System, switch on “Use graphics acceleration when available”, and restart the browser.</p>
     <p class="note">The host (whoever runs the game on their computer) sets up the teams and the rules, and starts the match. Testing alone? Open more tabs or windows, and add bots to either team in the lobby.</p>
   </div>
 </div>

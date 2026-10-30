@@ -99,7 +99,29 @@ To read a session: `python tools\log_report.py <the zip or a session folder>`. I
 - a table of every player: frame rate, frozen time, late updates, ping, input gaps while playing, late presses, presses made while still recovering;
 - what the press grace and sidestep compensation did, and the hits that came just after a press or a defence (too early, second ball);
 - freezes several players shared, which point at the host;
-- the numbers just before every L.
+- the numbers just before every L;
+- when Auto graphics changed a player's level and why, and players whose browser held their key presses for a while (a busy computer).
+
+## Graphics
+
+Each player picks their own in the menu (Esc), under **Your settings › Graphics**:
+
+| Setting | What it draws |
+| --- | --- |
+| **Auto** (the default) | Starts at High and lowers itself when the game gets choppy |
+| **High** | The sharpest picture and every effect |
+| **Medium** | A softer picture (3/4 of the sharpness) and every effect |
+| **Low** | A soft picture (half the sharpness) and fewer decorative effects: no afterimages after a perfect dodge, half as many behind deflected balls |
+
+- **Auto** steps down a level when the frame rate stays under 45 a second for 3 seconds.
+  - A step that doesn't help is undone, and Auto then leaves things alone: the game is held back by something else, like battery saver or a busy computer, and a softer picture wouldn't help.
+  - After 20 smooth seconds it tries a level up again, at most twice a session.
+  - On the host's computer, which also runs the server, Auto stays at Medium or lower. Pick High there to override it.
+- **The top-right corner** shows the level next to the frame rate, for example "1 ms · 60 fps · Medium". Low softens only the 3D picture: names, bars and the crosshair stay sharp.
+- **Nothing that matters for play changes** with the setting: the balls, their trails, the timing ring and the throw preview look the same on every level, so a low setting is never a disadvantage.
+- **Without the graphics card:** when the browser draws the game in software, the game runs at about 19 frames a second. The join screen and the menu then show a warning. The fix: in Chrome or Edge, open Settings › System, switch on "Use graphics acceleration when available", and restart the browser. Auto starts at Low there meanwhile.
+- **Presses are timed from the key itself.** A slow laptop can handle a key press up to a frame late (50 ms at 20 frames a second), but the server is told when the key really went down.
+- **Every effect is prepared while the game loads,** so nothing freezes the picture the first time it appears in a match.
 
 ## Controls
 
@@ -184,7 +206,7 @@ These are the **defaults** (they live in `config.py`). The host can change every
 - `static/`: the browser client, written in Three.js and bundled in `static/vendor`, so no internet is needed at the party.
   - Your browser moves your own player instantly, and the server keeps the movement legal.
   - The world is drawn about 0.1 s in the past, for smoothness.
-  - Every button press tells the server which moment was on screen. The server judges dodge, catch and deflect timing against that moment, so a parry that looked right on your screen counts.
+  - Every button press tells the server which moment was on screen when the key went down. The server judges dodge, catch and deflect timing against that moment, so a parry that looked right on your screen counts.
 
 ## Tests
 

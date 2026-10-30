@@ -122,6 +122,8 @@ Effort: **S** = hours, **M** = about a day, **L** = days.
 | D2 | **Warn when Chrome draws without the GPU:** "Turn on hardware acceleration in Chrome settings" | S | Measured at ~19 fps in that mode; one line of advice fixes it |
 | D3 | Reuse effect objects. Afterimages and bursts currently create new materials each time | S | Less garbage-collection stutter. Low priority |
 
+D1, D2 and B4 were built in the look-and-feel cycle (branch `look-and-feel`, decisions 129–130), with every effect's shader prepared while the game loads.
+
 ### E. Gameplay and mechanics changes that make delay matter less
 
 These change how the game feels. With the new lobby rules editor, they can be tried live during a session and kept only if they feel better.

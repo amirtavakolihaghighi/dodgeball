@@ -138,6 +138,28 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\why_hit.
 
 `why_hit.js` plays alone against three hard bots, with free deflects and no lockout, and deflects every other incoming ball about 0.27 s too early (the rest on time). It prints the presses, the hits, how many hits the server marked `early` ("TOO EARLY") or `second` ("SECOND BALL"), and how many of those popups appeared on screen. Healthy: the marked hits and the popups match one for one (measured: 10 hits, 6 too early and 3 second ball, and the same 6 + 3 popups).
 
+## Graphics, presses timed from their key, effects prepared in advance
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\graphics.json
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock&nowarm" tests\browser\graphics.json
+```
+
+`graphics.json` (+ `graphics.js`) checks:
+
+- **In the lobby:** the warning for drawing without the graphics card (headless Chrome draws in software, so it shows), Auto starting at Low at half the sharpness, and the host's ceiling of Medium.
+- **Auto's rules,** on a stand-in world fed made-up frame times:
+  - slow at High steps down, and a step that helps is kept;
+  - a step that doesn't help (30 → 31 fps) is undone, and Auto then stops changing things;
+  - 20 smooth seconds try a level up;
+  - the host's ceiling lowers Auto but not a chosen High;
+  - no graphics card starts at Low;
+  - a paused page isn't counted as slow.
+- **Presses timed from their key event:** a press the browser handled 40 ms or 120 ms late is logged as held that long, and its `wt` is the moment the key went down; a nonsense timestamp (2.5 s old) falls back to now.
+- **No shader built mid-match:** 35 s of play, deflecting, dodging and catching every ball in turn (rally balls, perfect-dodge afterimages, bounces, hits). It prints the shader count in the lobby and after the match.
+  - Healthy: none built mid-match. Measured: 10 in the lobby and none added.
+  - With `&nowarm` (no warm-up), the same match built 3 mid-match (5 in the lobby, then 8). Each such build freezes the picture for a moment on a real laptop.
+
 ## The session logs
 
 `--fresh` turns logging off, so give the test server a log folder (`tests\browser\out\` is git-ignored):
@@ -166,5 +188,5 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock&jitter=200" tests\brows
 - `&lag=150` makes the page add 150 ms of network round trip, to check lag compensation. `&jitter=200` adds up to 200 ms more, unevenly but in order, like Wi-Fi over TCP.
 - `CDP_SIZE=640x360` (an environment variable) renders a smaller page. Each software-rendered headless Chrome keeps every CPU core busy, so with two or more at once the server they test gets starved. Even small ones max out this 16-thread PC, so rehearse with one browser where you can.
 - To run two players at once, give each `cdp.js` run its own debug port (the third argument), for example 9401 and 9402.
-- Headless Chrome renders in software (~20 fps), so frame stalls cause the odd late press that a real player at 60 fps wouldn't get.
+- Headless Chrome renders in software: about 20 fps at High graphics. Auto starts at Low there (about 50 fps at the default size). Frame stalls still cause the odd late press that a real player at 60 fps wouldn't get.
 - Screenshots land in the current folder and are git-ignored.

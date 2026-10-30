@@ -1,0 +1,16 @@
+[
+  {"eval": "document.getElementById('nameInput').value = 'GfxTest'; document.getElementById('playBtn').click(); 'joined'"},
+  {"waitFor": "dp.cfg && dp.net.latest && dp.net.latest.r.s === 'lobby' && !document.getElementById('startBtn').hidden", "timeout": 8000},
+  {"wait": 1500},
+  {"evalFile": "graphics.js"},
+  {"eval": "__start()"},
+  {"eval": "__gfxUnit()"},
+  {"eval": "__pressTiming()"},
+  {"shot": "graphics_lobby.png"},
+  {"eval": "document.getElementById('startBtn').click(); 'match started'"},
+  {"waitFor": "dp.net.latest && dp.net.latest.r.s === 'play'", "timeout": 10000},
+  {"eval": "__defend()"},
+  {"wait": 35000},
+  {"eval": "__report()"},
+  {"shot": "graphics_match.png"}
+]

@@ -15,6 +15,7 @@ import { Lobby } from './lobby.js';
 import { RulesEditor } from './rules_ui.js';
 import { launchVelocity } from './physics.js';
 import { Diag } from './diag.js';
+import { Graphics, gpuInfo, LEVEL_NAMES } from './graphics.js';
 import * as settingsFile from './settings_file.js';
 
 const $ = (id) => document.getElementById(id);
@@ -47,7 +48,7 @@ const diag = new Diag();
 diag.clock = () => (net.offset === null ? null : performance.now() / 1000 + net.offset);
 diag.context = () => ({
   ping: Math.round(net.rtt), state: net.latest?.r.s ?? null, alive: me?.alive ? 1 : 0,
-  lock: input.locked ? 1 : 0, interp: Math.round(net.interpDelay * 1000),
+  lock: input.locked ? 1 : 0, interp: Math.round(net.interpDelay * 1000), gfx: graphics.level,
 });
 net.onSnapshot = (now, late) => diag.snapshot(now, late);
 net.onStale = (n) => diag.count('stale', n);
@@ -61,7 +62,7 @@ const lobby = new Lobby(net, {
 });
 editor.onMessage = (text, cls) => hud.popup(text, cls);
 
-const settings = { sens: 1, volume: 0.6, ring: true, follow: true };
+const settings = { sens: 1, volume: 0.6, ring: true, follow: true, graphics: 'auto' };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('dp.settings') || '{}'));
 } catch { /* private mode etc: defaults are fine */ }
@@ -69,6 +70,20 @@ const saveSettings = () => {
   try { localStorage.setItem('dp.settings', JSON.stringify(settings)); } catch { /* ignore */ }
 };
 sfx.setVolume(settings.volume);
+
+// The graphics setting (graphics.js), and a warning when the browser draws without the graphics
+// card: the game then runs at about 19 frames a second, and one browser setting fixes it.
+const gpu = gpuInfo(world.renderer);
+const graphics = new Graphics(world, settings.graphics, gpu.software);
+addEventListener('resize', () => graphics.apply());     // also catches a move to a sharper screen
+if (gpu.software) {
+  for (const id of ['gpuWarn', 'gpuWarnJoin']) $(id).hidden = false;
+}
+graphics.onChange = (from, to, why) => {
+  diag.log('gfx', { from, to, why, fps: graphics.fps === null ? null : round(graphics.fps, 1) });
+  $('gfxNote').textContent = graphics.describe();
+  hud.popup(`Graphics: ${LEVEL_NAMES[to]} (${why.split(':')[0]}). Esc › Your settings to change it`, 'dim');
+};
 
 let cfg = null;
 let isHost = false;
@@ -101,6 +116,7 @@ const sharedView = { text: '', at: 0 };    // what this host last told the other
 const watching = () => me?.team === -1;
 
 world.buildCourt(13, 7, 1);
+if (!params.has('nowarm')) world.warmUp();     // every effect's shader built now, not mid-match (?nowarm: for tests)
 
 // ------------------------------------------------------------------ join & menu
 
@@ -154,6 +170,8 @@ net.on('welcome', (m) => {
   rules.defaults = m.defaults;
   editor.setup(m.schema, m.defaults, isHost);
   lobby.setHost(isHost, m.cfg.botsMax);
+  if (isHost) graphics.setCeiling('medium');      // this computer also runs the server
+  $('gfxNote').textContent = graphics.describe();
   applyRules(m);
   hud.show(true);
   const box = $('joinInfo');
@@ -208,6 +226,15 @@ input.onLockChange = (locked) => {
 $('sensInput').value = settings.sens;
 $('volInput').value = settings.volume;
 $('ringInput').checked = settings.ring;
+$('gfxSelect').value = graphics.choice;
+$('gfxNote').textContent = graphics.describe();
+$('gfxSelect').addEventListener('change', (e) => {
+  settings.graphics = e.target.value;
+  saveSettings();
+  graphics.choose(settings.graphics);
+  diag.log('gfx', { choice: settings.graphics, to: graphics.level });
+  $('gfxNote').textContent = graphics.describe();
+});
 $('followInput').checked = settings.follow;
 $('followInput').addEventListener('change', (e) => {
   settings.follow = e.target.checked;
@@ -285,20 +312,13 @@ function importSetupText(text, fileName = 'the file') {
 
 /** The device, for the log: what frame rate and timing depend on. */
 function envInfo() {
-  const gl = world.renderer.getContext();
-  let gpu = null;
-  let vendor = null;
-  try {
-    const ext = gl.getExtension('WEBGL_debug_renderer_info');
-    gpu = gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
-    vendor = gl.getParameter(ext ? ext.UNMASKED_VENDOR_WEBGL : gl.VENDOR);
-  } catch { /* not available */ }
   const c = navigator.connection;
   return {
     ua: navigator.userAgent, platform: navigator.userAgentData?.platform ?? navigator.platform,
     cores: navigator.hardwareConcurrency ?? null, mem_gb: navigator.deviceMemory ?? null,
     screen: `${screen.width}x${screen.height}`, dpr: devicePixelRatio, window: `${innerWidth}x${innerHeight}`,
-    canvas: `${canvas.width}x${canvas.height}`, pixel_ratio: world.renderer.getPixelRatio(), gpu, vendor,
+    canvas: `${canvas.width}x${canvas.height}`, pixel_ratio: world.renderer.getPixelRatio(),
+    gpu: gpu.gpu, vendor: gpu.vendor, software: gpu.software, graphics: graphics.choice, level: graphics.level,
     net: c ? { type: c.effectiveType, rtt: c.rtt, down: c.downlink } : null,
     url: location.search.replace(/([?&]host=)[^&]*/, '$1(hidden)'), tab: diag.tab, run: diag.run, lang: navigator.language,
   };
@@ -306,7 +326,9 @@ function envInfo() {
 
 // ------------------------------------------------------------------ actions
 
-input.onPress = (a) => {
+// `at`: when the key or button went down (ms on the performance.now clock, input.js). Presses are
+// timed from it, not from when this code got to run, which on a slow laptop can be a frame later.
+input.onPress = (a, at) => {
   if (a === 'scores') { scoresHeld = true; return; }
   if (a === 'mark') {
     diag.log('mark', diag.context());
@@ -326,13 +348,13 @@ input.onPress = (a) => {
     return;
   }
   if (!me || !cfg || !me.alive) return;
-  if (a === 'throw') startCharge();
+  if (a === 'throw') startCharge(at);
   else if (a === 'revive') net.send({ t: 'revive' });
-  else tryAction(a);
+  else tryAction(a, at);
 };
-input.onRelease = (a) => {
+input.onRelease = (a, at) => {
   if (a === 'scores') scoresHeld = false;
-  else if (a === 'throw') releaseThrow();
+  else if (a === 'throw') releaseThrow(at);
 };
 input.onCancel = () => {
   if (local.charging) {
@@ -384,8 +406,8 @@ function ignored(kind, t) {
   denied(`Still recovering (${(local.busyUntil - t).toFixed(1)}s)`);
 }
 
-function startCharge() {
-  const t = clock();
+function startCharge(at = performance.now()) {
+  const t = at / 1000;
   if (!combatOpen()) return;
   if (t < local.busyUntil) return ignored('throw', t);
   if (!hasBall()) return denied(`No ball yet (${me.cooldown.toFixed(1)}s)`);
@@ -395,21 +417,21 @@ function startCharge() {
   }
   local.charging = true;
   local.chargeAt = t;
-  net.send({ t: 'charge', wt: round(net.viewTime(), 4) });
+  net.send({ t: 'charge', wt: round(net.viewTimeAt(at), 4) });
 }
 
-function releaseThrow() {
+function releaseThrow(at = performance.now()) {
   if (!local.charging) return;
-  const power = chargePower();
+  const power = chargePower(at / 1000);
   local.charging = false;
-  local.throwAt = clock();
-  net.send({ t: 'throw', wt: round(net.viewTime(), 4), aim: aim.point, tg: aim.tg });
+  local.throwAt = at / 1000;
+  net.send({ t: 'throw', wt: round(net.viewTimeAt(at), 4), aim: aim.point, tg: aim.tg });
   world.man(myId)?.playThrow();
   sfx.throw(power);
 }
 
-function tryAction(kind) {
-  const t = clock();
+function tryAction(kind, at = performance.now()) {
+  const t = at / 1000;
   if (!combatOpen()) return;
   if (t < local.busyUntil) return ignored(kind, t);
   const spec = cfg.actions[kind];
@@ -429,8 +451,12 @@ function tryAction(kind) {
     local.dashUntil = t + cfg.dash.time;
     dir = local.dashDir.map((v) => round(v, 3));
   }
-  net.send({ t: 'act', a: kind, wt: round(net.viewTime(), 4), dir, aim: aim.point, tg: aim.tg });
-  diag.log('press', { a: kind, wt: round(net.viewTime(), 3), tti: threat ? round(threat.tti, 3) : null, ball: threat?.b.id ?? null });
+  const wt = net.viewTimeAt(at);
+  net.send({ t: 'act', a: kind, wt: round(wt, 4), dir, aim: aim.point, tg: aim.tg });
+  diag.log('press', {
+    a: kind, wt: round(wt, 3), tti: threat ? round(threat.tti, 3) : null, ball: threat?.b.id ?? null,
+    held: Math.round(performance.now() - at),     // how long the browser held the event (ms)
+  });
 }
 
 function dodgeDirection() {
@@ -1026,7 +1052,7 @@ function updateHud(t) {
     }
   } else lastCount = -1;
   hud.showScores(scoresHeld, players, myId);
-  hud.setNet(`${Math.round(net.rtt)} ms · ${Math.round(fps)} fps`);
+  hud.setNet(`${Math.round(net.rtt)} ms · ${Math.round(fps)} fps · ${LEVEL_NAMES[graphics.level]}`);
   const lobbyOn = r.s === 'lobby';
   const spectating = watching();
   hud.setWatching(spectating);
@@ -1155,6 +1181,7 @@ function frame() {
   const tMs = performance.now();
   const frozen = drawFrame(tMs);
   diag.frame(tMs, performance.now() - tMs, frozen);
+  graphics.frame(tMs);
 }
 
 /** One frame. Returns true when no newer world update existed to show, so the picture of the
@@ -1220,7 +1247,7 @@ requestAnimationFrame(frame);
 
 // Handle for automated tests and console poking.
 window.dp = {
-  net, input, local, aim, world, lobby, editor, rules, diag, showMenu, spec, followNext,
+  net, input, local, aim, world, lobby, editor, rules, diag, graphics, showMenu, spec, followNext,
   exportSettings, importSetupText, settingsFile, ownValue, ballColorOf,
   get hostView() { return hostView; },
   get me() { return me; }, get threat() { return threat; }, get view() { return view; }, get cfg() { return cfg; }, get isHost() { return isHost; },

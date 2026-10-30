@@ -134,6 +134,11 @@ class Player:
                         and r.get("alive") and (r.get("lock") or free)}
         self.gpu = self.env.get("gpu") or "?"
         self.no_gpu = any(w in self.gpu.lower() for w in NO_GPU)
+        # The graphics setting (graphics.js): what they chose, and Auto's own changes, with why.
+        self.gfx_choice = self.env.get("graphics")
+        self.gfx_auto = [r for r in records if r.get("ty") == "gfx" and r.get("why")]
+        # How long the browser held each press before the game's code saw it (ms): a busy page.
+        self.held = [r["held"] for r in records if r.get("ty") == "press" and r.get("held") is not None]
         self.late_presses = []      # filled from the server log
         self.sidesteps = []         # balls that missed: clear on their own screen (sidestep compensation)
         self.graced = []            # defences that counted only thanks to the press grace
@@ -422,7 +427,17 @@ def verdicts(p):
         out.append(f"draws without the graphics card ({p.gpu}). Turn on hardware acceleration in Chrome settings.")
     if p.fps_med is not None and (p.fps_med < 45 or (p.slow_share or 0) > 10):
         cpu = f"; {p.js_med:.0f} ms of game code per frame, so the CPU is part of it" if (p.js_med or 0) > 8 else ""
-        out.append(f"low frame rate (typically {p.fps_med:.0f} fps, under 30 for {p.slow_share:.0f}% of the time{cpu}).")
+        fixed = (f" They chose {p.gfx_choice.capitalize()} graphics: Auto or a lower level would help."
+                 if p.gfx_choice in ("high", "medium") else "")
+        out.append(f"low frame rate (typically {p.fps_med:.0f} fps, under 30 for {p.slow_share:.0f}% of the time{cpu}).{fixed}")
+    for r in p.gfx_auto[:3]:
+        out.append(f"Auto graphics went from {str(r.get('from')).capitalize()} to {str(r.get('to')).capitalize()}: {r.get('why')}.")
+    if len(p.gfx_auto) > 3:
+        out.append(f"...and {len(p.gfx_auto) - 3} more automatic graphics change(s).")
+    held = pct(p.held, 0.95)
+    if held is not None and held >= 30:
+        out.append(f"the browser held their presses up to {held:.0f} ms (p95) before the game saw them: a busy page."
+                   " Presses are timed from the key itself, so it doesn't count against them.")
     if (p.frozen_pct or 0) >= 1 or (p.late_p95 or 0) >= 60:
         where = ("mostly while the server stalled or others froze too (host side)" if p.shared_ms > p.own_ms
                  else "mostly on its own (this player's download: likely their Wi-Fi)")

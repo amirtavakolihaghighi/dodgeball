@@ -807,16 +807,35 @@ This is the short version, kept on `main` while internet mode waits on its branc
 - **What carries over:**
   - the hall, its baked sunlight, the shafts, the sky backdrop, bloom and the grade carry over cheaply;
   - each athlete is about 1.5 million triangles, against a budget of 5,000–10,000, and exists only as posed statues, so the game needs lighter rigged models (step 7).
-- **The user's pick** (decision 127): the helmet, for now. The bodies are "mostly okay", but the lats looked abnormally big. They were: the lat shapes leaned the wrong way and flared out under the arms, so they were slimmed and re-tilted, and the round was rendered again.
+- **The user's pick** (decision 127): the helmet, for now. Then, the same day, both versions: when a player joins, the game picks one at random (decision 128). The bodies are "mostly okay", but the lats looked abnormally big. They were: the lat shapes leaned the wrong way and flared out under the arms, so they were slimmed and re-tilted, and the round was rendered again.
 - **The `Models` folder:** the user had downloaded four "free" character models for Claude to check: three Fortnite characters and a Call of Duty character.
   - They were copies of Epic Games' and Activision's characters, at least one extracted from the game itself (Fortnite's own texture names), with no licence at all.
   - They were unusable (decision 119, and decision 126: a reference, not something to copy), and risky in a public repository. They were removed at the user's request.
   - Claude listed CC0 alternatives in `docs/LOOK_AND_FEEL.md`, and the user will look for models later.
 
+**Step 2: smooth and fair** (decision 116; built the same day; decisions 129–130):
+
+- **D1, a graphics setting** for each player, under Your settings: Auto (the default), High, Medium and Low (section 7).
+  - The levels change the render resolution (all, 3/4 or half of the screen's sharpness) and, on Low, only decorative effects: no perfect-dodge afterimages, half as many behind deflected balls.
+  - Auto steps down when the frame rate stays under 45, keeps a step only if it helps, and tries a level up after 20 smooth seconds.
+- **The host's tab on a lower setting:** on the host's computer, Auto stays at Medium or lower. A chosen High overrides it.
+- **D2, a warning** on the join screen and in the menu when the browser draws without the graphics card, with the browser setting that fixes it. Auto starts at Low there.
+- **B4, presses timed from the key event** (`event.timeStamp`) instead of from when the page handled them, which on a slow laptop can be a frame later. Each `press` log line records how long the browser held it.
+- **Every effect prepared in the lobby:** one of every effect is built while the game loads and kept hidden, so its shader exists before play; a rebuilt court reuses the old court's shaders.
+  - Measured with three.js's own count: in 35 s of play with every kind of effect, the warm-up left no shader to build mid-match. Without it, 3 were built mid-match, each a short freeze on a real laptop.
+- **The log report** notes Auto's changes (with why) and presses the browser held for 30 ms or more.
+- **Tests:**
+  - New: `graphics.json`.
+  - Re-run and passing: the smoke, auto-defender (13 of 15 presses defended at 150 ms of lag), sidestep (13 of 24 sidestepped, no hits while clear), lobby (one and two browsers) and logs tests, and the 69 rule and 7 server tests.
+- **Not done:**
+  - An antialiasing switch: antialiasing is fixed when the page starts, and costs little on a smaller picture.
+  - A frame-rate cap for the host's tab: an idea for later.
+  - Measuring on real office laptops: that's step 10.
+
 **Next, in order:** the plan in `docs/LOOK_AND_FEEL.md`:
 
-1. Style samples (done: the sports hall, the helmet for now).
-2. The performance items.
+1. Style samples (done: the sports hall; athletes with and without the helmet, picked at random).
+2. The performance items (done: D1, D2, B4, effects prepared in the lobby, the host's lower setting).
 3. Juice and sound.
 4. The arena, the ball and effects, the characters and their animation, and the HUD.
 5. An office session.
@@ -947,7 +966,10 @@ This is the short version, kept on `main` while internet mode waits on its branc
 | 124 | The setting is the sports hall | U | "I think the sport hall is the proper setting for the game." Picked from style samples round 1 (night arena, daylight court, sports hall) |
 | 125 | Colours and light like the landscapes of Genshin Impact: vibrant, alive, cheerful, with beautiful light. Never pale | U | "I like the colors from the hall. It's vibrant and alive and cheerful… I want the colors to look like Genshin Impact lands… I don't like pale." A reference for the style, not something to copy |
 | 126 | Characters towards Fortnite-like humanoids: stylised human proportions | U | "I'm looking forward for them to look something like Fortnite humanoid characters." A reference for the style, not something to copy. Round 1's characters were a first draft |
-| 127 | The athletes wear the sports helmet with a visor, for now; the face version is set aside. Round 2's bodies are the base, with slimmer lats | U | "Helmet is ok for now." "The model is mostly okay but they look like they all have big lats." Picked from style samples round 2. The face came out generic and slightly uncanny up close. The user will look for free (CC0) models later |
+| 127 | The athletes wear the sports helmet with a visor, for now; the face version is set aside. Round 2's bodies are the base, with slimmer lats | U | "Helmet is ok for now." "The model is mostly okay but they look like they all have big lats." Picked from style samples round 2. The face came out generic and slightly uncanny up close. The user will look for free (CC0) models later. The helmet-only part is replaced by decision 128 |
+| 128 | Both versions of the athlete go into the game, with the helmet and without it: when a player joins, the game picks one at random and uses it | U | "I have changed my mind, I want with and without helmet both, when a player joins the game randomly picks a model and uses that." Replaces decision 127's helmet-only choice. Built with the characters (step 7 in `docs/LOOK_AND_FEEL.md`); details such as bots, and whether the pick lasts the whole session, are settled then |
+| 129 | The graphics setting (the lag study's D1), each player's own: Auto (default), High, Medium, Low. The levels change the render resolution (1, 0.75, 0.5 of `min(devicePixelRatio, 1.5)`) and, on Low, decorative effects only. Auto steps down after 3 s under 45 fps, keeps a step only if it raises the frame rate by 12%, and tries a level up after 20 s at 57 fps or more (twice a session). The host's Auto stays at Medium or lower (decision 116's lower default for the host's tab). Antialiasing stays on | C | Gameplay information looks the same on every level, so a low setting is never a disadvantage. A step that doesn't help means something else holds the game back (battery saver caps the frame rate; a busy CPU), and a softer picture would only cost. A ceiling rather than a fixed Medium lets the host's Auto still go lower, and a chosen High overrides it. Antialiasing is fixed when the page's WebGL context is made, and costs little on a smaller picture |
+| 130 | Presses are timed from their key or button event (B4; a missing, future or over-1-s-old timestamp falls back to now). Every effect's shader is built while the game loads and kept alive, and a rebuilt court reuses the old court's shaders. The no-graphics-card warning (D2) shows on the join screen and in the menu | C | A busy page holds events for up to a frame (50 ms at 20 fps), which counted against slow laptops. Measured: without the warm-up, 35 s of play built 3 shaders mid-match, each a freeze on a real laptop; with it, none. The warning names the one setting that turns ~19 fps into a normal frame rate |
 
 ## 6. Current features
 
@@ -984,6 +1006,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
 - Server-authoritative rules; lag compensation up to 0.25 s; press grace (0.02 s); sidestep compensation (dodging by moving is judged by your own screen); the lockout after a missed press is adjustable (0 = none).
 - Smooth interpolation, with ball arrival matched to the true contact moment.
 - A slow device can't stall the game.
+- Presses are timed from their key event, so a slow laptop doesn't lose up to a frame on each one.
 
 **Presentation:**
 
@@ -996,7 +1019,9 @@ This is the short version, kept on `main` while internet mode waits on its branc
   - Action costs; team scores with alive pips (and, with team health, each team's bar); round timer; kill feed.
   - Name tags with HP and stamina; the aim-assist marker; the timing ring with a direction arrow.
   - Popups (including "Still recovering" when a press comes during a recovery, and why a hit got through: "TOO EARLY (0.05 s)" or "SECOND BALL"); gold and red screen flashes; a Tab scoreboard; a hint line in the lobby; a line saying what the host is doing.
-  - An Esc menu that doubles as the lobby: teams, match settings, the rules editor, your own settings (sensitivity, volume, ring), controls and join addresses.
+  - An Esc menu that doubles as the lobby: teams, match settings, the rules editor, your own settings (sensitivity, volume, ring, graphics), controls and join addresses.
+- **A graphics setting** for each player: Auto (default), High, Medium, Low. Auto steps down when the frame rate stays low and undoes a step that doesn't help; the host's Auto stays at Medium or lower. A warning on the join screen and in the menu when the browser draws without the graphics card.
+- Every effect's shader is built while the game loads, so nothing freezes the picture the first time it appears.
 - Synthesized sounds.
 
 **Operations:**
@@ -1175,6 +1200,7 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - So `wt` is the server time of the world on screen, about 0.1 s behind on a LAN.
   - **Re-anchoring:** if even the least late update of a 1.5 s window arrived over 40 ms behind the estimate, the offset moves back by that much at once (this computer's clock was adjusted, or the route got slower for good). Without it, a clock running fast left the view time past the newest update for minutes.
 - **The press:** every action message carries `wt`. The server clamps it to `[now − 0.25, now]` and uses it as the press time (`action_start`). The clamp bounds cheating.
+  - `wt` is the view time **at the key or button event's own timestamp** (`event.timeStamp`, `input.js eventTime`), not when the page handled it: a busy page can hold an event for up to a frame. A timestamp that's missing, in the future or over 1 s old falls back to now. The log's `press` lines record how long each was held (`held`, ms).
 - **When a ball touches a player with no active action:**
   - The ball becomes `pending`: frozen at the contact point.
   - It waits until `deadline = t_c + clamp(view_lag + 0.03, 0.05, 0.28)`, where `view_lag` is smoothed from `now − wt` of the input messages.
@@ -1195,6 +1221,18 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - Balls homing on you always count. Balls homing on someone else count if they'd pass within the hit radius (0.62 m) plus 0.6 m. Free-flying balls count only within the hit radius plus 0.15 m.
   - A ball you've already pressed for is skipped, so the next one shows.
 - **Answered balls:** after a successful catch or deflect, your hands are freed locally the moment the answered ball arrives, mirroring the server.
+
+**Graphics (`graphics.js`), each player's own:**
+
+- **The levels:** render pixels per page pixel = `min(devicePixelRatio, 1.5)` × 1 (High), 0.75 (Medium) or 0.5 (Low). Antialiasing stays on at every level: it's fixed when the page creates its WebGL context, and on a smaller picture it costs little.
+- **Low** also leaves out the perfect-dodge afterimages (each copies the whole figure) and draws half as many afterimages behind deflected balls (every 0.07 s instead of 0.035 s). Nothing that matters for play changes with the level.
+- **Auto:**
+  - A second under 45 fps is slow, and 3 slow seconds in a row step down a level.
+  - The step must raise the frame rate by 12% (measured over the next 3 seconds), or it's undone and Auto stops changing things for the session.
+  - 20 seconds in a row at 57 fps or more try a level up, at most twice a session.
+  - The 2 seconds after any change aren't counted, and neither is a gap over 0.5 s between frames (a hidden tab, a stall).
+  - It starts at High, or at Low when the browser draws without the graphics card (`gpuInfo`: SwiftShader, llvmpipe, softpipe, "software", Basic Render Driver). On the host's computer it goes no higher than Medium.
+- Automatic changes are logged (`gfx`: from, to, why, fps) and shown in a dim popup; every `sec` line carries the level (`gfx`). The top-right readout shows it too ("1 ms · 60 fps · Medium").
 
 **Physics:**
 
@@ -1470,11 +1508,14 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - The menu's "Lag diagnostics" section has "Save my log" and the host's "Download all logs (zip)". L logs a `mark`.
 - `net.js` reports each update's lateness (`onSnapshot`) and stale events (`onStale`), and supports `?jitter=N`.
 
-**`net.js`:** connection, `?lag=N` simulation, clock offset, snapshot buffer (1.5 s), `sample()` with the interpolation rules above, and `takeEvents()` (drops events more than 1 s stale).
+**`net.js`:** connection, `?lag=N` simulation, clock offset, snapshot buffer (1.5 s), `sample()` with the interpolation rules above, `viewTime()` and `viewTimeAt(ms)` (the view time at a press's event), and `takeEvents()` (drops events more than 1 s stale).
 
 **`world.js`:**
 
 - **`World`:** the scene, lights, fog, court builder, preview points and bounce marker, effects (burst, ring, spark, ghostBall, ghostMan), and `project()` and `cameraRay()`.
+  - `setQuality(level, pixelRatio)`: the graphics level (`quality`; Low skips `ghostMan` and halves the ball afterimages) and the render resolution.
+  - `warmUp()`: builds one of every effect, a figure (opaque, and one fading), a deflected ball with its trail, and the throw preview, out of sight, compiles them all (`renderer.compile`), and keeps them hidden. three.js deletes a shader when the last material using it is disposed, so the kept ones hold every shader. `?nowarm` skips it, for tests.
+  - `buildCourt()` disposes the old court two frames later, after the new one has been drawn with the same shaders.
 - **`Stickman`:** joint hierarchy and procedural poses. The sign conventions are in a comment in the code.
   - Poses: walk cycle, dodge, deflect swat, catch, throw follow-through, wind-up, flinch, knockout fall, invulnerability flicker, fading near the camera.
   - The perfect-dodge spin lasts 0.38 s with ghosts every 0.065 s (your own at 0.22 opacity, others at 0.45).
@@ -1483,7 +1524,9 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 
 **`hud.js`:** DOM updates only when values change; names always go in via `textContent`. The timing ring radius is 26 + 150 × time-to-impact px, with "near" at ≤ 0.3 s and "now" at ≤ 0.1 s.
 
-**`input.js`:** bindings, pointer lock (`?nolock` bypasses it for tests), and everything released on blur, visibility change or loss of the lock. Releasing on blur cancels a wind-up instead of throwing.
+**`input.js`:** bindings, pointer lock (`?nolock` bypasses it for tests), and everything released on blur, visibility change or loss of the lock. Releasing on blur cancels a wind-up instead of throwing. `onPress(action, at)` and `onRelease(action, at)` pass when the key or button really went down (`eventTime`: the event's `timeStamp`, or now if it's missing, in the future or over 1 s old).
+
+**`graphics.js`:** the graphics setting (the numbers above): `Graphics` with `choose()` (the menu), `setCeiling()` (the host's Medium), `frame()` (every frame: Auto counts frames per second and steps), `apply()` (also on resize) and `describe()` (the menu's note); `gpuInfo(renderer)` (the graphics card's name, and whether the page is drawn without one). `main.js` saves the choice in `dp.settings.graphics`, shows the warning (`gpuWarn`, `gpuWarnJoin`), logs `gfx` lines and puts the level in every `sec` line.
 
 **Controls:**
 
@@ -1605,7 +1648,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 ```
 
 - **Healthy result:** nearly every auto-defender press is defended.
-- **Expected misses:** two balls arriving together, and ricochets bouncing at your feet. In software-rendered headless Chrome (~20 fps), frame stalls cause occasional late presses.
+- **Expected misses:** two balls arriving together, and ricochets bouncing at your feet. Headless Chrome draws in software (Auto graphics drops to Low there, about 50 fps), and frame stalls cause occasional late presses.
 - **The two-browser lobby test** (`lobby_host.json` with `lobby_guest.json`, run at the same time) is described in the browser tests' README.
 - **The clock test** (`clock.json`) makes the page's clock run fast (+300 ms over 10 s, like an OS time correction) and prints the frozen time per second. Healthy: the picture recovers as soon as the clock settles. Re-run it after touching the clock estimate in `net.js`.
 - **The sidestep test** (`sidestep.json` + `sidestep.js`, with `&lag=150`, and `&comp=0` for compensation off) walks out of every incoming ball's path and counts balls sidestepped, hits, and hits while clear on screen. Re-run it after touching sidestep compensation, position reports or the pending logic.
@@ -1614,6 +1657,13 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 - **The regeneration test** (`regen.json` + `regen.js`): the round-time buttons, both regeneration previews, and a player's health and a team bar sampled ten times a second (the pause after each hit, the speed, where it stops) with the limit markers. Re-run it after touching regeneration or the round-time buttons.
 - **The standing-still test** (`still.json` + `still.js`): with a bot that hits for 40 every 20 s, holds keys like a player through standing, walking and two kinds of dodge, and checks what each part regains and the hint, for a player and a team bar. Re-run it after touching standing still.
 - **The own-settings test** (`own_settings.json` + `own_settings.js`): a bot's and a person's own settings through the ⚙ pages, the ball colours editor, export → reset → import, a profile moved between bots, wrong files, and the colour every ball in flight is drawn in. Re-run it after touching players' own settings, the ball colours or the settings files.
+- **The graphics test** (`graphics.json` + `graphics.js`):
+  - the no-graphics-card warning and Auto at Low in headless Chrome, and the host's ceiling;
+  - Auto's rules on a stand-in world fed made-up frame times;
+  - presses timed from their key event (held 40 and 120 ms);
+  - the shader count before and after 35 s of every kind of effect.
+  - Healthy: no shader built mid-match. With `&nowarm`, 3 were.
+  - Re-run it after touching `graphics.js`, the effects or `warmUp()` in `world.js`, or press timing (`input.js eventTime`).
 
 **CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`; any page error fails it).
 
@@ -1670,6 +1720,11 @@ print(lengths, g.score, dict(counts))
   - **AgX turns a saturated red pink in warm light:** the kit's cloth uses a deeper red (and blue) than the team colours on screen.
   - **A mirror-like court washes out the far half:** at a grazing angle it reflects the bright windows, and the blue team disappeared against it. The court paint is satin.
   - **In a worktree session, Claude Code's guard refuses a program run by its quoted path with spaces.** Put Blender's folder on the PATH for that one command: `PATH="/c/Program Files/Blender Foundation/Blender 5.2:$PATH" blender.exe --background ...`.
+- **three.js deletes a shader when the last material using it is disposed:** building an effect early and then disposing it saves nothing, because its shader goes with it.
+  - Keep one material of each kind alive: `world.warmUp()` keeps them, hidden.
+  - Dispose an old court only after the new one has been drawn.
+  - `renderer.compile()` builds only visible objects (it doesn't check the camera's view), so make the warm-up objects visible while it runs, then hide them.
+  - `renderer.info.programs` counts the shaders: a growing count mid-match means something wasn't warmed up.
 - **Meshing smooth shapes (`art/style_samples_2.py`):** when pulling vertices onto the surface, clip the step after dividing by the field's slope, not before. Flat spots in the field flung vertices far away, as long streaks across the picture.
 - **Loading results into the user's Blender:**
   - Safe mode refuses to pull data out of another .blend (`bpy.data.libraries.load`), but opening and saving files is allowed.

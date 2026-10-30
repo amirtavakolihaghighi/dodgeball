@@ -8,6 +8,21 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 
 ## [Unreleased]
 
+### Added
+
+- **A graphics setting** (Esc › Your settings › Graphics): Auto (the default), High, Medium and Low.
+  - Auto lowers itself when the game gets choppy (under 45 frames a second for 3 seconds), undoes a step that doesn't help, and tries a level up after 20 smooth seconds.
+  - Medium draws 3/4 of the sharpness, Low half, with fewer decorative effects. Nothing that matters for play changes.
+  - On the host's computer, which also runs the server, Auto stays at Medium or lower.
+  - The top-right corner shows the level next to the frame rate.
+- **A warning when the browser draws without the graphics card** (on the join screen and in the menu), with the setting that fixes it. The game runs at about 19 frames a second that way.
+
+### Changed
+
+- **Presses are timed from the key itself,** not from when the page got round to them: a slow laptop no longer loses up to a frame (50 ms at 20 frames a second) on every dodge, catch, deflect and throw.
+- **Every effect is prepared while the game loads,** so none freezes the picture the first time it appears in a match. A rebuilt court (when the teams change size) no longer builds its shaders again either.
+- The log report notes automatic graphics changes, and presses the browser held for a while.
+
 ## [2.2.0] - 2026-10-29
 
 Each team's balls get their own colours, and the host gets new ways to set up a match: one health

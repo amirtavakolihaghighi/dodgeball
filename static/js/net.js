@@ -137,7 +137,12 @@ export class Net {
 
   /** Server time of the world currently on screen. */
   viewTime() {
-    return this.offset === null ? 0 : performance.now() / 1000 + this.offset - this.interpDelay;
+    return this.viewTimeAt(performance.now());
+  }
+
+  /** The world moment on screen at `ms` (the performance.now clock): for presses, their event's time. */
+  viewTimeAt(ms) {
+    return this.offset === null ? 0 : ms / 1000 + this.offset - this.interpDelay;
   }
 
   /** The world at server time `rt`, interpolated between the two snapshots around it. */
