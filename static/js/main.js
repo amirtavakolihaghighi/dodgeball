@@ -956,9 +956,10 @@ function onEvent(e) {
       world.man(e.p)?.impact(e.ko ? 0.15 : 0.085);     // an impact freeze on the hit player only
       if (e.ko) world.cheer(0.5);                          // the crowd jumps at a knockout
       if (pos) {
-        world.burst(pos.x, 1.2, pos.z, 0xffffff, 1.8);
+        world.burst(pos.x, 1.2, pos.z, 0xffffff, e.ko ? 2.6 : 1.8);
         const team = TEAM_COLORS[net.latest?.players.get(e.p)?.team ?? 0];
         const n = e.ko ? 2 : 1;
+        world.ring(pos.x, 1.2, pos.z, team, e.ko ? 1.4 : 1);
         world.burstOf(pos.x, 1.2, pos.z, 0xffffff, 12 * n, { speed: 6 + e.speed * 0.08, up: 0.3, life: 0.45 });
         world.burstOf(pos.x, 1.2, pos.z, team, 12 * n, { speed: 4.5 + e.speed * 0.06, up: 0.45, life: e.ko ? 0.9 : 0.6 });
       }
@@ -1006,7 +1007,8 @@ function onEvent(e) {
     case 'catch':
       // Your own catches/deflects get the popup and gold flash; a ring at the camera would blind you.
       if (pos && !mine) e.perfect ? world.ring(pos.x, 1.3, pos.z, 0xffc940) : world.burst(pos.x, 1.3, pos.z, 0x5dff9b);
-      if (pos) world.burstOf(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x5dff9b, (e.perfect ? 20 : 12) * (mine ? 0.6 : 1), { speed: 3, up: 0.6, life: 0.5, drag: 4 });
+      if (pos) world.burstOf(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x5dff9b, (e.perfect ? 20 : 12) * (mine ? 0.6 : 1), { speed: 3, up: 0.6, life: 0.5, drag: 4, star: e.perfect });
+      if (pos && e.perfect && !mine) world.flare(pos.x, 1.3, pos.z, 0xffc940);
       if (mine) {
         camFx.jolt(0, 0, 0.07, e.perfect ? -3 : 1.5);
         camFx.shake(e.perfect ? 0.25 : 0.15);
@@ -1019,7 +1021,8 @@ function onEvent(e) {
       break;
     case 'deflect':
       if (pos && !mine) world.ring(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x6ff3ff);
-      if (pos) world.burstOf(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x6ff3ff, (e.perfect ? 22 : 14) * (mine ? 0.6 : 1), { speed: 7, up: 0.2, life: 0.35 });
+      if (pos) world.burstOf(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x6ff3ff, (e.perfect ? 22 : 14) * (mine ? 0.6 : 1), { speed: 7, up: 0.2, life: 0.35, star: e.perfect });
+      if (pos) world.slash(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x6ff3ff, mine ? 0.7 : 1);
       if (mine) {
         camFx.jolt(0.03, 0, 0.05, e.perfect ? -3 : 1);
         camFx.shake(0.18);
@@ -1033,7 +1036,7 @@ function onEvent(e) {
     case 'dodge':
       if (e.perfect) {
         world.man(e.p)?.perfectDodge();
-        if (pos) world.burstOf(pos.x, 1.0, pos.z, 0xffc940, 14, { speed: 2.5, up: 0.7, life: 0.6, drag: 3 });
+        if (pos) world.burstOf(pos.x, 1.0, pos.z, 0xffc940, 14, { speed: 2.5, up: 0.7, life: 0.6, drag: 3, star: true });
         if (mine) camFx.jolt(0, 0, 0, -3);
       }
       if (mine) {

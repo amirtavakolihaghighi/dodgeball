@@ -1,6 +1,7 @@
 // Three.js scene: the court, stick figures, balls, trails and effects.
 import * as THREE from 'three';
 import { GLTFLoader } from '/static/vendor/addons/loaders/GLTFLoader.js';
+import { effectTextures } from './fxtex.js';
 
 export const TEAM_COLORS = [0xff4d5e, 0x3fa9ff];
 // Ball colour by rally (number of deflections): a distinct hue per level, ending white-hot. A ball
@@ -69,7 +70,7 @@ function seamTexture() {
 class Particles {
   static MAX = 600;
 
-  constructor(scene, map) {
+  constructor(scene, map, size = 0.13) {
     const n = Particles.MAX;
     this.pos = new Float32Array(n * 3);
     this.col = new Float32Array(n * 3);
@@ -84,7 +85,7 @@ class Particles {
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3).setUsage(THREE.DynamicDrawUsage));
     this.points = new THREE.Points(geo, new THREE.PointsMaterial({
-      size: 0.13, map, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      size, map, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     }));
     this.points.frustumCulled = false;
     scene.add(this.points);
@@ -301,6 +302,49 @@ function sunShafts(panes, toward, color) {
   return mesh;
 }
 
+// The low sun's shadows: long and thin along its light, and only where the sun itself reaches the
+// floor (its window stripes), read from the bake's sun mask. Until the hall is in, no sun: none.
+const NO_SUN = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+NO_SUN.needsUpdate = true;
+
+/** A shadow material: its own shape and strength; the sun mask and the floor's size shared. */
+function sunShadowMaterial(shared, shape, strength) {
+  return new THREE.ShaderMaterial({
+    uniforms: { ...shared, shape: { value: shape }, strength: { value: strength } },
+    vertexShader: `varying vec2 vUv; varying vec2 vXZ;
+      void main() { vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); vXZ = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `uniform sampler2D shape; uniform sampler2D sun; uniform vec2 floorHalf; uniform float strength;
+      varying vec2 vUv; varying vec2 vXZ;
+      void main() {
+        float lit = texture2D(sun, vec2(vXZ.x / (2.0 * floorHalf.x) + 0.5, 0.5 - vXZ.y / (2.0 * floorHalf.y))).r;
+        gl_FragColor = vec4(0.0, 0.0, 0.0, texture2D(shape, vUv).a * strength * lit);
+      }`,
+    transparent: true, depthWrite: false,
+  });
+}
+
+/** Lays a soft oval on the floor along the sun's light: centre (x, z), length along it, width across. */
+function placeSunShadow(mesh, sun, x, z, length, width) {
+  mesh.position.set(x, 0.021, z);
+  mesh.rotation.set(-Math.PI / 2, 0, sun.angle);
+  mesh.scale.set(length, width, 1);
+}
+
+/** A bright edge in the ball's own colour (where its surface turns away from you), so it stands
+ *  out against the busy, colourful hall. */
+function rimLight(mat) {
+  const rim = { value: new THREE.Color(1, 1, 1) };
+  mat.userData.rim = rim;
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.rimColor = rim;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 rimColor;')
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance += rimColor * pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0) * 0.9;`);
+  };
+  mat.customProgramCacheKey = () => 'ball-rim';
+}
+
 export class World {
   constructor(canvas) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -318,6 +362,11 @@ export class World {
     this.shadowMat = new THREE.MeshBasicMaterial({ map: this.shadowTex, transparent: true, depthWrite: false });
     this.seamTex = seamTexture();
     this.particles = new Particles(this.scene, this.glowTex);
+    this.fxTex = effectTextures();
+    this.stars = new Particles(this.scene, this.fxTex.sparkle, 0.26);     // sparkles: good and perfect plays
+    this.sunUniforms = { sun: { value: NO_SUN }, floorHalf: { value: new THREE.Vector2(1, 1) } };
+    this.sunShadowMat = sunShadowMaterial(this.sunUniforms, this.fxTex.longShadow, 0.8);   // the players': as dark as the shade between the sun's stripes
+    this.sunAway = null;    // which way shadows fall, once the hall's sun is known
     const hemi = new THREE.HemisphereLight(0xd6e6ff, 0x2a2018, 1.25);
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(8, 20, 10);
@@ -366,11 +415,12 @@ export class World {
         t.anisotropy = 4;
         return t;
       });
-      const [gltf, floorLight, hallLight, leavesLight, sky] = await Promise.all([
+      const [gltf, floorLight, hallLight, leavesLight, sky, sunMask] = await Promise.all([
         new GLTFLoader().loadAsync(ARENA + info.walls.model),
         texture(info.floor.light), texture(info.walls.light.hall, false), texture(info.walls.light.leaves, false),
-        texture(info.sky),
+        texture(info.sky), texture(info.floor.sun),
       ]);
+      sunMask.colorSpace = THREE.NoColorSpace;     // a mask, not a colour
       const lit = Math.PI / info.lightScale;       // the lightmaps hold light x lightScale
       const group = new THREE.Group();
       const isLeaves = (o) => { for (let q = o; q; q = q.parent) if (q.name.startsWith('leaves')) return true; return false; };
@@ -417,6 +467,11 @@ export class World {
       this.renderer.toneMappingExposure = 0.55;
       this.scene.add(group);
       this.arena = { info, group, canvas, floorTex, shafts };
+      this.sunUniforms.sun.value = sunMask;
+      const [tx, ty, tz] = info.sun.toward;
+      const flat = Math.hypot(tx, tz);
+      // shadows fall away from the sun: per metre of height, slope metres along the floor
+      this.sunAway = { x: -tx / flat, z: -tz / flat, slope: flat / ty, stretch: 1 / ty, angle: Math.atan2(tz / flat, -tx / flat) };
       if (this.courtSize) this.buildCourt(...this.courtSize);
       this.renderer.compile(this.scene, this.camera);     // its shaders now, not in the first round
     } catch (err) {
@@ -432,6 +487,7 @@ export class World {
     const reach = W + STANDS.gap + STANDS.rows * STANDS.depth + 1.5;
     const scale = Math.max(1, reach / hw, (L + 8) / hl);
     a.group.scale.setScalar(scale);
+    this.sunUniforms.floorHalf.value.set(hl * scale, hw * scale);
     const c = a.canvas.getContext('2d');
     const ppm = a.canvas.width / (2 * hl * scale);
     paintWood(c, a.canvas.width, a.canvas.height, ppm);
@@ -474,6 +530,9 @@ export class World {
     this.burst(at.x, at.y, at.z, 0xffffff);
     this.ring(at.x, at.y, at.z, 0xffffff);
     this.spark(at.x, at.y, at.z, 0xffffff, true);
+    this.spark(at.x, at.y, at.z, 0xffffff, false);
+    this.slash(at.x, at.y, at.z, 0xffffff);
+    this.flare(at.x, at.y, at.z, 0xffffff);
     this.ghostBall(at, 0xffffff);
     const mine = new Stickman(this, 0, true);       // a figure with the ring under your own feet
     const faded = new Stickman(this, 1, false);     // one fading out (near the camera, or blinking)
@@ -490,7 +549,9 @@ export class World {
     ball.update({ pos: { x: 0.5, y: at.y, z: 0 }, state: 1, rally: 1, color: '#ffffff', vx: 20, vy: 0, vz: 0 }, 0.01);
     const kept = this.fx.splice(first);
     for (const root of [mine.root, faded.root]) root.position.y = at.y;
-    const objects = [...kept.map((f) => f.obj), mine.root, faded.root, ball.holder, ball.glow, ball.shadow, ball.trail.mesh];
+    const objects = [...kept.map((f) => f.obj), mine.root, faded.root, mine.sunShadow, faded.sunShadow,
+      ball.holder, ball.glow, ball.shadow, ball.sunShadow, ball.trail.mesh];
+    for (const o of [mine.sunShadow, faded.sunShadow, ball.sunShadow]) o.visible = true;    // so its shader is built
     this.preview.visible = this.bounceMark.visible = true;     // the throw preview, too
     this.renderer.compile(this.scene, this.camera);
     this.preview.visible = this.bounceMark.visible = false;
@@ -778,29 +839,53 @@ export class World {
     this.oldTrails.push(trail);
   }
 
-  burst(x, y, z, color, size = 1.6) {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  /** A glowing shape (one of fxtex.js's) that grows and fades, at a random angle. */
+  flash(x, y, z, color, shape, size, dur) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: this.fxTex[shape], color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, rotation: Math.random() * Math.PI * 2,
+    }));
     sprite.position.set(x, y, z);
     this.scene.add(sprite);
-    this.fx.push({ obj: sprite, t: 0, dur: 0.35, size });
+    this.fx.push({ obj: sprite, t: 0, dur, size });
   }
 
-  ring(x, y, z, color) {
-    const mesh = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 40), new THREE.MeshBasicMaterial({ color, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
-    mesh.position.set(x, y, z);
-    mesh.lookAt(this.camera.position);
-    this.scene.add(mesh);
-    this.fx.push({ obj: mesh, t: 0, dur: 0.4, size: 2.2, ownGeometry: true });
+  /** An impact: spikes out of a bright core. */
+  burst(x, y, z, color, size = 1.6) {
+    this.flash(x, y, z, color, 'burst', size, 0.3);
   }
 
-  /** Ricochet spark: a flash plus a ring lying on the surface it bounced off. */
+  /** A shockwave ring. */
+  ring(x, y, z, color, size = 1) {
+    this.flash(x, y, z, color, 'ring', 2.4 * size, 0.4);
+  }
+
+  /** A deflect's swipe. */
+  slash(x, y, z, color, size = 1) {
+    this.flash(x, y, z, color, 'slash', 2.2 * size, 0.28);
+  }
+
+  /** A perfect play's six-point flare. */
+  flare(x, y, z, color, size = 1) {
+    this.flash(x, y, z, color, 'flare', 3.0 * size, 0.5);
+  }
+
+  /** A ball bouncing: off the floor, a puff of dust and a ripple on the floor; off a wall, a
+   *  spark and a ripple on the wall. */
   spark(x, y, z, color, floor) {
-    this.burst(x, y, z, color, 1.3);
-    const mesh = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.42, 32), new THREE.MeshBasicMaterial({ color, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
-    mesh.position.set(x, floor ? 0.03 : y, z);
-    if (floor) mesh.rotation.x = -Math.PI / 2;
+    const mesh = new THREE.Mesh(blobGeo, new THREE.MeshBasicMaterial({ map: this.fxTex.ring, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    if (floor) {
+      this.flash(x, 0.3, z, 0xffe2b0, 'puff', 1.5, 0.45);
+      mesh.position.set(x, 0.03, z);
+      mesh.rotation.x = -Math.PI / 2;
+    } else {
+      this.burst(x, y, z, color, 1.1);
+      const [L, W] = this.courtSize || [1, 1];
+      mesh.position.set(x, y, z);
+      if (Math.abs(x) - L > Math.abs(z) - W) mesh.lookAt(0, y, z);   // an end wall
+      else mesh.lookAt(x, y, 0);                                     // a side wall
+    }
     this.scene.add(mesh);
-    this.fx.push({ obj: mesh, t: 0, dur: 0.4, size: 2.4, ownGeometry: true });
+    this.fx.push({ obj: mesh, t: 0, dur: 0.4, size: 1.6 });
   }
 
   /** A fading copy of a ball, left behind by fast (deflected) balls. */
@@ -829,11 +914,13 @@ export class World {
 
   /** Specks flying out of an impact (Particles.emit); Low graphics throw half as many. */
   burstOf(x, y, z, color, count, opts) {
-    this.particles.emit(x, y, z, color, Math.max(1, Math.round(count * (this.quality === 'low' ? 0.5 : 1))), opts);
+    const pool = opts?.star ? this.stars : this.particles;      // star: sparkles instead of round specks
+    pool.emit(x, y, z, color, Math.max(1, Math.round(count * (this.quality === 'low' ? 0.5 : 1))), opts);
   }
 
   updateFx(dt, t) {
     this.particles.update(dt);
+    this.stars.update(dt);
     this.cheering = Math.max(0, this.cheering - dt * 0.5);
     this.moveCrowd(t);
     this.fx = this.fx.filter((f) => {
@@ -943,6 +1030,9 @@ class Stickman {
     shadow.position.y = 0.02;
     shadow.scale.setScalar(1.15);
     this.root.add(shadow);
+    this.sunShadow = new THREE.Mesh(blobGeo, world.sunShadowMat);   // the low sun's long shadow (in the hall)
+    this.sunShadow.visible = false;
+    world.scene.add(this.sunShadow);
     if (isMe) {
       const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2;
@@ -1144,6 +1234,11 @@ class Stickman {
     }
     this.root.position.set(s.x, 0, s.z);
     this.root.rotation.y = s.yaw + spin;
+    const sun = this.world.sunAway;
+    if (sun) {          // from the feet, away from the sun: as long as they're tall times the slope
+      const length = (s.alive ? 1.75 : 0.35) * sun.slope;
+      placeSunShadow(this.sunShadow, sun, s.x + sun.x * (length / 2 - 0.15), s.z + sun.z * (length / 2 - 0.15), length, 0.62);
+    }
     const shudder = frozen ? 0.05 * (this.freezeT / this.freezeDur) : 0;
     this.body.position.x = shudder * (Math.random() * 2 - 1);
     this.body.position.z = shudder * (Math.random() * 2 - 1);
@@ -1162,6 +1257,7 @@ class Stickman {
     else if (s.invuln) opacity = Math.sin(performance.now() / 45) > 0 ? 0.85 : 0.3;
     if (s.camDist < 2.6 && !s.isMe) opacity = Math.min(opacity, 0.2);   // don't block the camera
     this.root.visible = opacity > 0.01;
+    this.sunShadow.visible = this.root.visible && !!this.world.sunAway;
     for (const m of this.fadeMats) {
       m.transparent = opacity < 1;
       m.opacity = opacity;
@@ -1178,7 +1274,7 @@ class Stickman {
   }
 
   dispose(scene) {
-    scene.remove(this.root);
+    scene.remove(this.root, this.sunShadow);
     for (const m of this.fadeMats) m.dispose();
     if (this.meRing) {
       this.meRing.geometry.dispose();
@@ -1290,9 +1386,10 @@ class BallView {
   constructor(world) {
     this.world = world;
     this.mat = new THREE.MeshStandardMaterial({
-      color: RALLY_COLORS[0], emissive: RALLY_COLORS[0], emissiveIntensity: 0.6, roughness: 0.35,
-      map: world.seamTex, emissiveMap: world.seamTex,
+      color: RALLY_COLORS[0], emissive: RALLY_COLORS[0], emissiveIntensity: 0.6, roughness: 0.42,
+      map: world.seamTex, emissiveMap: world.seamTex, normalMap: world.fxTex.pebbles, normalScale: new THREE.Vector2(0.55, 0.55),
     });
+    rimLight(this.mat);
     this.holder = new THREE.Group();                    // carries the stretch; the ball spins inside it
     this.mesh = new THREE.Mesh(ballGeo, this.mat);
     this.holder.add(this.mesh);
@@ -1300,7 +1397,10 @@ class BallView {
     this.shadowMat = world.shadowMat.clone();
     this.shadow = new THREE.Mesh(blobGeo, this.shadowMat);
     this.shadow.rotation.x = -Math.PI / 2;
-    world.scene.add(this.holder, this.glow, this.shadow);
+    this.sunShadowMat = sunShadowMaterial(world.sunUniforms, world.fxTex.roundShadow, 0.75);
+    this.sunShadow = new THREE.Mesh(blobGeo, this.sunShadowMat);
+    this.sunShadow.visible = false;
+    world.scene.add(this.holder, this.glow, this.shadow, this.sunShadow);
     this.key = '';
     this.trail = null;
     this.trailRally = -1;
@@ -1327,6 +1427,7 @@ class BallView {
       this.mat.color.setHex(col);
       this.mat.emissive.setHex(col);
       this.mat.emissiveIntensity = live ? 0.6 : 0.05;
+      this.mat.userData.rim.value.setHex(live ? col : 0x000000);
       this.glow.material.color.setHex(col);
     }
     this.glow.visible = live;
@@ -1350,13 +1451,21 @@ class BallView {
     this.shadow.position.set(p.x, 0.025, p.z);
     this.shadow.scale.setScalar((0.45 + p.y * 0.12) * scale);
     this.shadowMat.opacity = clamp(1 - p.y / 6, 0.2, 0.9);
+    const sun = this.world.sunAway;
+    this.sunShadow.visible = !!sun;
+    if (sun) {          // where the sun's ray through the ball meets the floor; softer higher up
+      const r = 0.4 * scale * (1 + p.y * 0.08);
+      placeSunShadow(this.sunShadow, sun, p.x + sun.x * p.y * sun.slope, p.z + sun.z * p.y * sun.slope, r * sun.stretch, r);
+      this.sunShadowMat.uniforms.strength.value = clamp(0.75 - p.y * 0.05, 0.2, 0.75);
+    }
   }
 
   dispose(scene) {
-    scene.remove(this.holder, this.glow, this.shadow);
+    scene.remove(this.holder, this.glow, this.shadow, this.sunShadow);
     this.mat.dispose();
     this.glow.material.dispose();
     this.shadowMat.dispose();
+    this.sunShadowMat.dispose();
     if (this.trail) this.world.retireTrail(this.trail);
   }
 }

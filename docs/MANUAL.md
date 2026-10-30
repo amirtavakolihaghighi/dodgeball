@@ -107,6 +107,7 @@ To read a session: `python tools\log_report.py <the zip or a session folder>`. I
 - **You play in a sports hall** with tall windows, a low golden sun and a crowd in the stands. Its sunlight was worked out once, in advance, so drawing it costs laptops very little.
 - **The court is painted on the hall's wooden floor**, in the team colours, and the hall stays the same whatever the court's size. A court too big for it (the host's settings) makes the whole hall bigger.
 - **The crowd** sways, and jumps when a round ends or someone is knocked out.
+- **Long shadows:** the sun is low, so players and balls cast long shadows away from it, wherever its light falls on the floor.
 - **Walls never hide you:** back up to your end wall, or stand at a side and turn, and the camera ends up behind a wall or in the stands. They then fade until you can see through them, with a faint outline showing where the wall is, and come back when you step away.
 - **Until the hall has loaded** (a second or two), or if it can't load, the game draws the plain dark court of before.
 
@@ -134,7 +135,9 @@ Each player picks their own in the menu (Esc), under **Your settings › Graphic
 ## How impacts feel
 
 - **A hit player freezes for a split second** (longer for a knockout) and shudders, flashing white, then flinches. Only their figure stops: the balls and everyone else keep moving.
-- **Specks of light** fly from hits (white and the player's team colour), catches, deflects, ricochets and perfect dodges. Low graphics throw half as many.
+- **Specks of light** fly from hits (white and the player's team colour), catches, deflects, ricochets and perfect dodges; perfect plays throw sparkles. Low graphics throw half as many.
+- **Each impact has its own flash:** a white starburst and a shockwave ring in the team's colour on a hit, a swipe on a deflect, a six-point flare on someone's perfect catch, and a puff of dust where a ball bounces off the floor.
+- **The ball** is grippy rubber with a bright edge in its colour, so you can pick it out against the colourful hall.
 - **Balls stretch along their flight when they're fast** (up to 30% longer) and spin; their seams show the spin.
 - **The camera** shakes when you're hit (harder for a knockout) and when a ball ricochets near you. It jolts when you throw (harder throws kick more), catch or deflect, punches in on a perfect press and on your own hits, and zooms in a little while you charge a throw.
 - **Esc › Your settings › Screen shake** scales all of that camera motion; all the way left turns it off. It only moves the picture: your aim, the crosshair's target and the timing ring never move with it.

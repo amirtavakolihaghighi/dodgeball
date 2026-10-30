@@ -117,6 +117,7 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── js\input.js            keyboard/mouse, pointer lock, release-everything-on-blur
 │   ├── js\graphics.js         the graphics setting: Auto, High, Medium, Low; the no-graphics-card check
 │   ├── js\juice.js            camera shake, jolts and the charge zoom (applied after the aim)
+│   ├── js\fxtex.js            the effects' shapes, the ball's bumps and the shadows' shapes, drawn at start
 │   ├── js\sfx.js              the sound: recordings mixed with Web Audio, the hall's echo, music, synthesized fallbacks
 │   ├── js\sound_check.js      the "Hear every sound" page (sounds.html)
 │   ├── sounds.html            that page
@@ -942,12 +943,36 @@ This is the short version, kept on `main` while internet mode waits on its branc
 
 - **Tests:** `juice.json`'s new check backs into the end wall (the wall fades to 15%, its outline shows) and steps away (back to solid), then the same at a side (that side's boards, stands and crowd fade, the other side's don't). `graphics.json` and `juice.json` now wait for the hall to load before counting shaders: no shader built mid-match (30 before and after).
 
+**Step 6: the ball and effects** (decision 138; built 2026-10-30; the numbers are in section 8):
+
+- **The effects' shapes** (`fxtex.js`): drawn on small canvases when the game starts, so nothing more to download: a starburst, a soft shockwave ring, a four-point sparkle, a six-point flare, a dust puff and a crescent swipe, white on transparent, tinted and glowing additively.
+  - The plan said "effect textures made in Blender"; flat shapes like these come out as well from a few lines of canvas drawing, and change without a bake.
+- **Each moment's effect:**
+  - **a hit:** a white starburst (bigger for a knockout) and a shockwave ring in the team's colour, with the specks;
+  - **a catch:** the old ring or flash, and a gold six-point flare for someone else's perfect catch;
+  - **a deflect:** a crescent swipe in cyan (gold if perfect), smaller for your own;
+  - **a bounce:** off the floor, a puff of dust and a ripple lying on the floor; off a wall, a spark and a ripple on the wall;
+  - **perfect plays:** sparkles (four-point stars, a second pool of specks) instead of round specks.
+- **The ball:** grippy rubber (a normal map of small bumps) and a bright edge in its own colour where its surface turns away from you, so it stands out against the busy, colourful hall. A first, stronger edge washed the blue ball out to lavender; it's thinner now, and the team colour stays.
+
+  ![The effects' shapes, close up](images/look-and-feel/effects-shapes.jpg)
+  ![A hit in a match](images/look-and-feel/effects-hit.jpg)
+
+- **Long shadows from the low sun:** players and balls cast long, soft shadows away from the sun, only where its light reaches the floor (its window stripes). The bake now also saves where the sun falls (`floor_sun.jpg`), and the shadows' shader reads it. They are flat soft shapes on the floor, not shadow maps: almost free.
+  - A figure's is a capsule as long as it's tall times 2.25 (the sun is 24° up), darkest at the feet; a ball's is an oval where the sun's ray through it meets the floor, softer the higher it flies.
+  - At first they were too faint to see among the floor's own stripes (the debugging forced a solid black shape to prove it was there); they're as dark as the shade between the stripes now.
+
+  ![A player's long shadow in the sun](images/look-and-feel/sun-shadow.jpg)
+
+- **Tests:** `graphics.json` and `juice.json` (no shader built mid-match: 34 before and after, the new ones built in the warm-up), the smoke test. A match at High shows the effects and the balls' shadows.
+- **Next:** the user plays and judges the effects: Claude can't see them move.
+
 **Next, in order:** the plan in `docs/LOOK_AND_FEEL.md`:
 
 1. Style samples (done: the sports hall; athletes with and without the helmet, picked at random).
 2. The performance items (done: D1, D2, B4, effects prepared in the lobby, the host's lower setting).
 3. Juice (done) and sound (the user's verdict: the dodge redone, voices, breathing and revive sounds added, the match music lower).
-4. The arena (the user: good; the walls behind the camera turn see-through), then the ball and effects, the characters and their animation, and the HUD.
+4. The arena (done), the ball and effects (built; waiting for the user to play), then the characters and their animation, and the HUD.
 5. An office session.
 6. The merge into `main`, when the user says so.
 
@@ -1087,6 +1112,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
 | 135 | The incoming-ball sound is each player's setting: a whoosh swelling from the ball's side, loudest as it arrives (the default), a louder tick, or off | U | The user hadn't noticed the tick. Claude suggested the whoosh, which also says where the ball comes from and when it arrives, and the user said to do it; both stay as a setting, the user's standing preference for two good designs |
 | 136 | The arena: the round 2 hall, baked in Blender (lightmaps for the floor, the hall and its leaves; the outside as a panorama) and exported as glTF; the game paints the court on the floor under the baked light, and makes the court's walls, the stands, a crowd and the sun's shafts itself, because they follow the court's size. Neutral tone mapping. A court too big for the hall scales the hall up. Low: a third of the crowd, still, and no shafts | C | Phase 15's plan (step 5, decisions 116 and 124–125): the user's hall, at almost no cost to laptops, since baked light needs no lighting maths. A fixed hall like a real one, with the court and stands following the court's size, keeps the bake valid for every court. Neutral tone mapping keeps the colours vivid where AgX would mute them |
 | 137 | Walls and stands between the camera and the court turn see-through: your end wall (to 15%, with a faint outline), a side's boards (20%) and a side's stands and crowd (15%), fading in a fraction of a second, when the camera is behind them. Only the picture changes | U | The user: "when the player goes way back... they are hidden behind the wall at the end of the court... better for that wall to become see through with its border a little visible". The stands block the view the same way at a side wall |
+| 138 | The ball and effects: effect shapes drawn on canvases at start (a starburst, a shockwave ring, sparkles, a six-point flare, a dust puff, a swipe), a ring on hits, a swipe on deflects, a flare and sparkles on perfect plays, dust on floor bounces; the ball in grippy rubber with a bright edge in its colour; long soft shadows from the low sun, only where it reaches the floor (a mask from the bake) | C | Phase 15's plan (step 6). Canvas shapes instead of Blender renders: as good for flat glowing shapes, no download, no bake to change them. The ball must stay readable against the bright, busy hall. Sun shadows make the low sun real, at the cost of a few flat shapes |
 
 ## 6. Current features
 
@@ -1140,6 +1166,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
 - **A graphics setting** for each player: Auto (default), High, Medium, Low. Auto steps down when the frame rate stays low and undoes a step that doesn't help; the host's Auto stays at Medium or lower. A warning on the join screen and in the menu when the browser draws without the graphics card.
 - Every effect's shader is built while the game loads, so nothing freezes the picture the first time it appears.
 - **Juice:** an impact freeze on the hit player, specks of light from impacts, balls that stretch with speed and spin (seams), and a camera that shakes, jolts and zooms while charging. Screen shake is each player's own setting, and none of it moves the aim.
+- **Effects:** starbursts and shockwave rings on hits, a swipe on deflects, a flare and sparkles on perfect plays, dust on bounces; a rubber ball with a bright edge in its colour; long soft shadows from the low sun, only where it shines.
 - **The sports hall:** the round 2 hall with its sunlight baked in Blender, a sky outside the windows, glowing sun shafts, the court painted on a wooden floor, palette boards, and stands with a crowd that cheers; it scales up for big courts.
 - **Sound:** recordings (CC0), layered and varied, coming from where they happen, with the hall's echo; players' voices (grunts, knockout cries) and your panting when tired; a dash you hear when you dodge; revives that sound like an entrance to one team and a danger to the other; an announcer and a whistle for the rounds and a crowd at their end; music in the lobby and, lower, in matches; a volume for each kind, and a page to hear every sound. Synthesized fallbacks.
 
@@ -1389,7 +1416,7 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 
 **The sports hall (`world.js`, built by `art/arena.py`):**
 
-- **The files** (`static/arena/`): `hall.glb` (the hall and its leaves: about 1,100 + 10,500 faces, 23 flat colours, 770 KB), `floor_light.jpg` (2048 × 1536, 3.1 cm a pixel), `hall_light.jpg` (2048²), `leaves_light.jpg` (512²), `sky.jpg` (2048 × 1024) and `arena.json` (sizes, the sun, the window panes).
+- **The files** (`static/arena/`): `hall.glb` (the hall and its leaves: about 1,100 + 10,500 faces, 23 flat colours, 770 KB), `floor_light.jpg` (2048 × 1536, 3.1 cm a pixel), `floor_sun.jpg` (1024 × 768: where the sun itself reaches the floor, 0 to 1, for the shadows), `hall_light.jpg` (2048²), `leaves_light.jpg` (512²), `sky.jpg` (2048 × 1024) and `arena.json` (sizes, the sun, the window panes).
 - **The hall:** 64 × 48 m inside, 17 m high. The sun as in round 2: 24° up, from the left and a little behind (azimuth 101.5°), strength 12, `#ffd49a`; the sky at 0.9.
 - **The bake:** Cycles, 768 samples, direct and indirect diffuse light separately (no colour); the indirect blurred (3 px on the floor, 1.2 px elsewhere) to smooth its noise. The lightmaps hold light × 0.25, sRGB-encoded in 8-bit JPEGs; the game multiplies back (`lightMapIntensity` = π / 0.25, as `MeshBasicMaterial` divides by π).
 - **The floor's canvas:** 32 pixels a metre over the whole hall (2048 × 1536): boards 14 cm × 2.4 m in five tones; the court's halves `#e33f4f` and `#2a79c2`.
@@ -1399,6 +1426,14 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 - **The shafts:** glow 0.035, `#ffd49a`, strongest where you look across them (|cos|³) and fading towards the floor.
 - **The players' light:** the sun (12, from the bake's direction) and a hemisphere (sky `#a9d2ff`, floor `#d39a62`, 1.2). Neutral tone mapping at exposure 0.55.
 - **See-through:** a wall turns see-through while the camera is behind it (past the end wall's plane, past a side wall, or within 0.6 m of a side's stands): opacity to 15% (end walls, stands and crowd) or 20% (side boards) at a rate of 12 a second, its outline to 55%, and it stops hiding what's behind it (no depth writing) once more than half faded. Each end and each side has materials of its own, made see-through-capable (`transparent`) from the start, so fading never builds a shader.
+
+**Effects and shadows (`fxtex.js`, `world.js`):**
+
+- **The shapes:** canvases drawn at start: `burst` (14 spikes and a core, 256 px), `ring` (256), `sparkle` (four points, 128), `flare` (six points, 256), `puff` (128), `slash` (a 200° crescent, 256), and the ball's `pebbles` normal map (1,400 bumps, 256 × 128). Shadows: `longShadow` (a blurred capsule, alpha 1 at the feet to 0.4) and `roundShadow`.
+- **Flashes** (`flash`): a sprite at a random angle, growing from 0.35 to 1.35 × its size while it fades. `burst` 0.3 s (a hit 1.8, a knockout 2.6), `ring` 0.4 s (2.4; a hit's ×1, a knockout's ×1.4), `slash` 0.28 s (2.2; your own ×0.7), `flare` 0.5 s (3.0). A floor bounce: a puff (1.5, 0.45 s) and a ripple on the floor (1.6, 0.4 s); a wall bounce: a burst (1.1) and a ripple on the wall.
+- **Specks:** round (0.13 m) and sparkles (0.26 m, perfect plays), two pools of 600, one draw call each.
+- **The ball:** roughness 0.42, the bumps at 0.55; its edge adds its colour × 0.9 × (1 − cos)³ to its glow.
+- **Sun shadows:** a figure's 1.75 m × 2.25 long (0.35 m tall when knocked out) and 0.62 m wide, from 0.15 m behind the feet, strength 0.8; a ball's oval 0.4 m × (1 + 0.08 × height) across and 2.46 times that along the light, at strength 0.75 − 0.05 × height (at least 0.2). Strength × the shape × the sun mask under it. None until the hall has loaded.
 
 **Physics:**
 
@@ -1685,6 +1720,8 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
   - `loadArena()` (at start; skipped with `?noarena`): the hall from `static/arena/`, its unlit materials with their lightmaps, the floor, the shafts, the sky, the lights fitted to the bake, Neutral tone mapping; then `renderer.compile`.
   - `fitArena(L, W, gap)`: the hall's scale for the court, and the floor's canvas (`paintWood`, `paintCourt`). `plainFloor()` draws the court before the hall has loaded.
   - `courtWalls()`, `stands()` (with the crowd: two `InstancedMesh`es a side), `moveCrowd(t)` (from `updateFx`), `crowdSize()` (a third on Low) and `cheer(amount)` (`main.js` calls it at a round's end and a knockout).
+  - Effects: `flash(x, y, z, color, shape, size, dur)` and its kinds `burst`, `ring`, `slash`, `flare`; `spark(x, y, z, color, floor)` for bounces; `burstOf(..., { star })` picks the sparkle pool (`stars`). `warmUp()` makes one of each.
+  - Sun shadows: `sunShadowMaterial(shared, shape, strength)` (the mask and the floor's size shared in `sunUniforms`), `placeSunShadow()`, `sunAway` (which way and how long, from the hall's sun); every `Stickman` and `BallView` has a `sunShadow`. `rimLight(mat)` gives the ball its edge (`onBeforeCompile`).
   - `seeThrough(dt)` (every frame, after the camera is placed; `main.js`): fades the walls and stands the camera is behind (`occluders`, made by `addOccluder`). `ready` is true once the hall has loaded or won't (`?noarena`).
   - `particles` (a `Particles` pool) and `burstOf(x, y, z, color, count, opts)`, which halves counts on Low.
 - **`Stickman.impact(dur)`:** the impact freeze; the pose runs on its own clock (`pdt`), which stands still while frozen.
@@ -1698,6 +1735,8 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 **`hud.js`:** DOM updates only when values change; names always go in via `textContent`. The timing ring radius is 26 + 150 × time-to-impact px, with "near" at ≤ 0.3 s and "now" at ≤ 0.1 s.
 
 **`input.js`:** bindings, pointer lock (`?nolock` bypasses it for tests), and everything released on blur, visibility change or loss of the lock. Releasing on blur cancels a wind-up instead of throwing. `onPress(action, at)` and `onRelease(action, at)` pass when the key or button really went down (`eventTime`: the event's `timeStamp`, or now if it's missing, in the future or over 1 s old).
+
+**`fxtex.js`:** `effectTextures()`: the effects' shapes, the ball's bumps and the shadows' shapes, drawn on canvases at start.
 
 **`juice.js`:** `CameraFx`: `shake(amount)`, `jolt(x, y, z, fov)`, `update(dt, charge)` and `apply(camera)` (the numbers above). `main.js` makes one (`camFx`), calls it from `onEvent` and `releaseThrow`, and applies it after `updateFx`.
 
@@ -1969,6 +2008,8 @@ print(lengths, g.score, dict(counts))
 - **`MeshBasicMaterial` divides a lightmap by π** (three.js r155 and later): `lightMapIntensity` = π gives the texture's own values.
 - **Baking light in Blender from a script:** `bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT"})` (or `{"INDIRECT"}`) gives light without the surface's colour. Each material needs the target image in an image node that is active (selected) in its tree. Cycles uses the graphics card only after the script switches it on in the preferences (`compute_device_type`, `get_devices()`).
 - **One shared lightmap for many small pieces:** packed by area (smart project, average island scale, pack), hundreds of tiny leaf islands took half the map and left the walls blurry. The leaves got their own small map.
+- **`half` is a reserved word in GLSL ES:** a uniform called `half` fails to compile ("syntax error"); the floor's size is `floorHalf`.
+- **A see-through overlay that "isn't there":** before doubting the maths, force it to solid black at full strength. The sun shadows were placed right all along, just too faint against the floor's own sun stripes at half strength.
 - **The hall in headless Chrome:** Low dropped from about 50 to about 30 frames a second in software rendering, the crowd about 6 ms of it. Real graphics cards draw this cheaply, so judge frame rates on real laptops. The auto-defender's score varies more between runs than with the hall: 7 of 13 once, 15 of 15 the next.
 - **The venv's `python.exe` is a launcher:** the real interpreter runs as its child. Killing only the launcher leaves the server alive for a moment, still holding its files and port. Tests end the tree with `taskkill /F /T`.
 - **This PC's console code page is 1256.** Printing characters outside it to a pipe raises `UnicodeEncodeError`. The real console window is fine (Python writes UTF-16 to it). `say()` falls back to ASCII, and the log report prints ASCII only. `python -I` ignores `PYTHONIOENCODING`, so isolated scripts call `sys.stdout.reconfigure(encoding="utf-8")`.

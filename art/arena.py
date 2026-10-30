@@ -7,6 +7,8 @@ Writes into static/arena/:
 - hall.glb: the hall (walls, windows, piers, ceiling, beams, banners, scoreboard, bunting, planters)
   and its leaves (the green walls, the plants), two meshes with flat colours, each with one UV map
   for its lightmap;
+- floor_sun.jpg: where the sun itself reaches the floor (1 in its stripes, 0 in the shade), for the
+  players' and balls' shadows, which only fall where the sun does;
 - hall_light.jpg and leaves_light.jpg: those lightmaps (the leaves' is small: hundreds of tiny
   islands would crowd the walls out of one shared map); floor_light.jpg: the floor's (the game
   paints the court on the floor itself, so the court's paint gets the same sunlight);
@@ -368,9 +370,12 @@ def main():
     for o in (hall, leaves):
         print(f"{o.name}: {len(o.data.polygons)} faces, {len(o.material_slots)} materials")
 
-    fl = blur(bake(floor, image("floor_indirect", *FLOOR_PX), "INDIRECT"), 3.0)
-    fl += bake(floor, image("floor_direct", *FLOOR_PX), "DIRECT")
+    sun_light = bake(floor, image("floor_direct", *FLOOR_PX), "DIRECT")
+    fl = blur(bake(floor, image("floor_indirect", *FLOOR_PX), "INDIRECT"), 3.0) + sun_light
     save_jpg(fl, os.path.join(OUT, "floor_light.jpg"))
+    sun = sun_light.mean(axis=2)
+    sun = np.clip(sun / max(1e-6, float(np.percentile(sun, 99.5))), 0.0, 1.0)[::2, ::2]   # half size: shadows are soft
+    save_jpg(np.repeat(sun[..., None], 3, axis=2), os.path.join(OUT, "floor_sun.jpg"), encode=False)
     hl = blur(bake(hall, image("hall_indirect", HALL_PX, HALL_PX), "INDIRECT"), 1.2)
     hl += bake(hall, image("hall_direct", HALL_PX, HALL_PX), "DIRECT")
     save_jpg(hl, os.path.join(OUT, "hall_light.jpg"))
@@ -394,7 +399,7 @@ def main():
     sun = to_sun()
     info = {
         "hall": {"half": [HL, HW], "height": HH},
-        "floor": {"size": [2 * HL, 2 * HW], "light": "floor_light.jpg"},
+        "floor": {"size": [2 * HL, 2 * HW], "light": "floor_light.jpg", "sun": "floor_sun.jpg"},
         "walls": {"model": "hall.glb", "light": {"hall": "hall_light.jpg", "leaves": "leaves_light.jpg"}},
         "lightScale": LIGHT_SCALE,
         "sky": "sky.jpg",

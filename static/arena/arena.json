@@ -11,7 +11,8 @@
    64.0,
    48.0
   ],
-  "light": "floor_light.jpg"
+  "light": "floor_light.jpg",
+  "sun": "floor_sun.jpg"
  },
  "walls": {
   "model": "hall.glb",
