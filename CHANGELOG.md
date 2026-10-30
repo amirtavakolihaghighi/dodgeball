@@ -16,6 +16,12 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
   - On the host's computer, which also runs the server, Auto stays at Medium or lower.
   - The top-right corner shows the level next to the frame rate.
 - **A warning when the browser draws without the graphics card** (on the join screen and in the menu), with the setting that fixes it. The game runs at about 19 frames a second that way.
+- **Juice:**
+  - An impact freeze on the player who's hit (balls and everyone else keep moving).
+  - Specks of light from hits, catches, deflects, ricochets and perfect dodges.
+  - Balls that stretch with speed and spin (they have seams now).
+  - A camera that shakes and jolts on impacts and zooms in slightly while you charge.
+- **Screen shake** (Esc › Your settings) scales the camera motion, down to none. It never moves your aim.
 
 ### Changed
 

@@ -8,7 +8,7 @@
 // Everyone else sees it read-only, and can follow the host's screen while they set things up.
 import { Net } from './net.js';
 import { Input } from './input.js';
-import { World } from './world.js';
+import { World, TEAM_COLORS } from './world.js';
 import { Hud, TEAM, TEAM_CLASS, regenLimit } from './hud.js';
 import { Sfx } from './sfx.js';
 import { Lobby } from './lobby.js';
@@ -16,6 +16,7 @@ import { RulesEditor } from './rules_ui.js';
 import { launchVelocity } from './physics.js';
 import { Diag } from './diag.js';
 import { Graphics, gpuInfo, LEVEL_NAMES } from './graphics.js';
+import { CameraFx } from './juice.js';
 import * as settingsFile from './settings_file.js';
 
 const $ = (id) => document.getElementById(id);
@@ -62,7 +63,7 @@ const lobby = new Lobby(net, {
 });
 editor.onMessage = (text, cls) => hud.popup(text, cls);
 
-const settings = { sens: 1, volume: 0.6, ring: true, follow: true, graphics: 'auto' };
+const settings = { sens: 1, volume: 0.6, ring: true, follow: true, graphics: 'auto', shake: 1 };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('dp.settings') || '{}'));
 } catch { /* private mode etc: defaults are fine */ }
@@ -70,6 +71,10 @@ const saveSettings = () => {
   try { localStorage.setItem('dp.settings', JSON.stringify(settings)); } catch { /* ignore */ }
 };
 sfx.setVolume(settings.volume);
+
+// Shake, jolts and the charge zoom (juice.js): applied after the aim, to the picture only.
+const camFx = new CameraFx(world.camera);
+camFx.amount = settings.shake;
 
 // The graphics setting (graphics.js), and a warning when the browser draws without the graphics
 // card: the game then runs at about 19 frames a second, and one browser setting fixes it.
@@ -226,6 +231,12 @@ input.onLockChange = (locked) => {
 $('sensInput').value = settings.sens;
 $('volInput').value = settings.volume;
 $('ringInput').checked = settings.ring;
+$('shakeInput').value = settings.shake;
+$('shakeInput').addEventListener('input', (e) => {
+  settings.shake = Number(e.target.value);
+  camFx.amount = settings.shake;
+  saveSettings();
+});
 $('gfxSelect').value = graphics.choice;
 $('gfxNote').textContent = graphics.describe();
 $('gfxSelect').addEventListener('change', (e) => {
@@ -427,6 +438,7 @@ function releaseThrow(at = performance.now()) {
   local.throwAt = at / 1000;
   net.send({ t: 'throw', wt: round(net.viewTimeAt(at), 4), aim: aim.point, tg: aim.tg });
   world.man(myId)?.playThrow();
+  camFx.jolt(0, 0.015, 0.05 + 0.07 * power, 1 + 2 * power);      // recoil: harder throws kick more
   sfx.throw(power);
 }
 
@@ -882,6 +894,11 @@ function volumeFor(id) {
   return p ? clamp(1 - Math.hypot(p.x - local.x, p.z - local.z) / 30, 0.25, 1) : 0.5;
 }
 
+/** 1 right where you are, down to 0 at `range` metres (for shakes from things near you). */
+function nearMe(p, range) {
+  return clamp(1 - Math.hypot(p.x - local.x, p.z - local.z) / range, 0, 1);
+}
+
 function onEvent(e) {
   const mine = e.p === myId;
   const pos = posOf(e.p);
@@ -894,8 +911,19 @@ function onEvent(e) {
       }
       break;
     case 'hit': {
-      world.man(e.p)?.flinch();
-      if (pos) world.burst(pos.x, 1.2, pos.z, 0xffffff, 1.8);
+      world.man(e.p)?.impact(e.ko ? 0.15 : 0.085);     // an impact freeze on the hit player only
+      if (pos) {
+        world.burst(pos.x, 1.2, pos.z, 0xffffff, 1.8);
+        const team = TEAM_COLORS[net.latest?.players.get(e.p)?.team ?? 0];
+        const n = e.ko ? 2 : 1;
+        world.burstOf(pos.x, 1.2, pos.z, 0xffffff, 12 * n, { speed: 6 + e.speed * 0.08, up: 0.3, life: 0.45 });
+        world.burstOf(pos.x, 1.2, pos.z, team, 12 * n, { speed: 4.5 + e.speed * 0.06, up: 0.45, life: e.ko ? 0.9 : 0.6 });
+      }
+      if (mine) {
+        camFx.shake(e.ko ? 0.8 : 0.5);
+        camFx.jolt(0, -0.04, 0.12, 4);
+      } else if (e.by === myId) camFx.jolt(0, 0, -0.025, -1.5);  // your throw landed: a small punch in
+      else if (pos) camFx.shake(0.12 * nearMe(pos, 6));
       if (mine) local.hurtAt = clock();               // regeneration's pause starts over
       if (e.bar && net.latest?.players.get(e.p)?.team === myTeam) local.teamHurtAt = clock();
       if (mine) {
@@ -929,12 +957,17 @@ function onEvent(e) {
       break;
     case 'bounce':
       world.spark(e.x, e.y, e.z, 0xffffff, e.y < 0.5);
+      world.burstOf(e.x, Math.max(e.y, 0.05), e.z, 0xfff2c0, 12, { speed: 5, up: e.y < 0.5 ? 0.8 : 0.3, life: 0.4 });
+      camFx.shake(0.25 * nearMe(e, 10) ** 2);
       sfx.ricochet(clamp(1 - Math.hypot(e.x - local.x, e.z - local.z) / 30, 0.2, 1));
       break;
     case 'catch':
       // Your own catches/deflects get the popup and gold flash; a ring at the camera would blind you.
       if (pos && !mine) e.perfect ? world.ring(pos.x, 1.3, pos.z, 0xffc940) : world.burst(pos.x, 1.3, pos.z, 0x5dff9b);
+      if (pos) world.burstOf(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x5dff9b, (e.perfect ? 20 : 12) * (mine ? 0.6 : 1), { speed: 3, up: 0.6, life: 0.5, drag: 4 });
       if (mine) {
+        camFx.jolt(0, 0, 0.07, e.perfect ? -3 : 1.5);
+        camFx.shake(e.perfect ? 0.25 : 0.15);
         local.busyUntil = 0;
         hud.popup(`${e.perfect ? 'PERFECT CATCH' : 'CATCH'}  +${e.cash}`, e.perfect ? 'perfect' : 'good');
         if (e.perfect) hud.perfect();
@@ -944,7 +977,10 @@ function onEvent(e) {
       break;
     case 'deflect':
       if (pos && !mine) world.ring(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x6ff3ff);
+      if (pos) world.burstOf(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x6ff3ff, (e.perfect ? 22 : 14) * (mine ? 0.6 : 1), { speed: 7, up: 0.2, life: 0.35 });
       if (mine) {
+        camFx.jolt(0.03, 0, 0.05, e.perfect ? -3 : 1);
+        camFx.shake(0.18);
         local.busyUntil = 0;
         hud.popup(`${e.perfect ? 'PERFECT ' : ''}DEFLECT ×${e.rally}  +${e.cash}`, e.perfect ? 'perfect' : 'good');
         if (e.perfect) hud.perfect();
@@ -953,7 +989,11 @@ function onEvent(e) {
       if (e.rally >= 2) hud.feed([who(e.p), [` deflected: rally ×${e.rally}, ${e.speed} m/s`, 'gold']]);
       break;
     case 'dodge':
-      if (e.perfect) world.man(e.p)?.perfectDodge();
+      if (e.perfect) {
+        world.man(e.p)?.perfectDodge();
+        if (pos) world.burstOf(pos.x, 1.0, pos.z, 0xffc940, 14, { speed: 2.5, up: 0.7, life: 0.6, drag: 3 });
+        if (mine) camFx.jolt(0, 0, 0, -3);
+      }
       if (mine) {
         hud.popup(e.perfect ? `PERFECT DODGE  +${e.cash}` : 'DODGED', e.perfect ? 'perfect' : 'dim');
         if (e.perfect) hud.perfect();
@@ -1238,6 +1278,8 @@ function drawFrame(tMs) {
   world.syncPlayers(playerStates(t), dt);
   world.syncBalls(balls, t);
   world.updateFx(dt, t);
+  camFx.update(dt, me && me.alive && local.charging ? chargePower(t) : 0);
+  camFx.apply(world.camera);      // after the aim and the threat: the picture moves, the aim doesn't
   updateHud(t);
   shareHostView(t);
   world.render();
@@ -1247,7 +1289,7 @@ requestAnimationFrame(frame);
 
 // Handle for automated tests and console poking.
 window.dp = {
-  net, input, local, aim, world, lobby, editor, rules, diag, graphics, showMenu, spec, followNext,
+  net, input, local, aim, world, lobby, editor, rules, diag, graphics, camFx, placeCamera, computeAim, showMenu, spec, followNext,
   exportSettings, importSetupText, settingsFile, ownValue, ballColorOf,
   get hostView() { return hostView; },
   get me() { return me; }, get threat() { return threat; }, get view() { return view; }, get cfg() { return cfg; }, get isHost() { return isHost; },

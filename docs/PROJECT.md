@@ -832,11 +832,23 @@ This is the short version, kept on `main` while internet mode waits on its branc
   - A frame-rate cap for the host's tab: an idea for later.
   - Measuring on real office laptops: that's step 10.
 
+**Step 3: juice** (decision 131; built 2026-10-30; the numbers are in section 7):
+
+- **Impact freeze:** a hit player holds and shudders for a split second, then flinches. Never the balls, so nothing anyone reacts to stops.
+- **Particles:** specks of light from hits, catches, deflects, ricochets and perfect dodges, from one pooled set of points.
+- **Balls:** they stretch along their flight when fast and spin, with seams so the spin shows.
+- **Camera:** shake on being hit and on near ricochets; jolts on throws, catches and deflects; punches on perfect presses and your own hits; a slight zoom while charging.
+- **Screen shake:** each player's own setting scales the camera motion, down to none.
+  - It's applied after the aim is worked out, to the picture only, so it never moves the aim.
+  - The new `juice.json` test proves it: the aim with full shake equals the unshaken aim.
+- **Tested:** `juice.json` and `graphics.json` (no shader built mid-match: the two new materials are prepared at load), the smoke test, and the auto-defender (12 of 14 presses defended at 150 ms of lag, no hits).
+- **The user's verdict:** "the zoom while charging I think can be a little more; rest is good". The zoom went from 4.5° to 7°.
+
 **Next, in order:** the plan in `docs/LOOK_AND_FEEL.md`:
 
 1. Style samples (done: the sports hall; athletes with and without the helmet, picked at random).
 2. The performance items (done: D1, D2, B4, effects prepared in the lobby, the host's lower setting).
-3. Juice and sound.
+3. Juice (done) and sound.
 4. The arena, the ball and effects, the characters and their animation, and the HUD.
 5. An office session.
 6. The merge into `main`, when the user says so.
@@ -970,6 +982,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
 | 128 | Both versions of the athlete go into the game, with the helmet and without it: when a player joins, the game picks one at random and uses it | U | "I have changed my mind, I want with and without helmet both, when a player joins the game randomly picks a model and uses that." Replaces decision 127's helmet-only choice. Built with the characters (step 7 in `docs/LOOK_AND_FEEL.md`); details such as bots, and whether the pick lasts the whole session, are settled then |
 | 129 | The graphics setting (the lag study's D1), each player's own: Auto (default), High, Medium, Low. The levels change the render resolution (1, 0.75, 0.5 of `min(devicePixelRatio, 1.5)`) and, on Low, decorative effects only. Auto steps down after 3 s under 45 fps, keeps a step only if it raises the frame rate by 12%, and tries a level up after 20 s at 57 fps or more (twice a session). The host's Auto stays at Medium or lower (decision 116's lower default for the host's tab). Antialiasing stays on | C | Gameplay information looks the same on every level, so a low setting is never a disadvantage. A step that doesn't help means something else holds the game back (battery saver caps the frame rate; a busy CPU), and a softer picture would only cost. A ceiling rather than a fixed Medium lets the host's Auto still go lower, and a chosen High overrides it. Antialiasing is fixed when the page's WebGL context is made, and costs little on a smaller picture |
 | 130 | Presses are timed from their key or button event (B4; a missing, future or over-1-s-old timestamp falls back to now). Every effect's shader is built while the game loads and kept alive, and a rebuilt court reuses the old court's shaders. The no-graphics-card warning (D2) shows on the join screen and in the menu | C | A busy page holds events for up to a frame (50 ms at 20 fps), which counted against slow laptops. Measured: without the warm-up, 35 s of play built 3 shaders mid-match, each a freeze on a real laptop; with it, none. The warning names the one setting that turns ~19 fps into a normal frame rate |
+| 131 | Juice: an impact freeze on the hit player only (0.085 s, a knockout 0.15 s), pooled specks, stretching and spinning balls with seams, and camera shake, jolts and a charge zoom. The camera motion is applied after the aim, to the picture only, and each player scales it (Screen shake, 0–1, default 1). Low graphics halve the specks | C | Phase 15's plan: juice that never costs fairness. Freezing the balls would freeze what players react to, and moving the aim would make shake a handicap. The strengths are first guesses for the user to judge: Claude can't see motion |
 
 ## 6. Current features
 
@@ -1022,6 +1035,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
   - An Esc menu that doubles as the lobby: teams, match settings, the rules editor, your own settings (sensitivity, volume, ring, graphics), controls and join addresses.
 - **A graphics setting** for each player: Auto (default), High, Medium, Low. Auto steps down when the frame rate stays low and undoes a step that doesn't help; the host's Auto stays at Medium or lower. A warning on the join screen and in the menu when the browser draws without the graphics card.
 - Every effect's shader is built while the game loads, so nothing freezes the picture the first time it appears.
+- **Juice:** an impact freeze on the hit player, specks of light from impacts, balls that stretch with speed and spin (seams), and a camera that shakes, jolts and zooms while charging. Screen shake is each player's own setting, and none of it moves the aim.
 - Synthesized sounds.
 
 **Operations:**
@@ -1233,6 +1247,22 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - The 2 seconds after any change aren't counted, and neither is a gap over 0.5 s between frames (a hidden tab, a stall).
   - It starts at High, or at Low when the browser draws without the graphics card (`gpuInfo`: SwiftShader, llvmpipe, softpipe, "software", Basic Render Driver). On the host's computer it goes no higher than Medium.
 - Automatic changes are logged (`gfx`: from, to, why, fps) and shown in a dim popup; every `sec` line carries the level (`gfx`). The top-right readout shows it too ("1 ms · 60 fps · Medium").
+
+**Juice (`juice.js`, `world.js`):**
+
+- **Impact freeze:** a hit player's pose holds for 0.085 s (0.15 s for a knockout) and shudders (up to 5 cm, fading), with the hit flash; then the flinch plays. Their position keeps following the server, so nothing jumps afterwards. Only that figure stops.
+- **Specks:**
+  - One pool of 600 glow points (0.13 m, additive), one draw call. They fall (9.8 m/s²), slow down (drag), bounce off the floor and fade with the square of their life left.
+  - Per event: a hit 12 white + 12 in the player's team colour (twice as many for a knockout, faster with the ball's speed); a catch 12 green, or 20 gold if perfect; a deflect 14 cyan, or 22 gold; a ricochet 12 pale yellow; a perfect dodge 14 gold.
+  - Your own catches and deflects throw 60%, and Low graphics half.
+- **Balls:** two seams (great circles) on their texture. They stretch along their flight from 8 m/s, 1.2% longer per m/s up to 30% (thinner to keep their volume). They spin at their speed × 1.1 rad/s (× 1.6 once deflected), at most 26 rad/s, so it reads without strobing.
+- **The camera** (`CameraFx`):
+  - Shake grows with trauma squared (trauma fades at 1.4 a second), up to 0.03 rad of yaw, 0.025 of pitch and 0.02 of roll, with two sines per axis.
+  - Jolts are critically damped springs (18 rad/s) moving the camera along its own axes and widening the view.
+  - Being hit: trauma +0.5 (+0.8 for a knockout), a jolt 12 cm back and 4 cm down, 4° wider. Your throw: 5–12 cm back, 1–3° wider by its power. Your catch: 7 cm back, 1.5° wider (perfect: 3° narrower), trauma +0.15 (+0.25). Your deflect: 3 cm right, 5 cm back, 1° wider (perfect: 3° narrower), trauma +0.18. Your perfect dodge: 3° narrower. Your throw hitting: 2.5 cm forward, 1.5° narrower.
+  - A hit within 6 m of you, or a ricochet within 10 m: a little trauma by how close.
+  - The charge zoom: up to 7° narrower at a full charge (62° to 55°; 4.5° at first, more at the user's request).
+- **The Screen shake setting** (0–1, default 1) scales all of the camera motion. `main.js` applies it after the aim and the threat are worked out, to the picture only; the next frame places the camera afresh, and `apply()` updates the camera's matrices so name tags follow the moved picture.
 
 **Physics:**
 
@@ -1516,6 +1546,9 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
   - `setQuality(level, pixelRatio)`: the graphics level (`quality`; Low skips `ghostMan` and halves the ball afterimages) and the render resolution.
   - `warmUp()`: builds one of every effect, a figure (opaque, and one fading), a deflected ball with its trail, and the throw preview, out of sight, compiles them all (`renderer.compile`), and keeps them hidden. three.js deletes a shader when the last material using it is disposed, so the kept ones hold every shader. `?nowarm` skips it, for tests.
   - `buildCourt()` disposes the old court two frames later, after the new one has been drawn with the same shaders.
+  - `particles` (a `Particles` pool) and `burstOf(x, y, z, color, count, opts)`, which halves counts on Low.
+- **`Stickman.impact(dur)`:** the impact freeze; the pose runs on its own clock (`pdt`), which stands still while frozen.
+- **`BallView`:** a `holder` group carries the stretch along the velocity, and the seamed ball spins inside it.
 - **`Stickman`:** joint hierarchy and procedural poses. The sign conventions are in a comment in the code.
   - Poses: walk cycle, dodge, deflect swat, catch, throw follow-through, wind-up, flinch, knockout fall, invulnerability flicker, fading near the camera.
   - The perfect-dodge spin lasts 0.38 s with ghosts every 0.065 s (your own at 0.22 opacity, others at 0.45).
@@ -1525,6 +1558,8 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 **`hud.js`:** DOM updates only when values change; names always go in via `textContent`. The timing ring radius is 26 + 150 × time-to-impact px, with "near" at ≤ 0.3 s and "now" at ≤ 0.1 s.
 
 **`input.js`:** bindings, pointer lock (`?nolock` bypasses it for tests), and everything released on blur, visibility change or loss of the lock. Releasing on blur cancels a wind-up instead of throwing. `onPress(action, at)` and `onRelease(action, at)` pass when the key or button really went down (`eventTime`: the event's `timeStamp`, or now if it's missing, in the future or over 1 s old).
+
+**`juice.js`:** `CameraFx`: `shake(amount)`, `jolt(x, y, z, fov)`, `update(dt, charge)` and `apply(camera)` (the numbers above). `main.js` makes one (`camFx`), calls it from `onEvent` and `releaseThrow`, and applies it after `updateFx`.
 
 **`graphics.js`:** the graphics setting (the numbers above): `Graphics` with `choose()` (the menu), `setCeiling()` (the host's Medium), `frame()` (every frame: Auto counts frames per second and steps), `apply()` (also on resize) and `describe()` (the menu's note); `gpuInfo(renderer)` (the graphics card's name, and whether the page is drawn without one). `main.js` saves the choice in `dp.settings.graphics`, shows the warning (`gpuWarn`, `gpuWarnJoin`), logs `gfx` lines and puts the level in every `sec` line.
 
@@ -1664,6 +1699,12 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
   - the shader count before and after 35 s of every kind of effect.
   - Healthy: no shader built mid-match. With `&nowarm`, 3 were.
   - Re-run it after touching `graphics.js`, the effects or `warmUp()` in `world.js`, or press timing (`input.js eventTime`).
+- **The juice test** (`juice.json` + `juice.js`, with `graphics.js`):
+  - with full shake and a strong jolt, the aim from the shaken frame equals the aim from a freshly placed camera, while the drawn camera moved (21 cm, 0.75°, 5° wider);
+  - the slider at 0 moves nothing, and is saved;
+  - specks appear and fade (halved on Low); the impact freeze starts, shudders and ends;
+  - a match's balls stretch (to the 30% cap), with no shader built mid-match.
+  - Re-run it after touching `juice.js`, where the camera is placed or the aim worked out, or the effects in `onEvent`.
 
 **CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`; any page error fails it).
 

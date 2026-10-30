@@ -1,0 +1,21 @@
+[
+  {"eval": "document.getElementById('nameInput').value = 'JuiceTest'; document.getElementById('playBtn').click(); 'joined'"},
+  {"waitFor": "dp.cfg && dp.net.latest && dp.net.latest.r.s === 'lobby' && dp.me && dp.me.alive", "timeout": 8000},
+  {"eval": "document.getElementById('resumeBtn').click(); 'in the game'"},
+  {"wait": 1500},
+  {"evalFile": "juice.js"},
+  {"evalFile": "graphics.js"},
+  {"eval": "__start()"},
+  {"eval": "__aimUnmoved()"},
+  {"eval": "__shakeOff()"},
+  {"eval": "__specks()"},
+  {"eval": "__freeze()"},
+  {"eval": "document.getElementById('startBtn').click(); 'match started'"},
+  {"waitFor": "dp.net.latest && dp.net.latest.r.s === 'play'", "timeout": 10000},
+  {"eval": "__watch()"},
+  {"eval": "__defend()"},
+  {"wait": 25000},
+  {"eval": "__juiceReport()"},
+  {"eval": "__report()"},
+  {"shot": "juice_match.png"}
+]

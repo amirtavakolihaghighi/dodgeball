@@ -1,6 +1,6 @@
 # The look and feel: the working plan
 
-This is the working plan for the branch `look-and-feel`. Why the branch exists, the analysis behind it and every decision are in phase 15 and decisions 112–130 of [PROJECT.md](PROJECT.md). This file holds:
+This is the working plan for the branch `look-and-feel`. Why the branch exists, the analysis behind it and every decision are in phase 15 and decisions 112–131 of [PROJECT.md](PROJECT.md). This file holds:
 
 - the goal;
 - the plan and where each step stands;
@@ -51,7 +51,7 @@ The game should look and feel professionally made: juice and good art, both. We 
 | --- | --- | --- |
 | 1 | **Style samples:** two or three directions, rendered; the user picks | Done. Round 1: the sports hall (decisions 124–126). Round 2: the hall in vibrant colour and light, and athletes towards Fortnite-like humanoids; both versions, with and without the helmet, picked at random for each player (decisions 127–128) |
 | 2 | **Smooth and fair:** a graphics setting that scales itself down when the frame rate drops (D1); a warning when Chrome draws without the graphics card (D2); presses timed from the key event (B4); every effect prepared in the lobby; the host's tab on a lower setting by default | Done (decisions 129–130): Auto, High, Medium, Low; the warning; presses timed from the key; no shader built mid-match (3 before); the host's Auto at most Medium. Real laptops are measured in step 10 |
-| 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | To do |
+| 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | Done (decision 131). The user: the zoom while charging a little more (now 7°), the rest good |
 | 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | To do |
 | 5 | **The arena:** floor, walls, stands and a crowd; lighting baked in Blender | To do |
 | 6 | **The ball and effects art** | To do |
@@ -273,3 +273,7 @@ These are starting targets, to be checked on an office laptop and adjusted:
     - **No first-use freezes:** every effect prepared while the game loads.
     - **The host:** Auto stays at Medium or lower on the host's computer.
     - **Tested:** the new `graphics.json` and the earlier browser and Python tests. In 35 s of every kind of effect, no shader was built mid-match (3 without the warm-up).
+  - Committed as step 2. The user hadn't seen a change when trying it: the new art isn't in the game yet, and their computer, being the host, ran at Medium, which is barely softer. Zoomed pictures of the levels showed the difference, and the top-right readout now names the level.
+- **2026-10-30:**
+  - Step 3, juice (decision 131): an impact freeze on the hit player, specks, stretching and spinning balls with seams, camera shake, jolts and a charge zoom, and a Screen shake slider. None of it moves the aim, as the new `juice.json` test shows.
+    - The user's verdict: the zoom while charging a little more (4.5° became 7°); the rest is good.

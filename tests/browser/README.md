@@ -160,6 +160,20 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock&nowarm" tests\browser\g
   - Healthy: none built mid-match. Measured: 10 in the lobby and none added.
   - With `&nowarm` (no warm-up), the same match built 3 mid-match (5 in the lobby, then 8). Each such build freezes the picture for a moment on a real laptop.
 
+## Juice: the camera never moves the aim
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\juice.json
+```
+
+`juice.json` (+ `juice.js`, and `graphics.js` for the match) checks:
+
+- **The aim never moves:** with full shake and a strong jolt, the aim worked out in the shaken frame equals the aim from a freshly placed camera, while the camera that drew the frame had moved (measured: 21 cm and 0.75°, the view 5° wider).
+- **The Screen shake slider at 0:** the camera doesn't move, the view stays at 62°, and the setting is saved.
+- **The pooled specks** appear (20 of 40 on Low: half) and are all gone 1.6 s later.
+- **The impact freeze:** frozen right after, shuddering about 1.7 cm, over by 0.4 s, the figure back in place.
+- **A 25 s match** deflecting, dodging and catching every ball: the fastest balls stretch to the 30% cap, specks peak, and no shader is built mid-match.
+
 ## The session logs
 
 `--fresh` turns logging off, so give the test server a log folder (`tests\browser\out\` is git-ignored):

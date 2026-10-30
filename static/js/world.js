@@ -44,6 +44,113 @@ function dotTexture() {
   return tex;
 }
 
+/** Two seams round the ball (great circles), so its spin shows. White, so the ball's colour
+ *  shows through; the seams darken it. Wrapped round the sphere's usual texture layout. */
+function seamTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, 256, 128);
+  g.fillStyle = '#7a7a7a';
+  g.fillRect(0, 60, 256, 8);              // the equator
+  g.fillRect(0, 0, 4, 128);               // a meridian, and the opposite one: one great circle
+  g.fillRect(252, 0, 4, 128);
+  g.fillRect(124, 0, 8, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** Small glowing specks thrown out by impacts. One pool of points and one draw call for all of
+ *  them; each fades and falls, and bounces off the floor. */
+class Particles {
+  static MAX = 600;
+
+  constructor(scene, map) {
+    const n = Particles.MAX;
+    this.pos = new Float32Array(n * 3);
+    this.col = new Float32Array(n * 3);
+    this.base = new Float32Array(n * 3);
+    this.vel = new Float32Array(n * 3);
+    this.age = new Float32Array(n).fill(1);
+    this.life = new Float32Array(n).fill(1);
+    this.drag = new Float32Array(n);
+    this.next = 0;
+    this.live = 0;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3).setUsage(THREE.DynamicDrawUsage));
+    this.points = new THREE.Points(geo, new THREE.PointsMaterial({
+      size: 0.13, map, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    this.points.frustumCulled = false;
+    scene.add(this.points);
+  }
+
+  /** count specks of color from (x, y, z): speed m/s, up = how much they fly upwards (0..1),
+   *  life s, drag (how fast they slow down). */
+  emit(x, y, z, color, count, { speed = 5, up = 0.5, life = 0.5, drag = 2.5 } = {}) {
+    const c = new THREE.Color(color);
+    for (let k = 0; k < count; k++) {
+      const i = this.next;
+      this.next = (this.next + 1) % Particles.MAX;
+      let dx = Math.random() * 2 - 1;
+      let dy = Math.random() * 2 - 1;
+      let dz = Math.random() * 2 - 1;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      const s = speed * (0.35 + 0.65 * Math.random()) / len;
+      dx *= s;
+      dz *= s;
+      dy = dy * s * (1 - up) + Math.abs(speed) * up * (0.4 + 0.6 * Math.random());
+      this.pos.set([x, y, z], i * 3);
+      this.vel.set([dx, dy, dz], i * 3);
+      this.base.set([c.r, c.g, c.b], i * 3);
+      this.age[i] = 0;
+      this.life[i] = life * (0.6 + 0.4 * Math.random());
+      this.drag[i] = drag;
+    }
+  }
+
+  update(dt) {
+    let live = 0;
+    for (let i = 0; i < Particles.MAX; i++) {
+      const o = i * 3;
+      if (this.age[i] >= this.life[i]) {
+        if (this.col[o] || this.col[o + 1] || this.col[o + 2]) this.col.fill(0, o, o + 3);
+        continue;
+      }
+      live++;
+      this.age[i] += dt;
+      const slow = Math.exp(-this.drag[i] * dt);
+      this.vel[o] *= slow;
+      this.vel[o + 2] *= slow;
+      this.vel[o + 1] = this.vel[o + 1] * slow - 9.8 * dt;
+      this.pos[o] += this.vel[o] * dt;
+      this.pos[o + 1] += this.vel[o + 1] * dt;
+      this.pos[o + 2] += this.vel[o + 2] * dt;
+      if (this.pos[o + 1] < 0.03) {        // the floor
+        this.pos[o + 1] = 0.03;
+        this.vel[o + 1] *= -0.35;
+        this.vel[o] *= 0.6;
+        this.vel[o + 2] *= 0.6;
+      }
+      const k = 1 - this.age[i] / this.life[i];
+      const f = k * k;                     // additive: darker is fainter
+      this.col[o] = this.base[o] * f;
+      this.col[o + 1] = this.base[o + 1] * f;
+      this.col[o + 2] = this.base[o + 2] * f;
+    }
+    if (live || this.live) {               // nothing to send while every speck is gone
+      const geo = this.points.geometry;
+      geo.attributes.position.needsUpdate = true;
+      geo.attributes.color.needsUpdate = true;
+    }
+    this.live = live;
+  }
+}
+
 const capsules = new Map();
 function capsule(len, r) {
   const key = `${len}:${r}`;
@@ -86,6 +193,8 @@ export class World {
     this.shadowTex = radialTexture('rgba(0,0,0,0.65)', 'rgba(0,0,0,0)');
     this.glowTex = radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
     this.shadowMat = new THREE.MeshBasicMaterial({ map: this.shadowTex, transparent: true, depthWrite: false });
+    this.seamTex = seamTexture();
+    this.particles = new Particles(this.scene, this.glowTex);
     const hemi = new THREE.HemisphereLight(0xd6e6ff, 0x2a2018, 1.25);
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(8, 20, 10);
@@ -149,11 +258,11 @@ export class World {
     this.ghostMan(mine);                            // a perfect dodge's afterimage
     this.quality = quality;
     const ball = new BallView(this);                // a deflected ball: glow, shadow and trail
-    ball.update({ pos: at, state: 1, rally: 1, color: '#ffffff' }, 0);
-    ball.update({ pos: { x: 0.5, y: at.y, z: 0 }, state: 1, rally: 1, color: '#ffffff' }, 0.01);
+    ball.update({ pos: at, state: 1, rally: 1, color: '#ffffff', vx: 20, vy: 0, vz: 0 }, 0);
+    ball.update({ pos: { x: 0.5, y: at.y, z: 0 }, state: 1, rally: 1, color: '#ffffff', vx: 20, vy: 0, vz: 0 }, 0.01);
     const kept = this.fx.splice(first);
     for (const root of [mine.root, faded.root]) root.position.y = at.y;
-    const objects = [...kept.map((f) => f.obj), mine.root, faded.root, ball.mesh, ball.glow, ball.shadow, ball.trail.mesh];
+    const objects = [...kept.map((f) => f.obj), mine.root, faded.root, ball.holder, ball.glow, ball.shadow, ball.trail.mesh];
     this.preview.visible = this.bounceMark.visible = true;     // the throw preview, too
     this.renderer.compile(this.scene, this.camera);
     this.preview.visible = this.bounceMark.visible = false;
@@ -357,7 +466,13 @@ export class World {
     this.fx.push({ obj: group, mat, t: 0, dur: 0.4, fade: opacity });
   }
 
+  /** Specks flying out of an impact (Particles.emit); Low graphics throw half as many. */
+  burstOf(x, y, z, color, count, opts) {
+    this.particles.emit(x, y, z, color, Math.max(1, Math.round(count * (this.quality === 'low' ? 0.5 : 1))), opts);
+  }
+
   updateFx(dt, t) {
+    this.particles.update(dt);
     this.fx = this.fx.filter((f) => {
       f.t += dt;
       const k = f.t / f.dur;
@@ -479,6 +594,8 @@ class Stickman {
     this.last = null;
     this.throwT = 9;
     this.hitT = 9;
+    this.freezeT = 0;
+    this.freezeDur = 1;
     this.downT = 0;
     this.spinT = 9;
     this.spinDir = 1;
@@ -526,6 +643,13 @@ class Stickman {
     this.hitT = 0;
   }
 
+  /** Impact freeze (hitstop): the pose holds and shudders for `dur` seconds, with the hit flash,
+   *  then the flinch plays. Only this figure stops: the balls and everyone else keep moving. */
+  impact(dur) {
+    this.freezeT = this.freezeDur = dur;
+    this.hitT = 0;
+  }
+
   /** Perfect dodge: a full spin out of the way, leaving glowing afterimages. */
   perfectDodge() {
     this.spinT = 0;
@@ -537,6 +661,9 @@ class Stickman {
   // rotation.x < 0 swings a limb forward, knee rotation.x > 0 bends it, elbow < 0 bends it,
   // left arm rotation.z > 0 / right arm rotation.z < 0 raise the arm out to the side.
   update(dt, s) {
+    const frozen = this.freezeT > 0;
+    if (frozen) this.freezeT -= dt;
+    const pdt = frozen ? 0 : dt;              // the pose's own clock, stopped by an impact freeze
     if (!this.last) this.last = { x: s.x, z: s.z };
     const inv = 1 / Math.max(dt, 1e-3);
     const vx = (s.x - this.last.x) * inv;
@@ -544,17 +671,17 @@ class Stickman {
     this.last.x = s.x;
     this.last.z = s.z;
     this.speed = damp(this.speed, Math.min(16, Math.hypot(vx, vz)), 10, dt);
-    this.throwT += dt;
-    this.hitT += dt;
-    this.spinT += dt;
-    this.downT = s.alive ? 0 : this.downT + dt;
+    this.throwT += pdt;
+    this.hitT += pdt;
+    this.spinT += pdt;
+    this.downT = s.alive ? 0 : this.downT + pdt;
 
     const sy = Math.sin(s.yaw);
     const cy = Math.cos(s.yaw);
     const vf = vx * sy + vz * cy;       // velocity along facing
     const vr = -vx * cy + vz * sy;      // velocity to the right
     this.side = damp(this.side, vr, 20, dt);
-    this.phase += dt * this.speed * 1.9;
+    this.phase += pdt * this.speed * 1.9;
     const w = Math.min(1, this.speed / 6);
     const sw = Math.sin(this.phase);
     const spinning = this.spinT < SPIN_TIME && s.alive;
@@ -625,19 +752,19 @@ class Stickman {
     }
 
     const r = 22;
-    this.legL.hip.rotation.x = damp(this.legL.hip.rotation.x, T.legL, r, dt);
-    this.legR.hip.rotation.x = damp(this.legR.hip.rotation.x, T.legR, r, dt);
-    this.legL.knee.rotation.x = damp(this.legL.knee.rotation.x, T.kneeL, r, dt);
-    this.legR.knee.rotation.x = damp(this.legR.knee.rotation.x, T.kneeR, r, dt);
+    this.legL.hip.rotation.x = damp(this.legL.hip.rotation.x, T.legL, r, pdt);
+    this.legR.hip.rotation.x = damp(this.legR.hip.rotation.x, T.legR, r, pdt);
+    this.legL.knee.rotation.x = damp(this.legL.knee.rotation.x, T.kneeL, r, pdt);
+    this.legR.knee.rotation.x = damp(this.legR.knee.rotation.x, T.kneeR, r, pdt);
     const ra = this.throwT < 0.2 ? 60 : 26;
-    this.armL.shoulder.rotation.x = damp(this.armL.shoulder.rotation.x, T.armLx, 26, dt);
-    this.armR.shoulder.rotation.x = damp(this.armR.shoulder.rotation.x, T.armRx, ra, dt);
-    this.armL.shoulder.rotation.z = damp(this.armL.shoulder.rotation.z, T.armLz, 30, dt);
-    this.armR.shoulder.rotation.z = damp(this.armR.shoulder.rotation.z, T.armRz, 30, dt);
-    this.armL.elbow.rotation.x = damp(this.armL.elbow.rotation.x, T.elbowL, 26, dt);
-    this.armR.elbow.rotation.x = damp(this.armR.elbow.rotation.x, T.elbowR, 26, dt);
-    this.chest.rotation.y = damp(this.chest.rotation.y, T.twist, 24, dt);
-    this.hips.position.y = damp(this.hips.position.y, 0.95 - T.crouch, 20, dt);
+    this.armL.shoulder.rotation.x = damp(this.armL.shoulder.rotation.x, T.armLx, 26, pdt);
+    this.armR.shoulder.rotation.x = damp(this.armR.shoulder.rotation.x, T.armRx, ra, pdt);
+    this.armL.shoulder.rotation.z = damp(this.armL.shoulder.rotation.z, T.armLz, 30, pdt);
+    this.armR.shoulder.rotation.z = damp(this.armR.shoulder.rotation.z, T.armRz, 30, pdt);
+    this.armL.elbow.rotation.x = damp(this.armL.elbow.rotation.x, T.elbowL, 26, pdt);
+    this.armR.elbow.rotation.x = damp(this.armR.elbow.rotation.x, T.elbowR, 26, pdt);
+    this.chest.rotation.y = damp(this.chest.rotation.y, T.twist, 24, pdt);
+    this.hips.position.y = damp(this.hips.position.y, 0.95 - T.crouch, 20, pdt);
 
     let spin = 0;
     let hop = 0;
@@ -654,9 +781,12 @@ class Stickman {
     }
     this.root.position.set(s.x, 0, s.z);
     this.root.rotation.y = s.yaw + spin;
+    const shudder = frozen ? 0.05 * (this.freezeT / this.freezeDur) : 0;
+    this.body.position.x = shudder * (Math.random() * 2 - 1);
+    this.body.position.z = shudder * (Math.random() * 2 - 1);
     if (s.alive) {
-      this.body.rotation.x = damp(this.body.rotation.x, T.leanX, 14, dt);
-      this.body.rotation.z = damp(this.body.rotation.z, T.leanZ, 14, dt);
+      this.body.rotation.x = damp(this.body.rotation.x, T.leanX, 14, pdt);
+      this.body.rotation.z = damp(this.body.rotation.z, T.leanZ, 14, pdt);
       this.body.position.y = hop;
     } else {                                            // knocked out: fall flat, then fade away
       const k = clamp(this.downT / 0.4, 0, 1);
@@ -787,16 +917,27 @@ class Trail {
   }
 }
 
+// A fast ball stretches along its flight (up to 30% longer, thinner to keep its volume), and
+// spins: its seams turn at a speed that reads on screen without strobing.
+const STRETCH = { from: 8, per: 0.012, max: 0.3 };      // m/s where it starts, extra length per m/s, cap
+const SPIN_MAX = 26;                                    // rad/s (about 4 turns a second)
+const UP = new THREE.Vector3(0, 1, 0);
+
 class BallView {
   constructor(world) {
     this.world = world;
-    this.mat = new THREE.MeshStandardMaterial({ color: RALLY_COLORS[0], emissive: RALLY_COLORS[0], emissiveIntensity: 0.6, roughness: 0.35 });
+    this.mat = new THREE.MeshStandardMaterial({
+      color: RALLY_COLORS[0], emissive: RALLY_COLORS[0], emissiveIntensity: 0.6, roughness: 0.35,
+      map: world.seamTex, emissiveMap: world.seamTex,
+    });
+    this.holder = new THREE.Group();                    // carries the stretch; the ball spins inside it
     this.mesh = new THREE.Mesh(ballGeo, this.mat);
+    this.holder.add(this.mesh);
     this.glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: world.glowTex, color: RALLY_COLORS[0], transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.shadowMat = world.shadowMat.clone();
     this.shadow = new THREE.Mesh(blobGeo, this.shadowMat);
     this.shadow.rotation.x = -Math.PI / 2;
-    world.scene.add(this.mesh, this.glow, this.shadow);
+    world.scene.add(this.holder, this.glow, this.shadow);
     this.key = '';
     this.trail = null;
     this.trailRally = -1;
@@ -806,8 +947,14 @@ class BallView {
   update(b, t) {
     const p = b.pos;
     const scale = this.world.ballScale;
-    this.mesh.position.set(p.x, p.y, p.z);
-    this.mesh.scale.setScalar(scale);
+    const dt = this.lastT === undefined ? 0 : Math.min(0.1, Math.max(0, t - this.lastT));
+    this.lastT = t;
+    this.holder.position.set(p.x, p.y, p.z);
+    const speed = b.state === 2 ? 0 : Math.hypot(b.vx || 0, b.vy || 0, b.vz || 0);
+    const long = 1 + clamp((speed - STRETCH.from) * STRETCH.per, 0, STRETCH.max);
+    if (speed > 0.5) this.holder.quaternion.setFromUnitVectors(UP, tmpDir.set(b.vx, b.vy, b.vz).normalize());
+    this.holder.scale.set(scale / Math.sqrt(long), scale * long, scale / Math.sqrt(long));
+    this.mesh.rotation.x += Math.min(SPIN_MAX, speed * (b.rally ? 1.6 : 1.1)) * dt;   // tumbles forward
     this.glow.position.set(p.x, p.y, p.z);
     const live = b.state !== 2;
     const col = !live ? DEAD_BALL : b.rally ? rallyColor(b.rally) : hex(b.color);
@@ -843,7 +990,7 @@ class BallView {
   }
 
   dispose(scene) {
-    scene.remove(this.mesh, this.glow, this.shadow);
+    scene.remove(this.holder, this.glow, this.shadow);
     this.mat.dispose();
     this.glow.material.dispose();
     this.shadowMat.dispose();

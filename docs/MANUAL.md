@@ -123,6 +123,14 @@ Each player picks their own in the menu (Esc), under **Your settings › Graphic
 - **Presses are timed from the key itself.** A slow laptop can handle a key press up to a frame late (50 ms at 20 frames a second), but the server is told when the key really went down.
 - **Every effect is prepared while the game loads,** so nothing freezes the picture the first time it appears in a match.
 
+## How impacts feel
+
+- **A hit player freezes for a split second** (longer for a knockout) and shudders, flashing white, then flinches. Only their figure stops: the balls and everyone else keep moving.
+- **Specks of light** fly from hits (white and the player's team colour), catches, deflects, ricochets and perfect dodges. Low graphics throw half as many.
+- **Balls stretch along their flight when they're fast** (up to 30% longer) and spin; their seams show the spin.
+- **The camera** shakes when you're hit (harder for a knockout) and when a ball ricochets near you. It jolts when you throw (harder throws kick more), catch or deflect, punches in on a perfect press and on your own hits, and zooms in a little while you charge a throw.
+- **Esc › Your settings › Screen shake** scales all of that camera motion; all the way left turns it off. It only moves the picture: your aim, the crosshair's target and the timing ring never move with it.
+
 ## Controls
 
 | Input | Action |
