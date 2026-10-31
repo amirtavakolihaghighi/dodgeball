@@ -1,6 +1,8 @@
-// Three.js scene: the court, stick figures, balls, trails and effects.
+// Three.js scene: the court, the players (athletes posed by stick figures), balls, trails and effects.
 import * as THREE from 'three';
 import { GLTFLoader } from '/static/vendor/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from '/static/vendor/addons/utils/SkeletonUtils.js';
+import { Athlete, loadAthlete } from './athlete.js';
 import { effectTextures } from './fxtex.js';
 
 export const TEAM_COLORS = [0xff4d5e, 0x3fa9ff];
@@ -398,10 +400,23 @@ export class World {
     this.cheering = 0;
     addEventListener('resize', () => this.resize());
     this.resize();
-    // ?noarena: the plain court, for comparing frame rates (like ?nowarm for the warm-up)
-    this.ready = false;     // the hall has loaded, or won't
-    this.loading = (new URLSearchParams(location.search).has('noarena') ? Promise.resolve() : this.loadArena())
-      .then(() => { this.ready = true; });
+    // ?noarena: the plain court, and ?noathlete: the stick figures, for comparing frame rates (like
+    // ?nowarm for the warm-up). ?head=helmet or ?head=face: everyone in that version (pictures, tests).
+    const params = new URLSearchParams(location.search);
+    this.headChoice = params.get('head');
+    this.athlete = null;    // the athlete's meshes and maps (athlete.js), once loaded
+    this.ready = false;     // the hall and the athlete have loaded, or won't
+    const athlete = params.has('noathlete') ? null : loadAthlete().catch((err) => {
+      console.warn('The athlete could not be loaded; the stick figures stay.', err);
+      return null;
+    });
+    this.loading = Promise.all([params.has('noarena') ? null : this.loadArena(), athlete]).then(([, template]) => {
+      if (template) {       // after the hall: its tone mapping is part of every shader built here
+        this.athlete = template;
+        this.dressAll();
+      }
+      this.ready = true;
+    });
   }
 
   /** Loads the hall (art/arena.py's output) and puts the court in it. */
@@ -557,6 +572,31 @@ export class World {
     this.preview.visible = this.bounceMark.visible = false;
     for (const o of objects) o.visible = false;
     this.warm = { kept, mine, faded, ball };
+  }
+
+  /** The athlete has loaded: every stick figure (the warm-up's too) becomes an athlete, and its
+   *  shaders are built now (its own, faded, and as a perfect dodge's afterimage). */
+  dressAll() {
+    for (const man of this.men.values()) man.dress(this.athlete);
+    const w = this.warm;
+    if (!w) return;
+    w.mine.dress(this.athlete);
+    w.faded.dress(this.athlete);
+    for (const m of w.faded.fadeMats) {
+      m.transparent = true;
+      m.opacity = 0.5;
+    }
+    const first = this.fx.length;
+    const quality = this.quality;
+    this.quality = 'high';
+    this.ghostMan(w.mine);
+    this.quality = quality;
+    const ghosts = this.fx.splice(first);
+    w.kept.push(...ghosts);
+    const shown = [w.mine.root, w.faded.root, ...ghosts.map((f) => f.obj)];
+    for (const o of shown) o.visible = true;
+    this.renderer.compile(this.scene, this.camera);
+    for (const o of shown) o.visible = false;
   }
 
   buildCourt(L, W, gap) {
@@ -799,7 +839,7 @@ export class World {
         man = null;
       }
       if (!man) {
-        man = new Stickman(this, s.team, s.isMe);
+        man = new Stickman(this, s.team, s.isMe, s.id);
         this.men.set(s.id, man);
       }
       s.camDist = Math.hypot(s.x - this.camera.position.x, s.z - this.camera.position.z);
@@ -905,11 +945,11 @@ export class World {
     group.rotation.copy(man.root.rotation);
     const opacity = man.isMe ? 0.22 : 0.45;     // your own sit right in front of the camera
     const mat = new THREE.MeshBasicMaterial({ color: man.ghostColor, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending });
-    const body = man.body.clone(true);
+    const body = man.athlete ? cloneSkinned(man.body) : man.body.clone(true);   // an athlete's copy gets its own bones, held still
     body.traverse((o) => { if (o.isMesh) o.material = mat; });
     group.add(body);
     this.scene.add(group);
-    this.fx.push({ obj: group, mat, t: 0, dur: 0.4, fade: opacity });
+    this.fx.push({ obj: group, mat, t: 0, dur: 0.4, fade: opacity, skinned: !!man.athlete });
   }
 
   /** Specks flying out of an impact (Particles.emit); Low graphics throw half as many. */
@@ -931,6 +971,7 @@ export class World {
         this.scene.remove(f.obj);
         mat.dispose();
         if (f.ownGeometry) f.obj.geometry.dispose();
+        if (f.skinned) f.obj.traverse((o) => { if (o.isSkinnedMesh) o.skeleton.dispose(); });
         return false;
       }
       if (f.fade) mat.opacity = f.fade * (1 - k);
@@ -992,17 +1033,23 @@ export class World {
   }
 }
 
+// A player. The stick figure's joints make the pose (update), and the athlete (athlete.js) takes
+// the stick figure's place once it has loaded: its bones follow the joints. Without it (still
+// loading, or ?noathlete) the stick figure's own capsules show.
 class Stickman {
-  constructor(world, team, isMe) {
+  constructor(world, team, isMe, id = 0) {
     const color = TEAM_COLORS[team];
     this.world = world;
     this.team = team;
     this.isMe = isMe;
+    this.id = id;
     this.ghostColor = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.35);
     this.mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, emissive: color, emissiveIntensity: 0.18 });
     this.skin = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.45, emissive: 0xffffff, emissiveIntensity: 0.06 });
     this.heldMat = new THREE.MeshStandardMaterial({ color: RALLY_COLORS[0], emissive: RALLY_COLORS[0], emissiveIntensity: 0.4, roughness: 0.35 });
     this.fadeMats = [this.mat, this.skin, this.heldMat];
+    this.athlete = null;
+    this.capsules = [];                     // the stick figure's own shapes, gone once the athlete is in
     this.root = new THREE.Group();
     this.body = new THREE.Group();          // pivots at the feet: leans, hops, falls over
     this.root.add(this.body);
@@ -1018,6 +1065,7 @@ class Stickman {
     const visor = new THREE.Mesh(visorGeo, visorMat);   // shows which way they face
     visor.position.set(0, 0.81, 0.13);
     this.chest.add(torso, head, visor);
+    this.capsules.push(torso, head, visor);
     this.armL = this.arm(0.21);
     this.armR = this.arm(-0.21);
     this.legL = this.leg(0.1);
@@ -1053,6 +1101,7 @@ class Stickman {
     this.spinT = 9;
     this.spinDir = 1;
     this.lastGhost = 0;
+    if (world.athlete) this.dress(world.athlete);
   }
 
   arm(x) {
@@ -1066,10 +1115,12 @@ class Stickman {
     fore.position.y = -0.14;
     const hand = new THREE.Group();
     hand.position.y = -0.3;
-    hand.add(new THREE.Mesh(handGeo, this.skin));
+    const fist = new THREE.Mesh(handGeo, this.skin);
+    hand.add(fist);
     elbow.add(fore, hand);
     shoulder.add(upper, elbow);
     this.chest.add(shoulder);
+    this.capsules.push(upper, fore, fist);
     return { shoulder, elbow, hand };
   }
 
@@ -1085,7 +1136,22 @@ class Stickman {
     knee.add(shin);
     hip.add(thigh, knee);
     this.hips.add(hip);
+    this.capsules.push(thigh, shin);
     return { hip, knee };
+  }
+
+  /** The athlete takes the stick figure's place: one head version and look for this player
+   *  (decision 128), in their team's kit, holding the ball in its right hand. */
+  dress(template) {
+    if (this.athlete) return;
+    const a = (this.athlete = new Athlete(template, {
+      id: this.id, team: this.team, teamColor: TEAM_COLORS[this.team], head: this.world.headChoice,
+    }));
+    for (const m of this.capsules) m.removeFromParent();
+    this.body.add(a.model);
+    a.hold(this.held, 0.15 * this.world.ballScale);
+    a.setLow(this.world.quality === 'low');
+    this.fadeMats = [...a.mats, this.heldMat];
   }
 
   playThrow() {
@@ -1144,6 +1210,11 @@ class Stickman {
       armLx: -sw * 0.6 * w, armRx: sw * 0.6 * w, armLz: 0.12, armRz: -0.12, elbowL: -0.35, elbowR: -0.35,
       leanX: 0.1 * w, leanZ: 0, twist: 0, crouch: 0,
     };
+    if (s.hasBall && this.throwT > 0.35) {              // carrying a ball: in front of the hip, not in it
+      T.armRx = -0.45 + sw * 0.25 * w;
+      T.armRz = -0.05;
+      T.elbowR = -1.25;
+    }
     if (spinning) {                                     // perfect dodge: arms flung out mid-spin
       T.armLz = 1.25;
       T.armRz = -1.25;
@@ -1218,6 +1289,10 @@ class Stickman {
     this.armR.elbow.rotation.x = damp(this.armR.elbow.rotation.x, T.elbowR, 26, pdt);
     this.chest.rotation.y = damp(this.chest.rotation.y, T.twist, 24, pdt);
     this.hips.position.y = damp(this.hips.position.y, 0.95 - T.crouch, 20, pdt);
+    if (this.athlete) {
+      this.athlete.setLow(this.world.quality === 'low');
+      this.athlete.pose(this);
+    }
 
     let spin = 0;
     let hop = 0;
@@ -1262,9 +1337,12 @@ class Stickman {
       m.transparent = opacity < 1;
       m.opacity = opacity;
     }
-    this.mat.emissiveIntensity = 0.18 + Math.max(0, 1 - this.hitT / 0.18) * 1.6 + (spinning ? 0.6 : 0);
+    const glow = Math.max(0, 1 - this.hitT / 0.18) * 1.6 + (spinning ? 0.6 : 0);     // the hit flash, a perfect dodge
+    if (this.athlete) this.athlete.glow(glow);
+    else this.mat.emissiveIntensity = 0.18 + glow;
     this.held.visible = s.alive && s.hasBall && this.throwT > 0.12;
     this.held.scale.setScalar(this.world.ballScale);
+    if (this.athlete) this.athlete.hold(this.held, 0.15 * this.world.ballScale);
     if (s.ballColor !== this.ballColor) {      // the ball in hand is the colour it'll fly in
       this.ballColor = s.ballColor;
       this.heldMat.color.setHex(hex(s.ballColor));
@@ -1275,7 +1353,8 @@ class Stickman {
 
   dispose(scene) {
     scene.remove(this.root, this.sunShadow);
-    for (const m of this.fadeMats) m.dispose();
+    for (const m of [this.mat, this.skin, this.heldMat]) m.dispose();
+    if (this.athlete) this.athlete.dispose();
     if (this.meRing) {
       this.meRing.geometry.dispose();
       this.meRing.material.dispose();

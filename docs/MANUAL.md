@@ -102,6 +102,14 @@ To read a session: `python tools\log_report.py <the zip or a session folder>`. I
 - the numbers just before every L;
 - when Auto graphics changed a player's level and why, and players whose browser held their key presses for a while (a busy computer).
 
+## The players
+
+- **Every player is an athlete** in their team's kit: red or blue shirt with white trims, navy shorts with stripes in the team's colour, white socks and shoes.
+- **Two versions:** a sports helmet with a dark visor, or a face with hair. Each player gets one when they join, with one of six skin, hair and eye colours, and everyone sees them the same.
+- **They move as the stick figures did,** for now: the same running, throws, catches, deflects, dodges and falls. Holding a ball, they carry it in front of them.
+- **Low graphics** draw lighter versions (about a third of the detail).
+- **Until they have loaded** (a moment at start), the stick figures of before stand in.
+
 ## The hall
 
 - **You play in a sports hall** with tall windows, a low golden sun and a crowd in the stands. Its sunlight was worked out once, in advance, so drawing it costs laptops very little.

@@ -162,6 +162,19 @@ Add `&noarena` to any test to draw the plain court instead of the sports hall, f
   - Healthy: none built mid-match. Measured: 10 in the lobby and none added.
   - With `&nowarm` (no warm-up), the same match built 3 mid-match (5 in the lobby, then 8). Each such build freezes the picture for a moment on a real laptop.
 
+## The athletes
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\athletes.json
+```
+
+`athletes.json` (+ `athletes.js`) checks the athletes that replace the stick figures (`athlete.js`):
+
+- **Everyone dressed:** 4 of 4 (you and three bots), the helmet and the face both among them (from the players' ids: 1 and 2 face, 3 and 4 helmet), each drawing two meshes (the body and its head).
+- **Low:** the light meshes (`body_lo`, ...) show instead, and the shader count doesn't change (37).
+- **The pose follows the stick figure:** in the lobby and in a match, and with your own player held in a wind-up, a dodge, a catch and a deflect, each athlete's hands are within 10 cm of the stick figure's (their arms differ a little) and no ankle goes under its resting height (7 cm: no foot through the floor).
+- **Pictures** (`athletes_*.png`): your player from the front, back and side and its face close up, in each pose, a blue player, both heads close up, Low, and the game's own view. The camera is moved only while drawing (`world.render` wrapped), with everyone else hidden for that frame and the HUD faded.
+
 ## Juice: the camera never moves the aim
 
 ```powershell

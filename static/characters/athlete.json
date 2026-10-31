@@ -1,0 +1,96 @@
+{
+ "slots": [
+  "skin",
+  "lips",
+  "hair",
+  "eye_white",
+  "iris",
+  "pupil",
+  "cloth",
+  "bright",
+  "helmet",
+  "white",
+  "navy",
+  "sole",
+  "laces",
+  "visor",
+  "gloss_white"
+ ],
+ "color": [
+  "#e3ab82",
+  "#c47a68",
+  "#3a2418",
+  "#f4f1ec",
+  "#7a5230",
+  "#141012",
+  "#e0213a",
+  "#ff4d5e",
+  "#ff4d5e",
+  "#f6f7fa",
+  "#1e2338",
+  "#e9ebef",
+  "#2b2f3c",
+  "#0a1020",
+  "#f6f7f9"
+ ],
+ "rough": [
+  0.5,
+  0.45,
+  0.6,
+  0.25,
+  0.25,
+  0.2,
+  0.65,
+  0.45,
+  0.22,
+  0.6,
+  0.65,
+  0.6,
+  0.7,
+  0.1,
+  0.3
+ ],
+ "metal": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0.4,
+  0
+ ],
+ "maps": {
+  "body_hi": "athlete_body_hi.png",
+  "face_hi": "athlete_face_hi.png",
+  "helmet_hi": "athlete_helmet_hi.png",
+  "body_lo": "athlete_body_lo.png",
+  "face_lo": "athlete_face_lo.png",
+  "helmet_lo": "athlete_helmet_lo.png"
+ },
+ "supersample": 2,
+ "triangles": {
+  "body_hi": 6621,
+  "face_hi": 1756,
+  "helmet_hi": 1594,
+  "body_lo": 2363,
+  "face_lo": 634,
+  "helmet_lo": 531
+ },
+ "heads": [
+  "helmet",
+  "face"
+ ],
+ "held": {
+  "palm": "palm_R",
+  "centre": "ball_R",
+  "radius": 0.15
+ }
+}

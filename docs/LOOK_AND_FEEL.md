@@ -54,8 +54,8 @@ The game should look and feel professionally made: juice and good art, both. We 
 | 3 | **Juice:** an impact freeze on the player who's hit (never on the balls you react to); a camera punch; screen shake with a slider that never moves the aim; particles; balls that stretch and spin; a zoom while charging | Done (decision 131). The user: the zoom while charging a little more (now 7°), the rest good |
 | 4 | **Sound:** CC0 recordings, layered and varied; the hall's echo; music; a volume for each kind | Done (decision 132). The user: the dodge redone, everything else good; added at their request: voices when hit, panting when tired, revive sounds, a lower match music (decision 133); the incoming ball's whoosh (decision 135) |
 | 5 | **The arena:** floor, walls, stands and a crowd; lighting baked in Blender | Done (decision 136): the round 2 hall with its light baked, the court painted on its floor, stands and a crowd, the sun's shafts. The user: good; walls and stands behind the camera now turn see-through (decision 137) |
-| 6 | **The ball and effects art** | Built (decision 138): effect shapes (starburst, shockwave, sparkles, flare, dust, swipe), a rubber ball with a bright edge, long sun shadows where the sun shines. Waiting for the user to play |
-| 7 | **The characters:** the model in both versions, with the helmet and without it, one picked at random for each player who joins (decision 128); team colours; a lighter version for low settings | To do |
+| 6 | **The ball and effects art** | Done (decision 138): effect shapes (starburst, shockwave, sparkles, flare, dust, swipe), a rubber ball with a bright edge, long sun shadows where the sun shines. The user: good for now |
+| 7 | **The characters:** the model in both versions, with the helmet and without it, one picked at random for each player who joins (decision 128); team colours; a lighter version for low settings | Done (decision 139): round 2's athlete at about 6,600 + 1,700 triangles (Low a third), the body and kit one surface, coloured per player from maps of colour slots (team kit, six looks), its skeleton following the stick figure's poses until step 8. The user: fine |
 | 8 | **Animation:** running from CC0 motion capture; throws, catches, deflects and dodges in code, fitted to the host's timings; knockouts by physics (ragdolls). The user's dodges (decision 134): a perfect dodge is a butterfly twist, a corkscrew or an aerial side flip, picked at random each time, with afterimages; a normal dodge is a ghost dash or an MMA fighter's dash footwork | To do |
 | 9 | **The HUD and menus** | To do |
 | 10 | **An office session:** the logs measure frame rates, freezes and the first download on real laptops | To do |
@@ -83,6 +83,7 @@ Step 2 comes before anything heavy, and steps 3 and 4 can follow right after ste
   - Claude can't hear: the cuts come from measurements and pictures (`--sheets`, with `--with matplotlib`, draws them into `art/out/sound-sheets/`).
   - The user listens on the "Hear every sound" page (`/static/sounds.html`, linked under the volume sliders).
 - **The arena** (decision 136): `art/arena.py` builds the hall, bakes its light with Cycles on the graphics card and writes `static/arena/` (about 3½ minutes; `--quick` in 10 seconds, small and noisy, to check the look).
+- **The athlete** (decision 139): `art/athlete.py` builds it from round 2's shapes and writes `static/characters/` (about a minute; `--quick` meshes coarser). Check pictures go to `art/out/athlete/`, with a copy in the red team's colours (`athlete_preview.glb`) to import into the user's Blender.
 - **The user's open Blender** (through the MCP, decision 121) is for looking: results are loaded there so the user can turn them around.
   - Scripts sent through the MCP run in safe mode: `bpy`, `bmesh`, `mathutils`, `math`, `random`, and no files, programs or network.
 - **Conventions:**
@@ -102,8 +103,8 @@ Step 2 comes before anything heavy, and steps 3 and 4 can follow right after ste
 These are starting targets, to be checked on an office laptop and adjusted:
 
 - 60 fps on the default setting on recent built-in graphics (Intel Iris Xe class), and the lowest setting for older laptops;
-- under about 30 MB for the whole first download (about 1 MB before the sounds; about 6 MB now: 1 MB of sounds, 2.2 MB of music, 1.8 MB for the hall);
-- a character: about 5,000–10,000 triangles, one or two materials, textures no bigger than 1024 px;
+- under about 30 MB for the whole first download (about 1 MB before the sounds; about 6.8 MB now: 1 MB of sounds, 2.2 MB of music, 1.8 MB for the hall, 0.8 MB for the athlete);
+- a character: about 5,000–10,000 triangles, one or two materials, textures no bigger than 1024 px (the athlete: 8,300–8,400 triangles with its head, two draw calls, textures of 512 and 256 px painted per look);
 - the arena: lighting baked into textures, with real-time shadows only for players and balls.
 
 ## The style samples
@@ -313,3 +314,13 @@ These are starting targets, to be checked on an office laptop and adjusted:
     - The ball in grippy rubber with a bright edge in its colour, so it reads against the busy hall (a first, stronger edge washed the blue ball out to lavender).
     - Long soft shadows from the low sun for players and balls, only where it reaches the floor: the bake now saves where the sun falls.
     - Waiting for the user to play: Claude can't see the effects move.
+    - The user: "they are good for now". Committed as step 6.
+  - Step 7, the characters (decision 139):
+    - `art/athlete.py` makes round 2's athlete light: the body and its kit one surface (nothing under the clothes, nothing poking through), the hands, shoes, heads and eyes separate pieces, trimmed to about 6,600 + 1,700 triangles (Low about a third), shaded with the sculpt's own normals.
+    - A skeleton of 15 bones, weighted by round 2's body parts; in the game its bones follow the stick figure's joints, so every pose and timing still works until step 8.
+    - Colours from maps of colour slots, painted per player: their team's kit and one of six looks. Painting whole faces gave ragged trims, and the first maps had frayed collars (squashed islands, and points snapped between the collar and the neck). Both are fixed.
+    - The helmet or the face, and the look, from the player's id: the same on every screen.
+    - The ball carried in front of the hip; a faint cool rim light; feet kept above the floor in crouches.
+    - About 0.8 MB to download, two draw calls a player; in software rendering a match at Low runs about as fast as with the stick figures (24–26 against 26–27 frames a second).
+    - Waiting for the user's look: Claude can't see the athletes move.
+    - The user: "they are fine", and step 8 (animation) matters most to them. Committed as step 7.
