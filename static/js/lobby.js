@@ -1,7 +1,8 @@
 // The lobby / pause menu: who is on which team, each team's bots, the match settings, and the
 // host's controls. Everyone sees the same information; only the host gets working buttons (and
 // the server refuses everyone else anyway). During a match, changes wait for the next round,
-// and the menu says so next to each value.
+// and the menu says so next to each value. Players are told apart by who they are (their key),
+// so two with the same name get a small number each.
 import { TEAM } from './hud.js';
 
 const $ = (id) => document.getElementById(id);
@@ -17,7 +18,7 @@ function el(tag, cls, text) {
 }
 
 export class Lobby {
-  /** opts: {onStart(), openRules(), openPlayer({name, team, bot}), exportSettings(), importSettings()} */
+  /** opts: {onStart(), openRules(), openPlayer({key, name, team, bot}), openBots(), exportSettings(), importSettings()} */
   constructor(net, opts) {
     this.net = net;
     this.isHost = false;
@@ -47,6 +48,7 @@ export class Lobby {
     $('shuffleBtn').addEventListener('click', () => net.send({ t: 'shuffle' }));
     $('discardBtn').addEventListener('click', () => net.send({ t: 'rules', discard: true }));
     $('rulesBtn').addEventListener('click', () => opts.openRules());
+    $('botsBtn').addEventListener('click', () => opts.openBots());
     $('exportBtn').addEventListener('click', () => opts.exportSettings());
     $('importBtn').addEventListener('click', () => opts.importSettings());
     for (const [team, key] of [['Red', 'BOTS_RED'], ['Blue', 'BOTS_BLUE']]) {
@@ -63,8 +65,21 @@ export class Lobby {
       $(id).addEventListener('click', (e) => {
         const b = e.target.closest('button[data-p]');
         if (b) net.send({ t: 'move', p: Number(b.dataset.p) });
+        const bot = e.target.closest('button[data-bot]');      // a bot: ⇄ to the other team, ✕ off the team
+        if (bot) net.send({ t: 'rules', bot: { do: bot.dataset.do, bot: bot.dataset.bot } });
         const own = e.target.closest('button[data-own]');      // ⚙: that player's own settings
-        if (own) opts.openPlayer({ name: own.dataset.own, team: Number(own.dataset.team), bot: own.dataset.bot === '1' });
+        if (own) {
+          opts.openPlayer({ key: own.dataset.own, name: own.dataset.name, team: Number(own.dataset.team), bot: own.dataset.bot === '1' });
+        }
+      });
+    }
+    // Each team's "Add a bot…": one of the host's own bots, or a new one (the Bots & flags page).
+    for (const [team, id] of [[0, 'addRed'], [1, 'addBlue']]) {
+      $(id).addEventListener('change', (e) => {
+        const value = e.target.value;
+        e.target.value = '';
+        if (value === 'new') opts.openBots();
+        else if (value) net.send({ t: 'rules', bot: { do: 'add', team, bot: value } });
       });
     }
   }
@@ -74,6 +89,8 @@ export class Lobby {
     this.maxBots = maxBots;
     for (const e of document.querySelectorAll('.hostCtl')) e.disabled = !isHost;
     $('rulesBtn').textContent = isHost ? 'Game rules…' : 'View the game rules…';
+    $('botsBtn').textContent = isHost ? 'Bots & flags…' : 'View the bots & flags…';
+    for (const id of ['addRed', 'addBlue']) $(id).hidden = !isHost;
     $('importBtn').hidden = !isHost;
     this.sig = '';
   }
@@ -118,8 +135,9 @@ export class Lobby {
     this.rules = rules;
     this.desired = rules.next ?? rules.active;
     this.own = rules.nextPlayers ?? rules.players;     // each player's own settings, as the host last chose
+    this.bots = rules.nextBots ?? rules.bots;           // the roster, the flags and each team's bots
     const sig = JSON.stringify([r.s, r.n, r.score, r.res, r.pend, rules.rv, this.isHost, this.wanted,
-      players.map((p) => [p.id, p.name, p.team, p.bot, p.host, p.next])]);
+      players.map((p) => [p.id, p.name, p.team, p.bot, p.host, p.next, p.k])]);
     if (sig === this.sig) return;
     this.sig = sig;
     const lobby = r.s === 'lobby';
@@ -144,15 +162,27 @@ export class Lobby {
     $('watchers').textContent = watchers.length
       ? `Spectating: ${watchers.map((p) => `${p.name}${p.next !== null ? ` (joins ${TEAM[p.next]} next round)` : ''}`).join(', ')}` : '';
 
+    // The same name more than once: a small number for each, in the order they joined.
+    this.nth = new Map();
+    const seen = new Map();
+    for (const p of [...players].sort((a, b) => a.id - b.id)) {
+      const n = (seen.get(p.name) ?? 0) + 1;
+      seen.set(p.name, n);
+      this.nth.set(p.id, n);
+    }
+    this.twice = new Set([...seen].filter(([, n]) => n > 1).map(([name]) => name));
     for (const team of [0, 1]) {
       const list = $(team ? 'listBlue' : 'listRed');
-      const members = players.filter((p) => p.team === team).sort((a, b) => a.bot - b.bot || a.id - b.id);
+      const lineup = this.bots?.lineup?.[team] ?? [];
+      const slot = (p) => (p.bot ? lineup.indexOf(p.k?.slice(2)) : -1);
+      const members = players.filter((p) => p.team === team).sort((a, b) => a.bot - b.bot || slot(a) - slot(b) || a.id - b.id);
       $(team ? 'countBlue' : 'countRed').textContent = `${members.length}`;
       list.replaceChildren(...members.map((p) => this.row(p, myId, lobby)));
+      this.botChoices($(team ? 'addBlue' : 'addRed'));
     }
     $('teamsNote').textContent = this.isHost
-      ? `⇄ moves a player to the other team${lobby ? '' : ' from the next round'}. Bots stay where you put them: nothing balances the teams.`
-      : 'The host sets the teams and the bots.';
+      ? `⇄ moves a player or bot to the other team${lobby ? '' : ' from the next round'}, ✕ takes a bot off. ⚙ is a player's own settings, which you can also save to a file and load onto anyone. Nothing balances the teams.`
+      : 'The host sets the teams and the bots. ⚙ shows a player\'s own settings (and saves them to a file).';
     $('matchWho').textContent = this.isHost ? 'you are the host' : host ? `set by ${host.name}` : 'no host connected';
 
     this.value('botsRedValue', 'botsRedSoon', rules, 'BOTS_RED', (v) => String(v));
@@ -186,24 +216,55 @@ export class Lobby {
     return `Round ${r.n} · RED ${r.score[0]} – ${r.score[1]} BLUE${goal}. ${this.isHost ? 'Changes you make now apply from the next round.' : ''}`;
   }
 
+  /** A team's "Add a bot…" choices: the host's own bots not on a team, and "a new bot". */
+  botChoices(select) {
+    const roster = this.bots?.roster ?? {};
+    const playing = new Set([...(this.bots?.lineup?.[0] ?? []), ...(this.bots?.lineup?.[1] ?? [])]);
+    const free = Object.entries(roster).filter(([id, b]) => b.name && !playing.has(id))
+      .sort((a, b) => a[1].name.localeCompare(b[1].name));
+    const options = [new Option('Add a bot…', ''), ...free.map(([id, b]) => new Option(b.name, id)), new Option('A new bot…', 'new')];
+    const sig = JSON.stringify(free);
+    if (select.dataset.sig === sig) return;
+    select.dataset.sig = sig;
+    select.replaceChildren(...options);
+  }
+
   row(p, myId, lobby) {
     const li = el('li', p.bot ? 'bot' : '');
-    li.append(el('span', 'name', p.name));
-    if (p.id === myId) li.append(el('span', 'tag', 'you'));
-    if (p.host) li.append(el('span', 'tag host', 'host'));
-    if (p.bot) li.append(el('span', 'tag', 'bot'));
-    if (p.next !== null) li.append(el('span', 'tag soon', p.next === -1 ? '→ spectating next round' : `→ ${TEAM[p.next]} next round`));
-    const own = Object.keys(this.own?.[p.name] ?? {}).length;
-    if (own) li.append(el('span', 'tag own', `own settings: ${own}`));
+    const line = el('div', 'line');      // the name, its tags and the buttons, on one line
+    li.append(line);
+    line.append(el('span', 'name', p.name));
+    if (this.twice?.has(p.name)) line.append(el('span', 'tag nth', `#${this.nth.get(p.id)}`));
+    if (p.id === myId) line.append(el('span', 'tag', 'you'));
+    if (p.host) line.append(el('span', 'tag host', 'host'));
+    if (p.bot) line.append(el('span', 'tag', 'bot'));
+    if (p.next !== null) line.append(el('span', 'tag soon', p.next === -1 ? '→ spectating next round' : `→ ${TEAM[p.next]} next round`));
+    const bid = p.bot && p.k ? p.k.slice(2) : null;
+    const sub = el('div', 'sub');       // flags and own settings: a line under the name, so it stays readable
+    for (const f of (bid && this.bots?.roster?.[bid]?.flags) || []) {
+      const name = this.bots.flags?.[f]?.name;
+      if (name) sub.append(el('span', 'tag flag', name));
+    }
+    const own = Object.keys(this.own?.[p.k] ?? {}).length;
+    if (own) sub.append(el('span', 'tag own', `own settings: ${own}`));
+    if (sub.childElementCount) li.append(sub);         // under the line, so the name stays readable
     const gear = el('button', 'small gear', '⚙');      // everyone may look; only the host changes them
-    Object.assign(gear.dataset, { own: p.name, team: p.team, bot: p.bot ? '1' : '0' });
-    gear.title = this.isHost ? `Settings just for ${p.name}` : `${p.name}'s own settings`;
-    li.append(gear);
-    if (this.isHost && !p.bot && !(p.id === myId && p.next === -1)) {
+    Object.assign(gear.dataset, { own: p.k ?? p.name, name: p.name, team: p.team, bot: p.bot ? '1' : '0' });
+    gear.title = this.isHost ? `Settings just for ${p.name} (and a file of them)` : `${p.name}'s own settings`;
+    line.append(gear);
+    if (this.isHost && bid) {
+      const move = el('button', 'small move', '⇄');
+      Object.assign(move.dataset, { bot: bid, do: 'move' });
+      move.title = `Move ${p.name} to ${TEAM[1 - p.team]}${lobby ? '' : ' (from the next round)'}`;
+      const off = el('button', 'small move', '✕');
+      Object.assign(off.dataset, { bot: bid, do: 'remove' });
+      off.title = `Take ${p.name} off the team${lobby ? '' : ' (from the next round)'}`;
+      line.append(move, off);
+    } else if (this.isHost && !p.bot && !(p.id === myId && p.next === -1)) {
       const b = el('button', 'small move', p.next !== null ? '✕' : '⇄');
       b.dataset.p = p.id;
       b.title = p.next !== null ? 'Cancel the move' : `Move to ${TEAM[1 - p.team]}${lobby ? '' : ' (from the next round)'}`;
-      li.append(b);
+      line.append(b);
     }
     return li;
   }

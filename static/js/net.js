@@ -21,6 +21,7 @@ function decodePlayer(a) {
     host: !!(f & 32), switching: !!(f & 64),
     act: a[11], actAge: a[12], cooldown: a[13], tp: a[14], charge: a[15], stats: a[16],
     next: a[17] ?? null,        // the team the host's move takes them to next round (-1: spectating)
+    k: a[18] ?? null,           // who they are for own settings (two players may share a name)
   };
 }
 

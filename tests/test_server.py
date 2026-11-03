@@ -168,11 +168,13 @@ async def own_settings_scenario(url):
     host = await Browser.join(url, "Host")                          # RED, with Bot Ace
     alice = await Browser.join(url, "Alice", guest=True)            # BLUE, with Bot Blitz and Bot Dash
     assert alice.welcome["players"] == {} and alice.welcome["nextPlayers"] is None
-    await alice.send(t="rules", player="Alice", set={"MAX_HP": 400})                # a guest can't
-    await host.send(t="rules", player="Alice", set={"MAX_HP": 150, "WALK_SPEED": 9, "GRAVITY": 1})
+    me = alice.welcome["key"]                                       # who Alice is: own settings go by it
+    await alice.send(t="rules", player=me, set={"MAX_HP": 400})                     # a guest can't
+    await host.send(t="rules", player=me, set={"MAX_HP": 150, "WALK_SPEED": 9, "GRAVITY": 1})
     await asyncio.gather(host.pump(0.4), alice.pump(0.4))
     a, h = alice.rules_msgs[-1], host.rules_msgs[-1]
-    assert a["players"] == h["players"] == {"Alice": {"MAX_HP": 150, "WALK_SPEED": 9.0}}  # gravity is everyone's
+    assert a["players"] == h["players"] == {me: {"MAX_HP": 150, "WALK_SPEED": 9.0}}  # gravity is everyone's
+    assert a["labels"] == {me: "Alice"}
     assert a["cfg"]["maxHp"] == 150 and a["cfg"]["walk"] == 9 and h["cfg"]["maxHp"] == 100     # each browser its own
     assert a["rules"]["MAX_HP"] == 100 and [e["why"] for e in alice.my_events("deny")] == ["host"]
     me = next(p for p in alice.snap["p"] if p[0] == alice.welcome["id"])
@@ -183,7 +185,7 @@ async def own_settings_scenario(url):
     await asyncio.gather(host.pump(0.4), alice.pump(0.4))
     m = alice.rules_msgs[-1]
     assert m["rules"]["TEAM_HEALTH"] is True and m["rules"]["BALL_COLOR_RED"] == "#00ff00"
-    assert m["players"] == {"Bot Ace": {"BOT_SKILL": "hard"}} and m["cfg"]["maxHp"] == 100 and m["cfg"]["teamHealth"]
+    assert m["players"] == {"b:ace": {"BOT_SKILL": "hard"}} and m["cfg"]["maxHp"] == 100 and m["cfg"]["teamHealth"]
     assert alice.snap["r"]["th"] == [[200, 200], [300, 300]]       # team health: everyone's health added up
     for b in (host, alice):
         await b.ws.close()
@@ -210,12 +212,53 @@ async def host_view_scenario(url):
     # One player's own settings: whose page it is goes along, cleaned like the rest.
     await host.send(t="hostview", m="rules", pl={"n": "Bot Comet\n", "t": 7, "b": "yes"}, g="bots", f="BOT_SKILL")
     await guest.pump(0.3)
-    assert guest.hostviews[-1]["pl"] == {"n": "Bot Comet", "t": 0, "b": False} and guest.hostviews[-1]["f"] == "BOT_SKILL"
+    assert guest.hostviews[-1]["pl"] == {"n": "Bot Comet", "k": "b:comet", "t": 0, "b": False}
+    assert guest.hostviews[-1]["f"] == "BOT_SKILL"
     await host.ws.close()                                          # the host leaves: everyone is told
     await asyncio.gather(guest.pump(0.5), late.pump(0.5))
     assert guest.hostviews[-1] == late.hostviews[-1] == {"t": "hostview", "m": None}
     for b in (guest, late):
         await b.ws.close()
+
+
+async def identity_scenario(url):
+    def players(b):
+        return {p[0]: p for p in b.snap["p"]}
+
+    code = "a-browser-secret-code-0001"
+    host = await Browser.join(url, "Host")
+    sam = await Browser.join(url, "Sam", guest=True, who=code, tab="tab-1")
+    other = await Browser.join(url, "Sam", guest=True, who="another-browser-code-0002", tab="tab-9")
+    assert sam.welcome["who"] == code and sam.welcome["key"] == rules_mod.identity_key(code)
+    assert other.welcome["key"] != sam.welcome["key"]               # the same name, two people
+    await host.send(t="rules", player=sam.welcome["key"], set={"MAX_HP": 220})
+    await asyncio.gather(host.pump(0.3), sam.pump(0.3), other.pump(0.3))
+    ps = players(host)
+    assert ps[sam.welcome["id"]][7] == 220 and ps[other.welcome["id"]][7] == 100
+    assert ps[sam.welcome["id"]][18] == sam.welcome["key"]           # every player's key, for the menus
+    team = ps[sam.welcome["id"]][2]
+    # A second tab of the same browser plays as someone else; the same tab again takes over.
+    tab2 = await Browser.join(url, "Sam too", guest=True, who=code, tab="tab-2")
+    assert tab2.welcome["who"] != code and tab2.welcome["key"] != sam.welcome["key"]
+    back = await Browser.join(url, "Sam", guest=True, who=code, tab="tab-1")
+    await asyncio.gather(host.pump(0.3), back.pump(0.3))
+    ps = players(host)
+    assert sam.welcome["id"] not in ps and ps[back.welcome["id"]][7] == 220
+    assert ps[back.welcome["id"]][2] == team                        # and its team
+    # Renaming over the network: the name changes, nothing else.
+    await back.send(t="rename", name="Mina")
+    await asyncio.gather(host.pump(0.3), back.pump(0.3))
+    ps = players(host)
+    assert ps[back.welcome["id"]][1] == "Mina" and ps[back.welcome["id"]][7] == 220
+    assert [e["name"] for e in back.my_events("rename")] == ["Mina"]
+    for b in (host, sam, other, tab2, back):
+        with contextlib.suppress(Exception):
+            await b.ws.close()
+
+
+def test_who_a_player_is_follows_their_browser_not_their_name():
+    with running_server() as (port, _key):
+        asyncio.run(identity_scenario(f"ws://127.0.0.1:{port}/ws"))
 
 
 def test_the_hosts_screen_reaches_everyone_else():
@@ -354,8 +397,10 @@ def test_the_hosts_rules_are_saved_and_come_back():
         server.game.set_rules({"GRAVITY": 3, "MATCH_ROUNDS_TO_WIN": 5}, 0.0)
         server.game.set_player_rules("Bot Comet", {"BOT_SKILL": "hard", "MAX_HP": 150}, 0.0)
         server.save_current_rules().join()
-        assert json.loads(server.RULES_FILE.read_text()) == {
-            "rules": {"GRAVITY": 3.0, "MATCH_ROUNDS_TO_WIN": 5}, "players": {"Bot Comet": {"BOT_SKILL": "hard", "MAX_HP": 150}}}
+        saved = json.loads(server.RULES_FILE.read_text())
+        assert saved["version"] == 2 and saved["rules"] == {"GRAVITY": 3.0, "MATCH_ROUNDS_TO_WIN": 5}
+        assert saved["players"] == {"b:comet": {"BOT_SKILL": "hard", "MAX_HP": 150}} and saved["bots"]["lineup"] == [
+            ["ace"], ["blitz", "dash"]]
         server.game = Game()
         server.load_saved_rules()
         assert server.game.rules.GRAVITY == 3 and server.game.rules.MATCH_ROUNDS_TO_WIN == 5
@@ -368,6 +413,29 @@ def test_the_hosts_rules_are_saved_and_come_back():
         server.game = Game()
         server.load_saved_rules()
         assert server.game.rules.GRAVITY == rules_mod.DEFAULTS["GRAVITY"]
+
+
+def test_a_dropped_connection_is_only_noted():
+    """Windows' asyncio complains when a browser drops its connection without closing it (a shut
+    laptop, lost Wi-Fi): the server notes it in the session log instead of printing a traceback in
+    its window. Anything else is still printed, and noted too."""
+    import server
+    noted, printed = [], []
+
+    class Loop:
+        def default_exception_handler(self, context):
+            printed.append(context)
+    real = server.note_error
+    server.note_error = lambda where, exc=None, harmless=False: noted.append((where, type(exc).__name__, harmless))
+    try:
+        server.loop_error(Loop(), {"message": "Exception in callback _ProactorBasePipeTransport._call_connection_lost()",
+                                   "exception": ConnectionResetError(10054, "An existing connection was forcibly closed")})
+        server.loop_error(Loop(), {"message": "Task exception was never retrieved", "exception": ValueError("boom")})
+    finally:
+        server.note_error = real
+    assert noted == [("a browser's connection dropped", "ConnectionResetError", True),
+                     ("Task exception was never retrieved", "ValueError", False)]
+    assert len(printed) == 1 and isinstance(printed[0]["exception"], ValueError)
 
 
 def run_all():

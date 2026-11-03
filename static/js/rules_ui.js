@@ -4,7 +4,9 @@
 // Everyone else can open it read-only to see the lobby's rules, or let it follow the host's
 // screen live: the same group, the rule in focus and the host's edits as they make them.
 // It also shows one player's (or bot's) own settings (openFor): only the rules that may differ
-// per player, each either "same as everyone" or their own value, compared with everyone's.
+// per player, each either "same as everyone" or their own value, compared with everyone's; and a
+// bot flag's values (openFlag): what a bot carrying it plays by. The search looks through every
+// tab at once: each word anywhere in a rule's name, description or tab.
 import { Preview } from './previews.js';
 import * as settingsFile from './settings_file.js';
 
@@ -21,7 +23,7 @@ function el(tag, cls, text) {
 const decimals = (step) => (String(step).split('.')[1] || '').length;
 
 /** p: a rule's schema entry (rules.py Param), v: its value. */
-function formatValue(p, v) {
+export function formatValue(p, v) {
   if (p.kind === 'bool') return v ? 'On' : 'Off';
   if (p.kind === 'color') return String(v).toUpperCase();
   if (p.kind === 'choice') {
@@ -40,7 +42,13 @@ function numberText(p, v) {
 }
 
 const numeric = (p) => p.kind === 'int' || p.kind === 'float';
-const sameWho = (a, b) => (a?.name ?? null) === (b?.name ?? null) && (a?.team ?? null) === (b?.team ?? null) && !!a?.bot === !!b?.bot;
+/** Whose page: a player's key, a flag's id, or null for the lobby's rules. */
+const whoId = (w) => (w ? (w.flag ? `flag:${w.flag}` : w.key ?? w.name) : null);
+const sameWho = (a, b) => whoId(a) === whoId(b) && (a?.team ?? null) === (b?.team ?? null) && !!a?.bot === !!b?.bot;
+/** The rules a bot flag may set (rules.py FLAG_RULES): those a bot may have its own value for, but
+ *  not a team's colours, and of the bot-skill numbers only the normal profile's. */
+const flagRule = (p) => (p.who === 'all' || p.who === 'bots') && p.team < 0 && !/^BOT_(EASY|HARD)_/.test(p.key);
+const words = (q) => q.toLowerCase().split(/\s+/).filter(Boolean);
 
 /** The same consistency rules as the server (rules.Rules._fix): ordered pairs stay in order (an
  *  edited one wins) and a capped rule stays under its cap. Changes `values`; returns the keys it touched. */
@@ -74,7 +82,9 @@ export class RulesEditor {
     this.next = null;
     this.players = {};          // each player's own settings: live...
     this.nextPlayers = null;    // ...and as they'll be from the next round (null: nothing waits)
-    this.who = null;            // whose own settings this shows, {name, team, bot}; null: the lobby's rules
+    this.bots = null;           // the bots' roster, flags and lineups: live...
+    this.nextBots = null;       // ...and from the next round
+    this.who = null;            // whose page: a player's {key, name, team, bot}, a flag's {flag, name}; null: the lobby's rules
     this.draft = null;
     this.isHost = false;
     this.group = null;
@@ -88,7 +98,7 @@ export class RulesEditor {
     this.onMessage = null;          // (text, cls): say something on screen (a file that didn't load)
     $('rulesClose').addEventListener('click', () => this.close(true));
     $('rulesApply').addEventListener('click', () => this.apply());
-    $('rulesResetAll').addEventListener('click', () => this.replaceDraft({ ...this.reference() }));
+    $('rulesResetAll').addEventListener('click', () => this.replaceDraft({ ...this.resetValues() }));
     $('rulesRevert').addEventListener('click', () => this.replaceDraft({ ...this.base() }));
     $('rulesExportPlayer').addEventListener('click', () => this.exportPlayer());
     $('rulesImportPlayer').addEventListener('click', () => this.importPlayer());
@@ -109,12 +119,14 @@ export class RulesEditor {
 
   /** New rules from the server: the live set, the set waiting for the next round (or null), and
    *  each player's own settings (live, and from the next round or null). */
-  setServer(active, next, players = {}, nextPlayers = null) {
+  setServer(active, next, players = {}, nextPlayers = null, bots = null, nextBots = null) {
     const untouched = !this.draft || this.edits().length === 0;
     this.active = active;
     this.next = next;
     this.players = players;
     this.nextPlayers = nextPlayers;
+    this.bots = bots;
+    this.nextBots = nextBots;
     if (this.following) this.draft = { ...this.base(), ...this.following.d };
     else if (untouched || !this.isHost) this.draft = { ...this.base() };     // only the host drafts
     if (this.isOpen()) this.refresh();
@@ -125,9 +137,36 @@ export class RulesEditor {
     return this.next ?? this.active;
   }
 
-  /** A player's own settings, as the host last chose them. */
-  ownOf(name) {
-    return (this.nextPlayers ?? this.players)?.[name] ?? {};
+  /** A player's own settings (`key`: who they are), as the host last chose them; a bot's with its
+   *  flags under them. The server's rules.Rules.own_of: later flags win, and a flag's bot-skill
+   *  numbers land on the profile the bot plays at. */
+  ownOf(key, players = this.nextPlayers ?? this.players, bots = this.nextBots ?? this.bots, shared = this.shared()) {
+    const own = players?.[key] ?? {};
+    const entry = key?.startsWith('b:') ? bots?.roster?.[key.slice(2)] : null;
+    if (!entry?.flags?.length) return own;
+    const merged = {};
+    for (const id of entry.flags) Object.assign(merged, bots.flags?.[id]?.values ?? {});
+    const skill = String(own.BOT_SKILL ?? merged.BOT_SKILL ?? shared.BOT_SKILL).toUpperCase();
+    const out = {};
+    for (let [rule, value] of Object.entries(merged)) {
+      if (rule.startsWith('BOT_NORMAL_')) rule = `BOT_${skill}_${rule.slice('BOT_NORMAL_'.length)}`;
+      if (value !== shared[rule]) out[rule] = value;
+    }
+    return { ...out, ...own };
+  }
+
+  /** A flag's values (its bot-skill numbers as the normal profile's), as the host last chose them. */
+  flagValues(id, bots = this.nextBots ?? this.bots) {
+    return bots?.flags?.[id]?.values ?? {};
+  }
+
+  /** What this page's player or flag plays by on top of `shared` (live or as chosen). */
+  whoseOwn(live = false) {
+    const w = this.who;
+    if (!w) return {};
+    const bots = live ? this.bots : this.nextBots ?? this.bots;
+    if (w.flag) return this.flagValues(w.flag, bots);
+    return live ? this.ownOf(w.key, this.players, this.bots, this.active) : this.ownOf(w.key);
   }
 
   /** What `own` settings make of everyone's values `shared` (the server's Rules.for_player). */
@@ -137,9 +176,24 @@ export class RulesEditor {
     return values;
   }
 
-  /** The values the draft starts from: the lobby's rules, or what this player plays by. */
+  /** The values the draft starts from: the lobby's rules, or what this player (or flag) plays by. */
   base() {
-    return this.who ? this.effective(this.shared(), this.ownOf(this.who.name)) : this.shared();
+    return this.who ? this.effective(this.shared(), this.whoseOwn()) : this.shared();
+  }
+
+  /** What "Reset all" goes back to: the defaults; for a player or a flag, everyone's values; for a
+   *  bot carrying flags, what its flags alone make of everyone's (its own settings gone). */
+  resetValues() {
+    const w = this.who;
+    if (w?.key?.startsWith('b:') && this.botFlags(w.key).length) {
+      return this.effective(this.shared(), this.ownOf(w.key, {}));
+    }
+    return this.reference();
+  }
+
+  /** The flags a bot carries (as the host last chose). */
+  botFlags(key) {
+    return (this.nextBots ?? this.bots)?.roster?.[key.slice(2)]?.flags ?? [];
   }
 
   /** What "changed" is measured from: the defaults, or for a player everyone's values. */
@@ -161,9 +215,14 @@ export class RulesEditor {
     this.show(null);
   }
 
-  /** One player's (or bot's) own settings: who = {name, team, bot}. */
+  /** One player's (or bot's) own settings: who = {key, name, team, bot}. */
   openFor(who) {
     this.show(who);
+  }
+
+  /** What a bot flag changes: the rules a bot can have, the bot-skill numbers once. */
+  openFlag(id, name) {
+    this.show({ flag: id, name });
   }
 
   show(who) {
@@ -200,7 +259,7 @@ export class RulesEditor {
   follow(view) {
     const was = this.following;
     this.following = view;
-    const who = view.pl ? { name: view.pl.n, team: view.pl.t, bot: view.pl.b } : null;
+    const who = view.pl ? { key: view.pl.k ?? view.pl.n, name: view.pl.n, team: view.pl.t, bot: view.pl.b } : null;
     const page = !this.isOpen() || !sameWho(who, this.who);
     if (page) {
       const opening = !this.isOpen();
@@ -239,7 +298,7 @@ export class RulesEditor {
     if (view.m !== 'rules') return null;
     const parts = [[view.pl ? 'The host is looking at ' : 'The host is looking at the rules: ']];
     if (view.pl) parts.push([`${view.pl.n}'s own settings`, true], [': ']);
-    const base = view.pl ? this.effective(this.shared(), this.ownOf(view.pl.n)) : this.shared();
+    const base = view.pl ? this.effective(this.shared(), this.ownOf(view.pl.k ?? view.pl.n)) : this.shared();
     const p = this.params.get(view.f);
     const group = this.schema.groups.find((g) => g.id === (p?.group ?? view.g));
     if (view.q) parts.push([`search "${view.q}" › `]);
@@ -258,10 +317,11 @@ export class RulesEditor {
   /** What the host's editor shows, for the server to pass on (host only). */
   hostView() {
     if (!this.isOpen()) return null;
+    if (this.who?.flag) return { m: 'menu' };        // editing a bot flag: the others see the menu
     const d = {};
     for (const k of this.edits()) d[k] = this.draft[k];
     const view = { m: 'rules', g: this.group, q: $('rulesSearch').value.trim().slice(0, 40), f: this.focus, d };
-    if (this.who) view.pl = { n: this.who.name, t: this.who.team, b: this.who.bot };
+    if (this.who) view.pl = { n: this.who.name, k: this.who.key, t: this.who.team, b: this.who.bot };
     return view;
   }
 
@@ -269,7 +329,9 @@ export class RulesEditor {
   tick() {
     if (!this.isOpen()) return;
     const s = this.getState();
-    const whose = this.who ? `Only ${this.who.name} plays by these; the rest of the rules are everyone's. ` : '';
+    const whose = this.who?.flag
+      ? `Bots carrying the flag ${this.who.name} play by these (their own settings still win). `
+      : this.who ? `Only ${this.who.name} plays by these; the rest of the rules are everyone's. ` : '';
     const mode = this.following
       ? 'Following the host\'s screen live. Untick "Follow the host" in the menu to look around yourself.'
       : !this.isHost
@@ -286,14 +348,16 @@ export class RulesEditor {
   /** The title and which footer buttons show: the host edits; anyone may save a player's settings. */
   renderHeader() {
     const w = this.who;
-    $('rulesHeading').textContent = w ? `${w.name}'s own settings` : 'Game rules';
-    $('rulesSearch').placeholder = w ? 'Search their settings…' : 'Search rules…';
+    $('rulesHeading').textContent = w?.flag ? `The flag ${w.name}` : w ? `${w.name}'s own settings` : 'Game rules';
+    $('rulesSearch').placeholder = w?.flag ? 'Search what it can change…' : w ? 'Search their settings…' : 'Search every rule…';
     const editing = this.isHost && !this.following;
     $('rulesFooter').hidden = !editing && !w;
     for (const id of ['rulesResetAll', 'rulesRevert', 'rulesApply', 'rulesEditCount']) $(id).hidden = !editing;
-    $('rulesResetAll').textContent = w ? 'All the same as everyone' : 'Reset all to defaults';
-    $('rulesExportPlayer').hidden = !w;
-    $('rulesImportPlayer').hidden = !w || !editing;
+    $('rulesResetAll').textContent = w?.flag ? 'Clear the flag'
+      : w?.key?.startsWith('b:') && this.botFlags(w.key).length ? 'Back to just its flags'
+      : w ? 'All the same as everyone' : 'Reset all to defaults';
+    $('rulesFileBox').hidden = !w || !!w.flag;
+    $('rulesImportPlayer').hidden = !editing;
     this.mode = '';
   }
 
@@ -302,6 +366,7 @@ export class RulesEditor {
   applies(p) {
     const w = this.who;
     if (!w) return true;
+    if (w.flag) return flagRule(p);
     if (!p.who || (p.who === 'people' && w.bot) || (p.who === 'bots' && !w.bot)) return false;
     if (p.team >= 0 && p.team !== w.team) return false;
     if (p.group === 'bots' && p.sub) return p.sub.toLowerCase().startsWith(String(this.draft?.BOT_SKILL));
@@ -312,36 +377,71 @@ export class RulesEditor {
     return this.schema.groups.filter((g) => this.schema.params.some((p) => p.group === g.id && this.applies(p)));
   }
 
+  /** The tabs down the side. While searching: "Every tab" on top, and how many matches each tab
+   *  has; a tab then jumps to its matches, and the search stays. */
   renderNav() {
     const nav = $('rulesNav');
     const searching = $('rulesSearch').value.trim() !== '';
     const ref = this.reference();
     const base = this.base();
-    nav.replaceChildren(...this.groups().map((g) => {
-      const b = el('button', g.id === this.group && !searching ? 'on' : '');
+    const found = searching ? this.matches() : null;
+    const items = [];
+    if (searching) {
+      const all = el('button', 'on all');
+      all.append(el('span', '', 'Every tab'), el('em', 'hits', String(found.length)));
+      all.title = `${found.length} rule${found.length === 1 ? '' : 's'} match the search, from every tab`;
+      all.addEventListener('click', () => $('rulesList').scrollTo({ top: 0 }));
+      items.push(all);
+    }
+    for (const g of this.groups()) {
+      const hits = found ? found.filter((p) => p.group === g.id).length : 0;
+      const b = el('button', g.id === this.group && !searching ? 'on' : searching && !hits ? 'none' : '');
       b.append(el('span', '', g.title));
       const keys = this.schema.params.filter((p) => p.group === g.id && this.applies(p)).map((p) => p.key);
       const changed = keys.filter((k) => this.draft[k] !== ref[k]).length;
       const edited = keys.some((k) => this.draft[k] !== base[k]);
       if (edited) b.append(el('i', 'edited', '●'));
-      if (changed) b.append(el('em', '', String(changed)));
-      b.title = !changed ? (this.who ? 'All the same as everyone' : 'All defaults')
-        : this.who ? `${changed} of their own` : `${changed} changed from the defaults`;
+      if (searching) {
+        if (hits) b.append(el('em', 'hits', String(hits)));
+        b.title = hits ? `${hits} match${hits === 1 ? '' : 'es'} in ${g.title}` : `Nothing in ${g.title} matches`;
+      } else {
+        if (changed) b.append(el('em', '', String(changed)));
+        b.title = !changed ? (this.who ? 'All the same as everyone' : 'All defaults')
+          : this.who ? `${changed} of their own` : `${changed} changed from the defaults`;
+      }
       b.addEventListener('click', () => {
-        $('rulesSearch').value = '';
+        if (searching) {        // keep the search: show that tab's matches
+          const head = [...$('rulesList').querySelectorAll('h4.subhead')].find((h) => h.dataset.group === g.id);
+          if (head) $('rulesList').scrollTo({ top: head.offsetTop - $('rulesList').offsetTop - 4, behavior: 'smooth' });
+          return;
+        }
         this.group = g.id;
         this.renderNav();
         this.renderList();
       });
-      return b;
-    }));
+      items.push(b);
+    }
+    nav.replaceChildren(...items);
+  }
+
+  /** Every rule (on this page) that matches the search: each word somewhere in its name, its
+   *  description, its tab or its heading. Rules whose name matches come first, then tab by tab. */
+  matches() {
+    const q = words($('rulesSearch').value);
+    const order = new Map(this.schema.groups.map((g, i) => [g.id, i]));
+    const found = [];
+    for (const p of this.schema.params) {
+      if (!this.applies(p)) continue;
+      const g = this.schema.groups.find((x) => x.id === p.group);
+      const text = `${p.label} ${p.desc} ${p.key.replaceAll('_', ' ')} ${p.sub} ${g.title} ${g.blurb}`.toLowerCase();
+      if (q.every((w) => text.includes(w))) found.push(p);
+    }
+    return found.sort((a, b) => order.get(a.group) - order.get(b.group));
   }
 
   visibleParams() {
-    const q = $('rulesSearch').value.trim().toLowerCase();
-    const params = this.schema.params.filter((p) => this.applies(p));
-    if (!q) return params.filter((p) => p.group === this.group);
-    return params.filter((p) => `${p.label} ${p.desc} ${p.key} ${p.sub}`.toLowerCase().includes(q));
+    if ($('rulesSearch').value.trim() === '') return this.schema.params.filter((p) => this.applies(p) && p.group === this.group);
+    return this.matches();
   }
 
   renderList() {
@@ -353,20 +453,39 @@ export class RulesEditor {
     if (!searching) {
       const g = this.schema.groups.find((x) => x.id === this.group);
       items.push(el('p', 'groupBlurb', g.blurb));
-    } else if (!params.length) items.push(el('p', 'groupBlurb', 'No rule matches that search.'));
+    } else if (!params.length) items.push(el('p', 'groupBlurb', 'No rule matches that search, in any tab.'));
+    else items.push(el('p', 'groupBlurb', `${params.length} rule${params.length === 1 ? '' : 's'} from every tab match. Clear the search to go back to the tabs.`));
     let heading = null;
+    const sub = (p) => (this.who?.flag && p.group === 'bots' && p.sub ? 'Behaviour (at whatever skill the bot plays)' : p.sub);
     for (const p of params) {
-      const h = searching ? this.schema.groups.find((x) => x.id === p.group).title + (p.sub ? ` · ${p.sub}` : '') : p.sub;
-      if (h && h !== heading) items.push(el('h4', 'subhead', h));
+      const h = searching ? this.schema.groups.find((x) => x.id === p.group).title + (sub(p) ? ` · ${sub(p)}` : '') : sub(p);
+      if (h && h !== heading) {
+        const head = el('h4', 'subhead', h);
+        head.dataset.group = p.group;
+        items.push(head);
+      }
       heading = h;
       items.push(this.row(p));
     }
     list.replaceChildren(...items);
     list.scrollTop = 0;
-    if (!searching) this.renderNav();
+    if (searching) this.markWords(list);
+    this.renderNav();
     const first = params[0];
     if (first && (!this.focus || !params.some((p) => p.key === this.focus))) this.setFocus(first.key);
     else this.setFocus(this.focus);
+  }
+
+  /** Marks the searched words in the rules' names and descriptions. */
+  markWords(list) {
+    const q = words($('rulesSearch').value).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (!q.length) return;
+    const re = new RegExp(`(${q.join('|')})`, 'gi');
+    for (const node of list.querySelectorAll('.ruleHead b, .rule .desc')) {
+      const parts = node.textContent.split(re);
+      if (parts.length < 2) continue;
+      node.replaceChildren(...parts.map((part, i) => (i % 2 ? el('mark', '', part) : document.createTextNode(part))));
+    }
   }
 
   row(p) {
@@ -436,8 +555,8 @@ export class RulesEditor {
 
   /** The value now in play when what waits for the next round differs from it, else undefined. */
   livePending(key) {
-    if (!this.next) return undefined;
-    const live = this.who ? this.effective(this.active, this.players?.[this.who.name] ?? {}) : this.active;
+    if (!this.next && !this.nextPlayers && !this.nextBots) return undefined;
+    const live = this.who ? this.effective(this.active, this.whoseOwn(true)) : this.active;
     return this.base()[key] !== live[key] ? live[key] : undefined;
   }
 
@@ -546,23 +665,31 @@ export class RulesEditor {
   apply() {
     const changes = {};
     const shared = this.shared();
+    if (this.who?.flag) {           // a flag: all its values (where they differ from everyone's)
+      if (!this.edits().length) return;
+      const values = {};
+      for (const p of this.schema.params) if (flagRule(p) && this.draft[p.key] !== shared[p.key]) values[p.key] = this.draft[p.key];
+      const flag = (this.nextBots ?? this.bots)?.flags?.[this.who.flag];
+      this.net.send({ t: 'rules', bot: { do: 'flag', flag: this.who.flag, name: flag?.name ?? this.who.name, desc: flag?.desc ?? '', values } });
+      return;
+    }
     // On a player's page a value equal to everyone's is no own setting: null takes it away.
     for (const k of this.edits()) changes[k] = this.who && this.draft[k] === shared[k] ? null : this.draft[k];
     if (!Object.keys(changes).length) return;
-    this.net.send(this.who ? { t: 'rules', player: this.who.name, set: changes } : { t: 'rules', set: changes });
+    this.net.send(this.who ? { t: 'rules', player: this.who.key, set: changes } : { t: 'rules', set: changes });
   }
 
   /** Anyone: save this player's own settings as a file (a profile to load onto anyone). */
   exportPlayer() {
-    if (!this.who) return;
+    if (!this.who || this.who.flag) return;
     const name = settingsFile.playerFileName(this.who.name);
-    settingsFile.download(name, settingsFile.playerFile(this.who.name, this.ownOf(this.who.name)));
+    settingsFile.download(name, settingsFile.playerFile(this.who.name, this.ownOf(this.who.key)));
     this.onMessage?.(`${this.who.name}'s own settings saved to your Downloads folder: ${name}`, 'good');
   }
 
   /** The host: load a player's settings file onto this player, replacing their own settings. */
   async importPlayer() {
-    if (!this.who || !this.isHost) return;
+    if (!this.who || this.who.flag || !this.isHost) return;
     const file = await settingsFile.pickFile();
     if (file) this.importPlayerText(file.text, file.name);
   }
@@ -575,7 +702,7 @@ export class RulesEditor {
       this.onMessage?.(e.message, 'bad');
       return false;
     }
-    this.net.send({ t: 'rules', player: this.who.name, replace: settings });
+    this.net.send({ t: 'rules', player: this.who.key, replace: settings });
     const later = ['lobby', 'wait'].includes(this.getState()) ? '' : ' (from the next round)';
     this.onMessage?.(`Loaded ${fileName} onto ${this.who.name}${later}`, 'good');
     return true;

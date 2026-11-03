@@ -141,6 +141,9 @@ class Player:
         self.sound_error = next((r.get("error") for r in records if r.get("ty") == "sound" and r.get("error")), None)
         # How long the browser held each press before the game's code saw it (ms): a busy page.
         self.held = [r["held"] for r in records if r.get("ty") == "press" and r.get("held") is not None]
+        # Loading the game (main.js): seconds from opening the page to the hall and athlete in place, and
+        # how much came over the network (files from the browser's cache don't count).
+        self.loads = [r for r in records if r.get("ty") == "load"]
         self.late_presses = []      # filled from the server log
         self.sidesteps = []         # balls that missed: clear on their own screen (sidestep compensation)
         self.graced = []            # defences that counted only thanks to the press grace
@@ -265,6 +268,14 @@ def report(session, files):
                 "  (everyone's game froze during these)")
         else:
             say("  Game-loop stalls over 100 ms: none")
+        errors = [r for r in server if r.get("ty") == "error"]
+        dropped = [r for r in errors if r.get("harmless")]
+        real = [r for r in errors if not r.get("harmless")]
+        if dropped:
+            say(f"  Connections a browser dropped without closing (a laptop shut, Wi-Fi lost; harmless): {len(dropped)}")
+        if real:
+            say(f"  Errors in the server: {len(real)}; first at {clock.st(real[0]['st'], real[0].get('wall'))},"
+                f" in {real[0].get('where')}: {real[0].get('error')}")
         blocks = [r for r in server if r.get("ty") == "print_block"]
         if blocks:
             worst = max(blocks, key=lambda r: r["ms"])
@@ -316,6 +327,16 @@ def report(session, files):
     say("  (* = the host. frozen = time the picture of the others stood still. late = how much later than the quickest"
         " update the world updates arrived. input gap = longest wait between this player's inputs reaching the server,"
         " while playing. ignored = presses during the recovery after their own dodge, catch or deflect.)")
+
+    loading = [(p, r) for p in players for r in p.loads]
+    if loading:
+        say("")
+        say("LOADING: from opening the page to the game ready (the hall and the athletes in place)")
+        for p, r in loading:
+            got = f"{r.get('kb', 0) / 1024:.1f} MB downloaded" if r.get("kb") else "everything from the browser's cache"
+            slow = r.get("slowest") or [None, None]
+            extra = f"; slowest file {slow[0]} {slow[1] / 1000:.1f} s" if slow[0] and slow[1] else ""
+            say(f"  {p.name[:14]:<14} {r.get('ms', 0) / 1000:5.1f} s, {got}{extra}")
 
     helped = [p for p in players if p.sidesteps or p.graced or p.clear_hits or p.early_hits or p.second_hits]
     if helped:
@@ -439,6 +460,10 @@ def verdicts(p):
     if p.sound_error:
         out.append(f"the recorded sounds didn't load ({p.sound_error}), so they heard the simple synthesized ones."
                    " A download manager in the browser (such as IDM) can do this.")
+    slow_load = max((r.get("ms", 0) for r in p.loads), default=0)
+    if slow_load >= 15000:
+        out.append(f"the game took {slow_load / 1000:.0f} s to load: a slow Wi-Fi link to the host (the first visit"
+                   " downloads about 7 MB from the host's computer).")
     held = pct(p.held, 0.95)
     if held is not None and held >= 30:
         out.append(f"the browser held their presses up to {held:.0f} ms (p95) before the game saw them: a busy page."

@@ -47,7 +47,8 @@ jobs:
         run: |
           $zip = Get-Item *-windows.zip
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  $($zip.Name)" | Out-File -Encoding ascii "$($zip.Name).sha256"
+          # LF, not Out-File's CRLF: `sha256sum -c` reads the CR as part of the file's name
+          [System.IO.File]::WriteAllText("$($zip.FullName).sha256", "$hash  $($zip.Name)`n")
       - name: Attach to the release (a draft is created if none exists yet)
         shell: bash
         env:

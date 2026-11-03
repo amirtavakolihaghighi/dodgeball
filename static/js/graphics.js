@@ -1,9 +1,12 @@
 // The graphics setting: how sharp the picture is, and how many decorative effects are drawn.
 //
 // Auto (the default) watches the frame rate and steps down a level when it stays low, so a slow
-// laptop stays smooth. A step down that doesn't raise the frame rate is undone: the game is then
-// held back by something else (battery saver, a busy computer), and a softer picture wouldn't
-// help. The host's computer also runs the server, so there Auto stays at Medium or lower.
+// laptop stays smooth. A step down that doesn't raise the frame rate is followed by one more (Low
+// halves the sharpness, which a slow graphics chip feels most); if even that doesn't help, the
+// game is held back by something else (battery saver, a busy computer), a softer picture wouldn't
+// help, and Auto goes back to where it was. It tries a level up only between rounds, and never
+// tries again a level it had to leave. The host's computer also runs the server, so there Auto
+// stays at Medium or lower.
 // Nothing that matters for play changes with the level: balls, trails, the timing ring and the
 // throw preview look the same everywhere, so a low setting is never a disadvantage.
 
@@ -20,7 +23,8 @@ const SHARPNESS = { low: 0.5, medium: 0.75, high: 1 };
 const MAX_PIXEL_RATIO = 1.5;
 const DROP_FPS = 45;        // Auto: a second under this many frames is slow...
 const DROP_AFTER = 3;       // ...and this many slow seconds in a row step down a level
-const HELPED = 1.12;        // a step down must raise the frame rate by 12%, or it's undone
+const HELPED = 1.12;        // a step down must raise the frame rate by 12%, or Auto steps once more
+const TRIAL = 5;            // seconds a step down is judged over (3 was too noisy on a slow laptop)
 const RISE_FPS = 57;        // this many frames a second or more...
 const RISE_AFTER = 20;      // ...for this many seconds in a row tries a level up
 const RISES = 2;            // at most this many tries a session, so it can't keep see-sawing
@@ -56,9 +60,12 @@ export class Graphics {
     this.why = this.choice === 'auto' && software ? 'the page is drawn without the graphics card' : '';
     this.fps = null;            // the latest second's frame rate
     this.onChange = () => {};   // (from, to, why): Auto changed the level by itself
+    this.calm = () => true;     // may Auto try a level up now? (main.js: not while a round is played)
     this.ups = 0;
-    this.stuck = false;         // a step down didn't help: Auto stops changing things
+    this.stuck = false;         // even the lowest step didn't help: Auto stops changing things
     this.trial = null;          // after a step down: is it helping?
+    this.risen = null;          // the level Auto last stepped up to...
+    this.failed = new Set();    // ...and levels it had to leave again after stepping up: not tried again
     this.slow = [];
     this.fast = 0;
     this.settle = SETTLE;
@@ -80,6 +87,8 @@ export class Graphics {
     this.stuck = false;
     this.trial = null;
     this.ups = 0;
+    this.risen = null;
+    this.failed.clear();
     this.why = choice === 'auto' && this.software ? 'the page is drawn without the graphics card' : '';
     this.change(choice === 'auto' ? (this.software ? 'low' : this.ceiling) : choice, '');
   }
@@ -131,13 +140,19 @@ export class Graphics {
     const i = LEVELS.indexOf(this.level);
     if (this.trial) {
       this.trial.seconds.push(fps);
-      if (this.trial.seconds.length < 3) return;
+      if (this.trial.seconds.length < TRIAL) return;
       const after = mean(this.trial.seconds);
       const { from, before } = this.trial;
       this.trial = null;
       if (after < DROP_FPS && after < before * HELPED) {
+        const was = `${Math.round(before)} → ${Math.round(after)} frames a second`;
+        if (i > 0) {        // one more step before giving up, judged against the same "before"
+          this.change(LEVELS[i - 1], `a lower level didn't help enough (${was}), so one more`);
+          this.trial = { from, before, seconds: [] };
+          return;
+        }
         this.stuck = true;
-        this.change(from, `a lower level didn't help (${Math.round(before)} → ${Math.round(after)} frames a second): something else holds the game back, like battery saver or a busy computer`);
+        this.change(from, `even the lowest level didn't help (${was}): something else holds the game back, like battery saver or a busy computer`);
       }
       return;
     }
@@ -150,15 +165,18 @@ export class Graphics {
       this.slow = [];
       if (i === 0) return;
       const from = this.level;
+      if (from === this.risen) this.failed.add(from);    // stepped up to it, and it was too much
       this.change(LEVELS[i - 1], `the frame rate was under ${DROP_FPS} (${Math.round(before)} frames a second)`);
       this.trial = { from, before, seconds: [] };
       return;
     }
     this.slow = [];
     this.fast = fps >= RISE_FPS ? this.fast + 1 : 0;
-    if (this.fast >= RISE_AFTER && this.ups < RISES && i < LEVELS.indexOf(this.ceiling)) {
+    const up = LEVELS[i + 1];
+    if (this.fast >= RISE_AFTER && this.ups < RISES && i < LEVELS.indexOf(this.ceiling) && !this.failed.has(up) && this.calm()) {
       this.ups++;
-      this.change(LEVELS[i + 1], 'the frame rate has room to spare');
+      this.risen = up;
+      this.change(up, 'the frame rate has room to spare');
     }
   }
 

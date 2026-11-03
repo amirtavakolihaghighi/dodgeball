@@ -31,14 +31,26 @@
     let w = fake(); let g = new Graphics(w, 'auto', false); let c = { t: 0 }; g.frame(c.t);
     run(g, 30, 6, c); out.slowStepsDown = g.level;
     run(g, 50, 6, c); out.helpedStays = g.level;
-    // 2. A step down that doesn't help (30 -> 31 fps): undone, and Auto stops changing things.
+    // 2. A step down that doesn't help (30 -> 31 fps): one more, to Low; when that doesn't help either,
+    //    back to High, and Auto stops changing things.
     w = fake(); g = new Graphics(w, 'auto', false); c = { t: 0 }; g.frame(c.t);
     run(g, 30, 6, c); const stepped = g.level;
-    run(g, 31, 6, c); out.notHelped = `${stepped} then ${g.level}, stuck ${g.stuck}`;
+    run(g, 31, 8, c); const second = g.level;
+    run(g, 31, 10, c); out.notHelped = `${stepped}, then ${second}, then ${g.level}, stuck ${g.stuck}`;
     run(g, 30, 10, c); out.afterStuck = g.level;
-    // 3. Smooth for 20 s at Medium: tries High again; at most twice a session.
+    // 2b. ...and when Low does help (31 -> 50 fps), it stays at Low.
+    w = fake(); g = new Graphics(w, 'auto', false); c = { t: 0 }; g.frame(c.t);
+    run(g, 30, 6, c); run(g, 31, 8, c); run(g, 50, 10, c); out.lowHelped = `${g.level}, stuck ${g.stuck}`;
+    // 3. Smooth for 20 s at Medium: tries High, but only between rounds (calm()).
     w = fake(); g = new Graphics(w, 'medium', false); g.choose('auto'); g.level = 'medium'; c = { t: 0 }; g.frame(c.t);
-    run(g, 60, 24, c); out.rises = g.level;
+    let calm = false;
+    g.calm = () => calm;
+    run(g, 60, 24, c); const inRound = g.level;
+    calm = true;
+    run(g, 60, 2, c); out.rises = `${inRound} during a round, ${g.level} after it`;
+    // 3b. High turns out too slow: back to Medium, and High isn't tried again.
+    run(g, 30, 6, c); run(g, 50, 6, c); const dropped = g.level;
+    run(g, 60, 30, c); out.failedNotRetried = `${dropped}, then ${g.level} after 30 smooth seconds`;
     // 4. The host's ceiling: Auto at High drops to Medium; a fixed High stays.
     w = fake(); g = new Graphics(w, 'auto', false); g.setCeiling('medium'); out.hostAuto = g.level;
     w = fake(); g = new Graphics(w, 'high', false); g.setCeiling('medium'); out.hostFixedHigh = g.level;

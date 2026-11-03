@@ -57,6 +57,19 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_ho
   - sees the pending change as "next round (now 6.0 m/s²)" and a pending notice;
   - gets gravity 9 when round 2 starts.
 
+## Who players are, renaming, the search, bots with flags
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\people_bots.json
+```
+
+`people_bots.json` (+ `people_bots.js`), as the host:
+
+- **The same name twice:** a second "browser" (a WebSocket from the page, with its own secret code) joins under the host's name. The two get different keys, the lobby numbers them #1 and #2 (`people_same_name.png`), and own settings given to the twin reach only the twin.
+- **Renaming** with the menu's name box: a long name is cut at 32 letters, the key and team stay, a reload would rejoin under the new name, and the HUD and the tab's title follow, also back to a shorter name.
+- **The search across every tab:** "dash time" (the Dodge tab), "network" (the whole Network tab, by its title) and "perfect catch" (three tabs), with "Every tab" and each tab's count in the nav and the words marked (`rules_search.png`).
+- **The bots page:** Alex made on BLUE and given Dodge master and Berserker through the page's own controls (`bots_page.png`); Alex's ⚙ page shows its flags' values (reacts to 1.00×, every throw at full power, at the front) and the lobby its flags (`bots_alex_settings.png`); the Berserker flag's page shows the bot numbers once, under "Behaviour", and an edit applied changes the flag (`bots_flag_editor.png`); Alex moved to RED, taken off, and added back to BLUE with "Add a bot…" (`bots_lobby.png`).
+
 ## Team health
 
 ```powershell
@@ -152,8 +165,8 @@ Add `&noarena` to any test to draw the plain court instead of the sports hall, f
 - **In the lobby:** the warning for drawing without the graphics card (headless Chrome draws in software, so it shows), Auto starting at Low at half the sharpness, and the host's ceiling of Medium.
 - **Auto's rules,** on a stand-in world fed made-up frame times:
   - slow at High steps down, and a step that helps is kept;
-  - a step that doesn't help (30 → 31 fps) is undone, and Auto then stops changing things;
-  - 20 smooth seconds try a level up;
+  - a step that doesn't help (30 → 31 fps) is followed by one more, to Low; when that doesn't help either, Auto goes back to High and stops changing things (`notHelped`: `medium, then low, then high, stuck true`); when Low helps, it stays there (`lowHelped`: `low, stuck false`);
+  - 20 smooth seconds try a level up, but only between rounds (`rises`: `medium during a round, high after it`), and a level that was too slow after a step up isn't tried again (`failedNotRetried`: `medium, then medium after 30 smooth seconds`);
   - the host's ceiling lowers Auto but not a chosen High;
   - no graphics card starts at Low;
   - a paused page isn't counted as slow.

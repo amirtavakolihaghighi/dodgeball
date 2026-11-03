@@ -2,7 +2,7 @@
 
 Every animation the athletes have, every change from one move into another, and what you should see in each. This is step 8's working list (decision 142): the user tries one move, writes what they saw and what they expected, Claude fixes that move only, and once the user approves it, it's **locked**.
 
-> **On hold since 2026-11-03, and not finished** (decision 143). The user approved the three fixes from 11-01 (perfect dodges, strafing, getting up: now Locked) and is happy with the moves for now. Other work came first: the office logs, then names, players' identities, renaming, the lobby's search and bots with flags. **When the moves are picked up again, the first job is the animation tool** (option c at the end of this list: a viewer, then an editor), then the rest of this list, one move at a time.
+> **On hold since 2026-11-03, and not finished** (decision 143). The user approved the three fixes from 11-01 (perfect dodges, strafing, getting up: now Locked) and is happy with the moves for now. Other work came first: the office logs, then names, players' identities, renaming, the lobby's search and bots with flags. **When the moves are picked up again, the first job is the animation tool** (option c at the end of this list: a viewer, then an editor), then the rest of this list, one move at a time. Since the merge into `main` (v2.3.0, 2026-11-03), this is the first item on `main`'s task list (section 15 of `docs/PROJECT.md`).
 
 Times are with the default rules: the host can change the dash's time, each action's window and recovery, and the charge time, and the moves stretch to fit.
 

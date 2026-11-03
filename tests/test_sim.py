@@ -758,7 +758,7 @@ def test_host_can_discard_pending_changes_and_reset_everything():
     say(g, host, t, t="rules", discard=True)
     assert g.next_rules is None and g.rules.GRAVITY == 2
     say(g, host, t, t="rules", reset=True)
-    assert sorted(g.pending_changes()) == ["BOTS_BLUE", "BOTS_RED", "GRAVITY"] and g.next_rules.values() == DEFAULTS
+    assert sorted(g.pending_changes()) == ["BOTS_BLUE", "BOTS_RED", "GRAVITY", "bots"] and g.next_rules.values() == DEFAULTS
 
 
 def test_rules_are_validated_and_clamped():
@@ -1317,7 +1317,7 @@ def test_a_player_can_have_their_own_settings():
     say(g, guest, t, t="rules", player="Guest0", set={"MAX_HP": 400})       # only the host
     assert events(g, "deny")[0]["why"] == "host" and not g.rules.players
     say(g, host, t, t="rules", player="Guest0", set={"MAX_HP": 150, "THROW_SPEED_MAX": 40, "GRAVITY": 1, "WALK_SPEED": "fast"})
-    assert g.rules.players == {"Guest0": {"MAX_HP": 150, "THROW_SPEED_MAX": 40.0}}     # gravity is everyone's
+    assert g.rules.players == {"n:Guest0": {"MAX_HP": 150, "THROW_SPEED_MAX": 40.0}}   # gravity is everyone's
     assert guest.hp == 150 and host.hp == C.MAX_HP and host.rules is g.rules             # the lobby: at once
     assert "Guest0 › Health" in events(g, "rules")[-1]["names"]
     t = play_now(g, t)
@@ -1331,9 +1331,9 @@ def test_a_player_can_have_their_own_settings():
     t = run(g, t, C.ROUND_OVER_TIME + 0.2)
     assert g.state == "count" and guest.hp == C.MAX_HP and guest.rules.actions["catch"].window == 0.5
     say(g, host, t, t="rules", player="Guest0", set={"CATCH_WINDOW": C.CATCH_WINDOW})   # = everyone's: no own setting
-    assert g.next_rules.players == {"Guest0": {"THROW_SPEED_MAX": 40.0}}
+    assert g.next_rules.players == {"n:Guest0": {"THROW_SPEED_MAX": 40.0}}
     g.remove_player(guest.id, t)
-    back = g.add_player("Guest0", None, t)                                    # settings go by name: they keep them
+    back = g.add_player("Guest0", None, t)                                    # a test's players go by name
     assert back.rules.THROW_SPEED_MAX == 40
     # Their own value wins over an ordered pair: a tap speed above everyone's full speed lifts their full speed.
     r = Rules()
@@ -1401,10 +1401,10 @@ def test_a_settings_file_replaces_the_whole_setup():
     say(g, host, t, t="rules", **{"import": file})
     assert g.rules.GRAVITY == 3 and g.rules.WALK_SPEED == C.WALK_SPEED     # what the file leaves out: the default
     assert g.rules.TEAM_HEALTH and g.rules.BALL_COLOR_RED == "#abcdef" and g.rules.MAX_HP == C.MAX_HP
-    assert g.rules.players == {"Bot Ace": {"BOT_SKILL": "hard"}, "Host": {"WALK_SPEED": 12.0}}   # Guest0's are gone
+    assert g.rules.players == {"b:ace": {"BOT_SKILL": "hard"}, "n:Host": {"WALK_SPEED": 12.0}}   # Guest0's are gone
     assert guest.hp == C.MAX_HP and host.rules.WALK_SPEED == 12
     say(g, host, t, t="rules", player="Host", replace={"CATCH_WINDOW": 0.4})   # one player's file: theirs replaced
-    assert g.rules.players["Host"] == {"CATCH_WINDOW": 0.4}
+    assert g.rules.players["n:Host"] == {"CATCH_WINDOW": 0.4}
     t = play_now(g, t)
     say(g, host, t, t="rules", **{"import": {"rules": {}}})                 # mid-match: from the next round
     assert g.rules.GRAVITY == 3 and g.next_rules.GRAVITY == C.GRAVITY and not g.next_rules.players
@@ -1426,6 +1426,125 @@ def test_ball_colours_are_rules():
     who = {p.key: (p.who, p.team) for p in PARAMS if p.kind == "color"}
     assert who == {"BALL_COLOR_RED": ("people", 0), "BALL_COLOR_RED_BOTS": ("bots", 0),
                    "BALL_COLOR_BLUE": ("people", 1), "BALL_COLOR_BLUE_BOTS": ("bots", 1)}
+
+
+# ---------------------------------------------------------------- who a player is, renaming, bots with flags
+
+def bot(g, key):
+    return next((p for p in g.players.values() if p.key == key), None)
+
+
+def test_two_people_with_the_same_name_keep_their_own_settings_apart():
+    """Own settings and the team to come back to follow who a player is (their browser's key), not
+    their name: names never have to be unique."""
+    g, host, _, t = lobby(guests=0)
+    alice = g.add_player("Sam", 0, t, key=rules_mod.identity_key("alice's browser"))
+    bob = g.add_player("Sam", 1, t, key=rules_mod.identity_key("bob's browser"))
+    say(g, host, t, t="rules", player=alice.key, set={"MAX_HP": 300})
+    assert alice.hp == 300 and bob.hp == C.MAX_HP and bob.rules is g.rules
+    assert g.rules.labels[alice.key] == "Sam" and "Sam › Health" in events(g, "rules")[-1]["names"]
+    g.remove_player(alice.id, t)                    # back after leaving (or a dropped connection)
+    again = g.add_player("Sam", None, t, key=alice.key)
+    assert again.team == 0 and again.hp == 300
+
+
+def test_settings_saved_by_name_go_to_the_first_person_with_that_name():
+    """Older files kept own settings by name: the first person to join with that name takes them
+    over; a second one with the same name doesn't get them."""
+    g = Game(seed=3, rules=Rules({"BOTS_RED": 0, "BOTS_BLUE": 0}, {"Robin": {"MAX_HP": 200}, "Bot Ace": {"BOT_SKILL": "hard"}}))
+    assert set(g.rules.players) == {"n:Robin", "b:ace"}     # a built-in bot's name is that bot
+    t = 10.0
+    first = g.add_player("Robin", 0, t, key=rules_mod.identity_key("first"))
+    second = g.add_player("Robin", 1, t, key=rules_mod.identity_key("second"))
+    assert first.hp == 200 and second.hp == C.MAX_HP and set(g.rules.players) == {first.key, "b:ace"}
+    assert g.rules.labels[first.key] == "Robin" and g.rules_version > 0      # the browsers hear of it
+
+
+def test_a_person_can_rename_themselves():
+    g, host, _, t = lobby(guests=0)
+    p = g.add_player("Player-123", 1, t, key=rules_mod.identity_key("a tab"))
+    say(g, host, t, t="rules", player=p.key, set={"MAX_HP": 180})
+    p.stats["hits"] = 2
+    say(g, p, t, t="rename", name="  Mina  ")
+    assert p.name == "Mina" and p.team == 1 and p.hp == 180 and p.stats["hits"] == 2
+    e = events(g, "rename")[-1]
+    assert (e["p"], e["name"], e["was"]) == (p.id, "Mina", "Player-123") and g.rules.labels[p.key] == "Mina"
+    say(g, p, t, t="rename", name="x" * 50)         # 32 letters at most
+    assert p.name == "x" * 32 and rules_mod.NAME_LENGTH == 32
+    say(g, p, t, t="rename", name="   ")            # nothing to go by: the name stays
+    assert p.name == "x" * 32 and len(events(g, "rename")) == 2
+
+
+def test_the_host_makes_bots_with_flags_and_puts_them_on_teams():
+    g, host, (guest,), t = lobby()
+    say(g, guest, t, t="rules", bot={"do": "make", "name": "Mallory", "team": 1})     # only the host
+    assert events(g, "deny")[-1]["why"] == "host" and not g.rules.roster
+    say(g, host, t, t="rules", bot={"do": "make", "name": "Alex", "team": 1})
+    alex = bot(g, "b:alex")
+    assert alex.name == "Alex" and alex.team == 1 and g.rules.lineup == [[], ["alex"]] and g.rules.BOTS_BLUE == 1
+    say(g, host, t, t="rules", bot={"do": "edit", "bot": "alex", "flags": ["dodge-master", "berserker", "nope"]})
+    alex = bot(g, "b:alex")
+    prof = alex.rules.bot_profile(alex.rules.BOT_SKILL)
+    assert g.rules.roster["alex"]["flags"] == ["dodge-master", "berserker"]
+    assert prof["react"] == 1.0 and prof["mix_catch"] == 0 and prof["power_min"] == prof["power_max"] == 1.0
+    assert alex.rules.BOT_STAMINA_RESERVE == 0 and g.rules.bot_profile("normal")["react"] == C.BOT_PROFILES["normal"]["react"]
+    # Its own skill: the flags' numbers land on that skill's profile; its own settings win over flags.
+    say(g, host, t, t="rules", player="b:alex", set={"BOT_SKILL": "hard", "BOT_HARD_AIM": 9})
+    alex = bot(g, "b:alex")
+    assert alex.rules.bot_profile("hard")["react"] == 1.0 and alex.rules.BOT_HARD_POWER_MIN == 1.0
+    assert alex.rules.BOT_HARD_AIM == 9 and alex.rules.BOT_NORMAL_REACT == C.BOT_PROFILES["normal"]["react"]
+    # Plain bots fill up around it; it moves, leaves and comes back the same bot.
+    say(g, host, t, t="rules", bot={"do": "add", "team": 1})
+    assert g.rules.lineup == [[], ["alex", "blitz"]] and bot(g, "b:blitz").name == "Bot Blitz"
+    say(g, host, t, t="rules", bot={"do": "move", "bot": "alex"})
+    assert g.rules.lineup == [["alex"], ["blitz"]] and bot(g, "b:alex").team == 0
+    say(g, host, t, t="rules", bot={"do": "remove", "bot": "alex"})
+    assert bot(g, "b:alex") is None and "alex" in g.rules.roster and g.rules.BOTS_RED == 0
+    say(g, host, t, t="rules", bot={"do": "add", "team": 1, "bot": "alex"})
+    assert bot(g, "b:alex").team == 1 and bot(g, "b:alex").rules.BOT_SKILL == "hard"
+    say(g, host, t, t="rules", bot={"do": "edit", "bot": "alex", "name": "Alexandra"})
+    assert bot(g, "b:alex").name == "Alexandra"
+    # A flag edited: every bot carrying it follows (only rules a bot can have count); deleted: it's gone from them.
+    say(g, host, t, t="rules", bot={"do": "flag", "flag": "berserker", "name": "Berserker", "desc": "Hard-ish",
+                                     "values": {"BOT_NORMAL_POWER_MIN": 0.5, "BOT_NORMAL_POWER_MAX": 0.6, "GRAVITY": 1}})
+    assert bot(g, "b:alex").rules.BOT_HARD_POWER_MAX == 0.6 and "GRAVITY" not in g.rules.flags["berserker"]["values"]
+    say(g, host, t, t="rules", bot={"do": "flag", "name": "Wall", "values": {"BOT_NORMAL_MIX_CATCH": 1}})
+    assert g.rules.flags["wall"]["name"] == "Wall"
+    say(g, host, t, t="rules", bot={"do": "unflag", "flag": "berserker"})
+    assert g.rules.roster["alex"]["flags"] == ["dodge-master"] and "berserker" not in g.rules.flags
+    # Built-in bots can carry flags too, but only the host's own bots can be deleted (own settings with them).
+    say(g, host, t, t="rules", bot={"do": "edit", "bot": "blitz", "flags": ["wall"]})
+    assert bot(g, "b:blitz").rules.bot_profile(C.BOT_SKILL)["mix_catch"] == 1
+    say(g, host, t, t="rules", bot={"do": "delete", "bot": "blitz"})
+    assert bot(g, "b:blitz") is not None
+    say(g, host, t, t="rules", bot={"do": "delete", "bot": "alex"})
+    assert "alex" not in g.rules.roster and "b:alex" not in g.rules.players and bot(g, "b:alex") is None
+    # During a match: from the next round, like every rule.
+    t = play_now(g, t)
+    say(g, host, t, t="rules", bot={"do": "make", "name": "Maya", "team": 0})
+    assert bot(g, "b:maya") is None and g.pending_changes()[-1] == "bots"
+    host.alive = False
+    t = run(g, t, C.ROUND_OVER_TIME + 0.2)
+    assert bot(g, "b:maya").team == 0
+
+
+def test_bot_counts_and_files_keep_working():
+    """The bot counts (lobby − / +, older files) still pick built-in bots, and a setup's bots,
+    flags and lineups survive a file."""
+    r = Rules({"BOTS_RED": 3})
+    assert r.lineup == [["ace", "comet", "echo"], ["blitz", "dash"]]
+    r.bot_change({"do": "make", "name": "Alex", "team": 0})
+    r.bot_change({"do": "edit", "bot": "alex", "flags": ["sniper"]})
+    r.update({"BOTS_RED": 2})                        # fewer: the last ones go
+    assert r.lineup[0] == ["ace", "comet"]
+    r.update({"BOTS_RED": 4, "BOTS_BLUE": 12})       # more: the next free built-in ones
+    assert r.lineup[0] == ["ace", "comet", "echo", "gale"] and len(r.lineup[1]) == 12
+    copy = Rules()
+    copy.replace(r.values(), {}, None, json.loads(json.dumps(r.bots_data())))
+    assert copy.bots_data() == r.bots_data() and copy.roster["alex"] == {"name": "Alex", "flags": ["sniper"]}
+    copy.set_bots({"roster": {"Bad Id!": {"name": "x"}, "zed": {"name": "Zed?"}}, "lineup": [["nobody", "ace", "ace"], "x"],
+                   "flags": {"f": {"name": "", "values": {}}}})       # junk from a file is dropped
+    assert copy.roster == {} and copy.flags == {} and copy.lineup[0][:1] == ["ace"]
 
 
 def run_all():

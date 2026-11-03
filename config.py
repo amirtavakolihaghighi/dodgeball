@@ -190,12 +190,45 @@ BOT_STAMINA_RESERVE = 30    # bots keep this much stamina for defending before t
 BOT_STAND_TO_REGEN = True   # a hurt bot stands still when that brings its health (or its team's bar) back
 # react: chance to attempt a defence at all; sd: timing spread (s); aim: aim error (deg);
 # gap_min/gap_max: extra pause between throws (s); mix_*: preference for each defence;
-# bank: chance a throw is a ricochet off the floor or a side wall
+# bank: chance a throw is a ricochet off the floor or a side wall; power_min/power_max: how hard
+# it throws (share of a full charge, picked between the two); stance: where it stands (-1 at the
+# back, 0 anywhere in its half, 1 at the front); sidestep: chance it just walks out of a slow ball
+_BOT_COMMON = dict(power_min=0.15, power_max=1.0, stance=0.0, sidestep=0.35)
 BOT_PROFILES = {
     "easy": dict(react=0.55, sd=0.09, aim=7.0, gap_min=1.6, gap_max=3.4,
-                 mix_dodge=0.5, mix_catch=0.45, mix_deflect=0.05, bank=0.05),
+                 mix_dodge=0.5, mix_catch=0.45, mix_deflect=0.05, bank=0.05, **_BOT_COMMON),
     "normal": dict(react=0.8, sd=0.055, aim=3.5, gap_min=0.8, gap_max=2.2,
-                   mix_dodge=0.4, mix_catch=0.4, mix_deflect=0.2, bank=0.15),
+                   mix_dodge=0.4, mix_catch=0.4, mix_deflect=0.2, bank=0.15, **_BOT_COMMON),
     "hard": dict(react=0.93, sd=0.03, aim=1.8, gap_min=0.3, gap_max=1.2,
-                 mix_dodge=0.3, mix_catch=0.4, mix_deflect=0.3, bank=0.25),
+                 mix_dodge=0.3, mix_catch=0.4, mix_deflect=0.3, bank=0.25, **_BOT_COMMON),
 }
+# Bot flags: named bundles of behaviour the host puts on bots (several at once, later ones winning).
+# A flag's values are own settings; the bot-skill numbers are written as the normal profile's
+# (BOT_NORMAL_...) and land on whichever profile the bot plays at. The host can edit, add and
+# delete flags; these are the ones a new setup starts with.
+BOT_FLAGS = {
+    "dodge-master": dict(name="Dodge master", desc="Defends nearly every ball, almost always by dodging, with near-perfect timing.",
+                         values=dict(BOT_NORMAL_REACT=1.0, BOT_NORMAL_SD=0.012, BOT_NORMAL_MIX_DODGE=1.0,
+                                     BOT_NORMAL_MIX_CATCH=0.0, BOT_NORMAL_MIX_DEFLECT=0.0, BOT_NORMAL_SIDESTEP=0.0)),
+    "berserker": dict(name="Berserker", desc="Every throw at full power, as soon as it has a ball, from the front line. "
+                      "Keeps no stamina back for defending.",
+                      values=dict(BOT_NORMAL_POWER_MIN=1.0, BOT_NORMAL_POWER_MAX=1.0, BOT_NORMAL_GAP_MIN=0.0,
+                                  BOT_NORMAL_GAP_MAX=0.3, BOT_NORMAL_STANCE=1.0, BOT_STAMINA_RESERVE=0)),
+    "sniper": dict(name="Sniper", desc="Aims almost perfectly and takes its time: fewer, harder throws from the back.",
+                   values=dict(BOT_NORMAL_AIM=0.8, BOT_NORMAL_GAP_MIN=1.5, BOT_NORMAL_GAP_MAX=3.5,
+                               BOT_NORMAL_POWER_MIN=0.7, BOT_NORMAL_STANCE=-1.0, BOT_NORMAL_BANK=0.0)),
+    "catcher": dict(name="Catcher", desc="Catches whatever it can, with good timing.",
+                    values=dict(BOT_NORMAL_REACT=0.95, BOT_NORMAL_SD=0.03, BOT_NORMAL_MIX_CATCH=1.0,
+                                BOT_NORMAL_MIX_DODGE=0.1, BOT_NORMAL_MIX_DEFLECT=0.0)),
+    "parry-king": dict(name="Parry king", desc="Deflects everything straight back, with sharp timing.",
+                       values=dict(BOT_NORMAL_REACT=0.95, BOT_NORMAL_SD=0.02, BOT_NORMAL_MIX_DEFLECT=1.0,
+                                   BOT_NORMAL_MIX_DODGE=0.0, BOT_NORMAL_MIX_CATCH=0.0)),
+    "trickster": dict(name="Trickster", desc="Banks most of its throws off the floor and the side walls.",
+                      values=dict(BOT_NORMAL_BANK=0.8)),
+    "rookie": dict(name="Rookie", desc="Slow to react, rough timing, wild aim.",
+                   values=dict(BOT_NORMAL_REACT=0.4, BOT_NORMAL_SD=0.12, BOT_NORMAL_AIM=9.0)),
+    "tank": dict(name="Tank", desc="Twice the health, but slower on its feet.",
+                 values=dict(MAX_HP=200, WALK_SPEED=4.5)),
+}
+BOT_ROSTER_MAX = 48         # bots the host can make, and flags they can define
+BOT_FLAG_MAX = 32

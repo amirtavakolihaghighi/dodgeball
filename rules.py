@@ -6,24 +6,27 @@ config.py. A Rules object holds one complete set of values, read as attributes
 (rules.WALK_SPEED). Edits from browsers go through Rules.update(), which ignores unknown keys,
 rejects wrong types and clamps numbers to their range, so no value can break the server.
 
-A rule set also holds each player's own settings (Rules.players: name -> {key: value}), for the
-rules that may differ per player (Param.who). Rules.for_player(name) is the set that player plays
-by: everyone's values with theirs on top.
+A rule set also holds each player's own settings (Rules.players: who -> {key: value}), for the
+rules that may differ per player (Param.who). Rules.for_player(who) is the set that player plays
+by: everyone's values with theirs on top. Own settings follow a player's identity, not their name
+(two people may share a name): see clean_key.
 """
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from dataclasses import asdict, dataclass
 
 import config as C
+from bots import NAMES as BOT_NAMES
 from config import ActionSpec
 
 ACTION_KINDS = ("dodge", "catch", "deflect")
 SKILLS = ("easy", "normal", "hard")
 COLOR = re.compile(r"#[0-9a-fA-F]{6}")
 MAX_CUSTOM_PLAYERS = 64     # players and bots with their own settings, at most
-NAME_LENGTH = 16            # the longest player name (sim.py cleans names the same way)
+NAME_LENGTH = 32            # the longest player name (sim.py cleans names the same way; main.js NAME_LENGTH)
 
 
 def _clamp(v, lo, hi):
@@ -33,6 +36,48 @@ def _clamp(v, lo, hi):
 def clean_name(name):
     """A player's name as the game stores it: printable, trimmed, at most NAME_LENGTH long."""
     return "".join(ch for ch in str(name or "") if ch.isprintable()).strip()[:NAME_LENGTH]
+
+
+# Who own settings belong to (a "key"):
+#   u + 10 hex    a person: from their browser's secret code (identity_key), so it follows them
+#                 through renames and reloads, and nobody gets it by taking their name;
+#   b:<id>        a bot: a built-in one by its name (b:ace is "Bot Ace"), or one the host made;
+#   n:<name>      a name nobody has claimed yet: own settings from an older file or saved_rules.json
+#                 (which went by name), or a test's player. The first person to join with that name
+#                 takes them over (Rules.claim).
+PERSON_KEY = re.compile(r"u[0-9a-f]{10}")
+BOT_KEY = re.compile(r"b:[a-z0-9][a-z0-9-]{0,39}")
+BUILTIN_BOTS = {f"Bot {n}": f"b:{n.lower()}" for n in BOT_NAMES}     # how older files named the built-in bots
+
+
+def identity_key(code):
+    """A person's key from the secret code their browser keeps: others see the key, never the code."""
+    return "u" + hashlib.sha256(str(code).encode()).hexdigest()[:10]
+
+
+def clean_key(raw):
+    """An untrusted key (or, the old way, a name) -> a key, or "" if it's neither. A bare name is
+    read as older files meant it: a built-in bot's name is that bot, any other waits for a person."""
+    if not isinstance(raw, str):
+        return ""
+    if PERSON_KEY.fullmatch(raw) or BOT_KEY.fullmatch(raw):
+        return raw
+    named = raw.startswith("n:")
+    name = clean_name(raw[2:] if named else raw)
+    if not name:
+        return ""
+    return BUILTIN_BOTS[name] if name in BUILTIN_BOTS and not named else f"n:{name}"
+
+
+def key_label(key, labels=None):
+    """How a key reads in messages: the name last seen with it."""
+    if labels and labels.get(key):
+        return labels[key]
+    if key.startswith("n:"):
+        return key[2:]
+    if key.startswith("b:"):
+        return next((name for name, k in BUILTIN_BOTS.items() if k == key), key[2:])
+    return key
 
 
 @dataclass(frozen=True)
@@ -116,6 +161,14 @@ BOT_FIELDS = (
     ("mix_catch", "Prefers catch", "How much a bot favours catching (relative weight).", 0, 1, 0.05, ""),
     ("mix_deflect", "Prefers deflect", "How much a bot favours deflecting (relative weight).", 0, 1, 0.05, ""),
     ("bank", "Bank-shot chance", "Share of a bot's throws aimed off the floor or a side wall.", 0, 1, 0.01, "×"),
+    ("power_min", "Weakest throw", "How hard a bot throws, as a share of a full charge: each throw is somewhere between "
+     "this...", 0, 1, 0.05, "×"),
+    ("power_max", "Strongest throw", "...and this (both 1: every throw at full power). It never throws harder than its "
+     "stamina allows.", 0, 1, 0.05, "×"),
+    ("stance", "Where it stands", "Where in its half a bot moves about: −1 at the back, 0 anywhere, 1 near the centre "
+     "line.", -1, 1, 0.1, ""),
+    ("sidestep", "Walks out of slow balls", "Chance that a bot just walks out of the way of a slow ball (under 20 m/s) "
+     "instead of dodging, catching or deflecting it.", 0, 1, 0.05, "×"),
 )
 
 
@@ -523,8 +576,9 @@ DEFAULTS = {p.key: BY_KEY[p.key].clean(_default(p.key)) for p in PARAMS}
 
 # Pairs that must stay in order. When an edit breaks the order, the edited one wins.
 ORDERED_PAIRS = [("THROW_SPEED_MIN", "THROW_SPEED_MAX"), ("THROW_COST_MIN", "THROW_COST_MAX"),
-                 ("DAMAGE_MIN", "DAMAGE_MAX")] + [(f"BOT_{s.upper()}_GAP_MIN", f"BOT_{s.upper()}_GAP_MAX")
-                                                  for s in SKILLS]
+                 ("DAMAGE_MIN", "DAMAGE_MAX")] + [(f"BOT_{s.upper()}_{lo}", f"BOT_{s.upper()}_{hi}")
+                                                  for s in SKILLS for lo, hi in (("GAP_MIN", "GAP_MAX"),
+                                                                                 ("POWER_MIN", "POWER_MAX"))]
 
 
 # Each of these may not exceed the other: the perfect zone fits in the window, a perfect costs no more.
@@ -546,19 +600,65 @@ def schema():
             "params": [asdict(p) for p in PARAMS], "pairs": ORDERED_PAIRS, "caps": CAPPED_BY}
 
 
-class Rules:
-    """One complete set of rule values, read as attributes: rules.WALK_SPEED. It also holds each
-    player's own settings (players: name -> {key: value}) for the rules that may differ per player."""
+TEAM_TITLES = ("RED", "BLUE")
+BUILTIN_IDS = frozenset(n.lower() for n in BOT_NAMES)
+BOT_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+# The rules a bot flag may set: those a bot may have its own value for, except a team's colours, and
+# of the bot-skill numbers only the normal profile's (they stand for whatever skill the bot plays at).
+FLAG_RULES = frozenset(p.key for p in PARAMS if p.who in ("all", "bots") and p.team < 0 and not (
+    p.key.startswith(("BOT_EASY_", "BOT_HARD_"))))
 
-    def __init__(self, values=None, players=None):
+
+def _copy_flag(flag):
+    return {"name": flag["name"], "desc": flag.get("desc", ""), "values": dict(flag.get("values", {}))}
+
+
+def _new_id(name, taken):
+    """An id for a new bot or flag, from its name: "alex", then "alex-2"..."""
+    base = re.sub(r"[^a-z0-9]+", "-", clean_name(name).lower()).strip("-")[:30] or "bot"
+    out, n = base, 1
+    while out in taken:
+        n += 1
+        out = f"{base}-{n}"
+    return out
+
+
+def _flag_values(raw):
+    """A flag's values from untrusted input (FLAG_RULES only, each cleaned like any rule)."""
+    out = {}
+    if isinstance(raw, dict):
+        for rule, value in list(raw.items())[:len(PARAMS)]:
+            if rule in FLAG_RULES:
+                v = BY_KEY[rule].clean(value)
+                if v is not None:
+                    out[rule] = v
+    return out
+
+
+class Rules:
+    """One complete set of rule values, read as attributes: rules.WALK_SPEED. It also holds:
+    - players: each player's own settings (key -> {rule: value}), for the rules that may differ per
+      player, and labels (key -> the name last seen with it), for showing whose they are;
+    - the bots: roster (the host's own bots, and flags given to built-in ones), flags (named bundles
+      of own settings a bot can carry) and lineup (each team's bots in order; BOTS_RED / BOTS_BLUE
+      are its lengths)."""
+
+    def __init__(self, values=None, players=None, labels=None, bots=None):
         self.__dict__.update(DEFAULTS)
         self.players = {}
-        self._own = {}          # name -> the Rules that player plays by, built when first asked for
+        self.labels = {}
+        self.roster = {}
+        self.flags = {fid: _copy_flag(f) for fid, f in C.BOT_FLAGS.items()}
+        self.lineup = [[], []]
+        self._own = {}          # key -> the Rules that player plays by, built when first asked for
         self._derive()
+        self._fit_lineup()
         if values:
             self.update(values)
         if players:
-            self.set_players(players)
+            self.set_players(players, labels)
+        if bots:
+            self.set_bots(bots)
 
     def update(self, values):
         """Apply untrusted {key: value} edits: unknown keys and wrong types are ignored, numbers are
@@ -575,77 +675,291 @@ class Rules:
                 edited.add(key)
         self._fix(edited)
         self._derive()
+        self._fit_lineup()
         self._own.clear()
         return [k for k, v in self.values().items() if v != before[k]]
 
-    def update_player(self, name, values):
-        """Apply untrusted edits to one player's own settings: {key: value}, or {key: None} for
-        everyone's value again. Only rules that may differ per player count, and a value equal to
-        everyone's is no own setting. Returns what changed, as (name, key) pairs."""
-        name = clean_name(name) if isinstance(name, str) else ""
-        if not name or not isinstance(values, dict):
+    # ---- players' own settings
+
+    def update_player(self, who, values):
+        """Apply untrusted edits to one player's own settings (who: their key, or the old way a
+        name): {rule: value}, or {rule: None} for everyone's value again. Only rules that may differ
+        per player count, and a value equal to everyone's is no own setting. Returns what changed,
+        as (key, rule) pairs."""
+        key = clean_key(who)
+        if not key or not isinstance(values, dict):
             return []
-        before = self.players.get(name, {})
+        before = self.players.get(key, {})
         own = dict(before)
-        for key, raw in list(values.items())[:len(PARAMS)]:
-            param = BY_KEY.get(key) if isinstance(key, str) else None
+        for rule, raw in list(values.items())[:len(PARAMS)]:
+            param = BY_KEY.get(rule) if isinstance(rule, str) else None
             if param is None or not param.who:
                 continue
             value = None if raw is None else param.clean(raw)
-            if raw is None or value == getattr(self, key):
-                own.pop(key, None)
+            if raw is None or value == getattr(self, rule):
+                own.pop(rule, None)
             elif value is not None:
-                own[key] = value
-        if own == before or (own and name not in self.players and len(self.players) >= MAX_CUSTOM_PLAYERS):
+                own[rule] = value
+        if own == before or (own and key not in self.players and len(self.players) >= MAX_CUSTOM_PLAYERS):
             return []
         if own:
-            self.players[name] = own
+            self.players[key] = own
         else:
-            self.players.pop(name, None)
-        self._own.pop(name, None)
-        return [(name, k) for k in sorted(set(own) | set(before)) if own.get(k) != before.get(k)]
+            self.players.pop(key, None)
+            self.labels.pop(key, None)
+        self._own.pop(key, None)
+        return [(key, k) for k in sorted(set(own) | set(before)) if own.get(k) != before.get(k)]
 
-    def set_player(self, name, values):
+    def set_player(self, who, values):
         """Replace one player's own settings, e.g. with a profile from a file."""
-        name = clean_name(name) if isinstance(name, str) else ""
-        edits = dict.fromkeys(self.players.get(name, {}))
+        key = clean_key(who)
+        edits = dict.fromkeys(self.players.get(key, {}))
         if isinstance(values, dict):
             edits.update(values)
-        return self.update_player(name, edits)
+        return self.update_player(key, edits)
 
-    def set_players(self, players):
-        """Replace every player's own settings (untrusted: {name: {key: value}})."""
+    def set_players(self, players, labels=None):
+        """Replace every player's own settings (untrusted: {key or name: {rule: value}}), and the
+        names they were last seen with."""
         before = self.copy()
-        self.players, self._own = {}, {}
+        self.players, self.labels, self._own = {}, {}, {}
+        labels = labels if isinstance(labels, dict) else {}
         if isinstance(players, dict):
-            for name, values in list(players.items())[:MAX_CUSTOM_PLAYERS]:
-                if isinstance(name, str):
-                    self.update_player(name, values)
+            for who, values in list(players.items())[:MAX_CUSTOM_PLAYERS]:
+                if self.update_player(who, values) and isinstance(labels.get(who), str) and clean_name(labels[who]):
+                    self.labels[clean_key(who)] = clean_name(labels[who])
         return self.player_differences(before)
 
-    def replace(self, values, players):
-        """Become the set a file describes: its rules (any it leaves out go back to their default)
-        and its players' own settings. Returns what changed: rule keys, then (name, key) pairs."""
-        before = self.copy()
-        self.__dict__.update(DEFAULTS)
-        self.update(values if isinstance(values, dict) else {})
-        self.set_players(players)
-        return self.differences(before) + self.player_differences(before)
+    def claim(self, key, name):
+        """A person joined (or renamed themselves) as `name`: own settings waiting under that name
+        (from an older file) become theirs, if they have none of their own. Returns True if so."""
+        waiting = f"n:{clean_name(name)}"
+        if key in self.players or waiting not in self.players or key == waiting:
+            return False
+        self.players[key] = self.players.pop(waiting)
+        self.labels[key] = clean_name(name)
+        self._own.pop(waiting, None)
+        return True
 
-    def for_player(self, name):
-        """The rules `name` plays by: everyone's values with their own settings on top (ordered pairs
-        and caps kept, their own value winning). Without own settings, this very set."""
-        own = self.players.get(name)
+    def label(self, key, name):
+        """Remember the name a player with own settings goes by. Returns True if it changed."""
+        name = clean_name(name)
+        if key not in self.players or not name or self.labels.get(key) == name:
+            return False
+        self.labels[key] = name
+        return True
+
+    def for_player(self, who):
+        """The rules a player (key, or the old way a name) plays by: everyone's values with their own
+        settings on top (a bot's flags first), ordered pairs and caps kept, their own value winning.
+        Without own settings, this very set."""
+        key = who if who in self.players or who in self._own else clean_key(who)
+        own = self.own_of(key)
         if not own:
             return self
-        mine = self._own.get(name)
+        mine = self._own.get(key)
         if mine is None:
             mine = Rules(self.values())
             mine.__dict__.update(own)
             mine._fix(set(own))
             mine._derive()
-            self._own[name] = mine
+            self._own[key] = mine
         return mine
+
+    def own_of(self, key):
+        """What a player plays by on top of everyone's values: a bot's flags (in order, later ones
+        winning; their bot-skill numbers land on the profile the bot plays at), then their own
+        settings. rules_ui.js ownOf() does the same."""
+        own = self.players.get(key, {})
+        entry = self.roster.get(key[2:]) if key.startswith("b:") else None
+        if not entry or not entry.get("flags"):
+            return own
+        merged = {}
+        for fid in entry["flags"]:
+            merged.update(self.flags.get(fid, {}).get("values", {}))
+        skill = own.get("BOT_SKILL", merged.get("BOT_SKILL", self.BOT_SKILL)).upper()
+        out = {}
+        for rule, value in merged.items():
+            if rule.startswith("BOT_NORMAL_"):
+                rule = f"BOT_{skill}_" + rule[len("BOT_NORMAL_"):]
+            if value != getattr(self, rule):
+                out[rule] = value
+        out.update(own)
+        return out
+
+    # ---- bots: the roster, flags and each team's lineup
+
+    @staticmethod
+    def builtin_bots(team):
+        """The built-in bots that fill a team's slots, in order: RED's Ace, Comet, Echo...; BLUE's
+        Blitz, Dash, Flick... (every other name). Their ids are their names in lower case."""
+        return [n.lower() for n in BOT_NAMES[team::2]]
+
+    def bot_name(self, bid):
+        """A bot's name in the game: a built-in one is "Bot Ace"; the host's own, the name they gave."""
+        entry = self.roster.get(bid) or {}
+        if entry.get("name"):
+            return entry["name"]
+        builtin = next((n for n in BOT_NAMES if n.lower() == bid), None)
+        return f"Bot {builtin}" if builtin else bid
+
+    def bot_exists(self, bid):
+        return bid in BUILTIN_IDS or bool((self.roster.get(bid) or {}).get("name"))
+
+    def _fit_lineup(self):
+        """Each team's lineup holds exactly BOTS_RED / BOTS_BLUE bots: fewer drops the last ones,
+        more brings in the next built-in bots nobody uses (the team's own first, then the other's)."""
+        lineup = [[b for b in team if self.bot_exists(b)] for team in self.lineup]
+        for t in (0, 1):
+            seen = set(lineup[1 - t]) if t == 1 else set()
+            lineup[t] = [b for i, b in enumerate(lineup[t]) if b not in seen and b not in lineup[t][:i]]
+        for t in (0, 1):
+            want = self.bots_for(t)
+            del lineup[t][want:]
+        for t in (0, 1):
+            want = self.bots_for(t)
+            used = set(lineup[0]) | set(lineup[1])
+            spare = [b for b in self.builtin_bots(t) + self.builtin_bots(1 - t) if b not in used]
+            lineup[t] += spare[:want - len(lineup[t])]
+        self.lineup = lineup
+
+    def _set_counts(self):
+        self.BOTS_RED, self.BOTS_BLUE = len(self.lineup[0]), len(self.lineup[1])
+
+    def bot_change(self, op):
+        """The host's edits to the bots (untrusted {"do": ..., ...}). Returns what changed (labels
+        for the messages), or []:
+        - add {team, bot?}: a bot joins a team (`bot`: which; without it, the next free built-in one);
+        - remove {bot}: it leaves its team;   - move {bot}: to the other team;
+        - make {name, team?}: a new bot of the host's own (joining `team` if given);
+        - edit {bot, name?, flags?}: rename the host's own bot, or set any bot's flags (a list);
+        - delete {bot}: one of the host's own bots, gone (its own settings too);
+        - flag {flag?, name, desc, values}: a new flag, or changes to one;  - unflag {flag}: delete it."""
+        if not isinstance(op, dict):
+            return []
+        do, bid = op.get("do"), op.get("bot")
+        bid = bid if isinstance(bid, str) and self.bot_exists(bid) else None
+        team = op.get("team") if op.get("team") in (0, 1) and not isinstance(op.get("team"), bool) else None
+        where = next((t for t in (0, 1) if bid in self.lineup[t]), None)
+        changed = []
+        if do == "add" and team is not None and len(self.lineup[team]) < C.BOTS_PER_TEAM_MAX:
+            if bid is None:
+                used = set(self.lineup[0]) | set(self.lineup[1])
+                bid = next((b for b in self.builtin_bots(team) + self.builtin_bots(1 - team) if b not in used), None)
+            if bid is not None and where != team:
+                if where is not None:
+                    self.lineup[where].remove(bid)
+                self.lineup[team].append(bid)
+                changed = [f"{TEAM_TITLES[team]} bots"]
+        elif do == "remove" and where is not None:
+            self.lineup[where].remove(bid)
+            changed = [f"{TEAM_TITLES[where]} bots"]
+        elif do == "move" and where is not None and len(self.lineup[1 - where]) < C.BOTS_PER_TEAM_MAX:
+            self.lineup[where].remove(bid)
+            self.lineup[1 - where].append(bid)
+            changed = ["RED bots", "BLUE bots"]
+        elif do == "make":
+            name = clean_name(op.get("name"))
+            if name and sum(b not in BUILTIN_IDS for b in self.roster) < C.BOT_ROSTER_MAX:
+                new = _new_id(name, set(self.roster) | BUILTIN_IDS)
+                self.roster[new] = {"name": name, "flags": []}
+                changed = [f"a new bot, {name}"]
+                if team is not None and len(self.lineup[team]) < C.BOTS_PER_TEAM_MAX:
+                    self.lineup[team].append(new)
+        elif do == "edit" and bid is not None:
+            entry = dict(self.roster.get(bid) or {"flags": []})
+            name = clean_name(op.get("name")) if isinstance(op.get("name"), str) else None
+            if name and bid not in BUILTIN_IDS and name != entry.get("name"):
+                entry["name"] = name
+                changed.append(f"{name}'s name")
+            if isinstance(op.get("flags"), list):
+                flags = list(dict.fromkeys(f for f in op["flags"] if isinstance(f, str) and f in self.flags))[:8]
+                if flags != entry.get("flags", []):
+                    entry["flags"] = flags
+                    changed.append(f"{self.bot_name(bid)}'s flags")
+            if changed:
+                if bid in BUILTIN_IDS and not entry.get("flags"):
+                    self.roster.pop(bid, None)          # a built-in bot back to plain: nothing to keep
+                else:
+                    self.roster[bid] = entry
+        elif do == "delete" and bid is not None and bid not in BUILTIN_IDS:
+            changed = [f"{self.bot_name(bid)} deleted"]
+            del self.roster[bid]
+            self.players.pop(f"b:{bid}", None)
+            for t in (0, 1):
+                if bid in self.lineup[t]:
+                    self.lineup[t].remove(bid)
+        elif do == "flag":
+            fid = op.get("flag") if isinstance(op.get("flag"), str) and op.get("flag") in self.flags else None
+            name = clean_name(op.get("name")) or (self.flags[fid]["name"] if fid else "")
+            if name and (fid or len(self.flags) < C.BOT_FLAG_MAX):
+                flag = {"name": name, "desc": str(op.get("desc") or "")[:200].strip(),
+                        "values": _flag_values(op.get("values"))}
+                fid = fid or _new_id(name, set(self.flags))
+                if flag != self.flags.get(fid):
+                    changed = [f"the flag {name}"]
+                    self.flags[fid] = flag
+        elif do == "unflag" and op.get("flag") in self.flags:
+            changed = [f"the flag {self.flags[op['flag']]['name']} deleted"]
+            del self.flags[op["flag"]]
+            for entry in self.roster.values():
+                if op["flag"] in entry.get("flags", []):
+                    entry["flags"] = [f for f in entry["flags"] if f != op["flag"]]
+            self.roster = {b: e for b, e in self.roster.items() if b not in BUILTIN_IDS or e.get("flags")}
+        if changed:
+            self._set_counts()
+            self._own.clear()
+        return changed
+
+    def bots_data(self):
+        """The bots as files and the browsers see them."""
+        return {"roster": {b: {"name": e.get("name"), "flags": list(e.get("flags", []))} for b, e in self.roster.items()},
+                "flags": {f: _copy_flag(v) for f, v in self.flags.items()},
+                "lineup": [list(t) for t in self.lineup]}
+
+    def set_bots(self, data):
+        """Replace the roster, the flags and the lineups (untrusted, from a file or saved_rules.json;
+        anything missing keeps the defaults: the built-in flags, no own bots, the counts' lineups)."""
+        if not isinstance(data, dict):
+            return
+        if isinstance(data.get("flags"), dict):
+            self.flags = {}
+            for fid, f in list(data["flags"].items())[:C.BOT_FLAG_MAX]:
+                if isinstance(fid, str) and BOT_ID.fullmatch(fid) and isinstance(f, dict) and clean_name(f.get("name")):
+                    self.flags[fid] = {"name": clean_name(f["name"]), "desc": str(f.get("desc") or "")[:200].strip(),
+                                       "values": _flag_values(f.get("values"))}
+        self.roster = {}
+        if isinstance(data.get("roster"), dict):
+            for bid, e in list(data["roster"].items())[:C.BOT_ROSTER_MAX + len(BUILTIN_IDS)]:
+                if not isinstance(bid, str) or not BOT_ID.fullmatch(bid) or not isinstance(e, dict):
+                    continue
+                flags = ([f for f in e.get("flags", []) if isinstance(f, str) and f in self.flags][:8]
+                         if isinstance(e.get("flags"), list) else [])
+                name = clean_name(e.get("name"))
+                if bid in BUILTIN_IDS and flags:
+                    self.roster[bid] = {"flags": flags}
+                elif bid not in BUILTIN_IDS and name:
+                    self.roster[bid] = {"name": name, "flags": flags}
+        if isinstance(data.get("lineup"), list) and len(data["lineup"]) == 2:
+            self.lineup = [[b for b in team if isinstance(b, str) and self.bot_exists(b)][:C.BOTS_PER_TEAM_MAX]
+                           if isinstance(team, list) else [] for team in data["lineup"]]
+            self._set_counts()
+        self._fit_lineup()
+        self._own.clear()
+
+    def replace(self, values, players, labels=None, bots=None):
+        """Become the set a file describes: its rules (any it leaves out go back to their default),
+        its players' own settings and its bots. Returns what changed: rule keys, then (key, rule)
+        pairs, then "bots" if the bots changed."""
+        before = self.copy()
+        self.__dict__.update(DEFAULTS)
+        self.roster, self.flags = {}, {fid: _copy_flag(f) for fid, f in C.BOT_FLAGS.items()}
+        self.lineup = [[], []]
+        self.update(values if isinstance(values, dict) else {})
+        self.set_players(players, labels)
+        self.set_bots(bots)
+        return (self.differences(before) + self.player_differences(before)
+                + (["bots"] if self.bots_differ(before) else []))
 
     def _fix(self, edited):
         v = self.__dict__
@@ -668,7 +982,11 @@ class Rules:
 
     def copy(self):
         twin = Rules(self.values())
-        twin.players = {name: dict(own) for name, own in self.players.items()}
+        twin.players = {key: dict(own) for key, own in self.players.items()}
+        twin.labels = dict(self.labels)
+        twin.roster = {b: {**e, "flags": list(e.get("flags", []))} for b, e in self.roster.items()}
+        twin.flags = {f: _copy_flag(v) for f, v in self.flags.items()}
+        twin.lineup = [list(t) for t in self.lineup]
         return twin
 
     def differences(self, other=None):
@@ -677,13 +995,17 @@ class Rules:
         return [k for k, v in self.values().items() if v != base[k]]
 
     def player_differences(self, other=None):
-        """(name, key) of each player's own setting that differs from `other`'s (default: none)."""
+        """(key, rule) of each player's own setting that differs from `other`'s (default: none)."""
         theirs = other.players if other is not None else {}
         out = []
-        for name in sorted(set(self.players) | set(theirs)):
-            mine, them = self.players.get(name, {}), theirs.get(name, {})
-            out += [(name, k) for k in sorted(set(mine) | set(them)) if mine.get(k) != them.get(k)]
+        for key in sorted(set(self.players) | set(theirs)):
+            mine, them = self.players.get(key, {}), theirs.get(key, {})
+            out += [(key, k) for k in sorted(set(mine) | set(them)) if mine.get(k) != them.get(k)]
         return out
+
+    def bots_differ(self, other):
+        """The roster, the flags or a team's bots differ from `other`'s."""
+        return self.bots_data() != other.bots_data()
 
     # ---- formulas shared by the game and the bots
 

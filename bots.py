@@ -40,7 +40,7 @@ def update(game, p, now, dt):
     prof = p.rules.bot_profile(p.rules.BOT_SKILL)     # its own skill, if the host gave it one
     threat = _defend(game, p, brain, prof, now)
     _throw(game, p, brain, prof, now, threat)
-    _walk(game, p, brain, now, dt)
+    _walk(game, p, brain, prof, now, dt)
     _revive(game, p, brain, now)
 
 
@@ -93,7 +93,7 @@ def _plan(game, p, brain, ball, prof, tti, now):
     actions = p.rules.actions
     if rng.random() > prof["react"]:
         return [None, 0.0, True]            # didn't react in time
-    if ball.speed < 20 and tti > 0.55 and rng.random() < 0.35 and not resting(game, p):
+    if ball.speed < 20 and tti > 0.55 and rng.random() < prof["sidestep"] and not resting(game, p):
         _sidestep(game, p, brain, ball, now)    # slow ball: just walk out of the way
         return [None, 0.0, True]
     mix = {"dodge": prof["mix_dodge"], "catch": prof["mix_catch"], "deflect": prof["mix_deflect"]}
@@ -157,7 +157,7 @@ def _throw(game, p, brain, prof, now, threat):
         return
     span = R.THROW_COST_MAX - R.THROW_COST_MIN
     spare = (p.stamina - R.BOT_STAMINA_RESERVE - R.THROW_COST_MIN) / span if span > 0 else 1.0
-    power = rng.uniform(0.15, 1.0) * min(1.0, spare)
+    power = rng.uniform(*sorted((prof["power_min"], prof["power_max"]))) * min(1.0, spare)
     game.start_charge(p, now, now)
     brain.release_at = now + power * R.CHARGE_TIME
     brain.throw_target = target.id
@@ -206,7 +206,7 @@ def _bank_point(game, p, target):
     return (p.x + (target.x - p.x) * f, game.rules.CHEST_HEIGHT, wall)
 
 
-def _walk(game, p, brain, now, dt):
+def _walk(game, p, brain, prof, now, dt):
     R = p.rules
     if p.action == "dodge" and now < p.action_start + R.DODGE_DASH_TIME:
         return                              # the dash is moving us
@@ -221,7 +221,9 @@ def _walk(game, p, brain, now, dt):
     side = -1.0 if p.team == 0 else 1.0
     goal = brain.goal
     if goal is None or now >= brain.goal_until or math.hypot(goal[0] - p.x, goal[1] - p.z) < 0.3:
-        goal = brain.goal = (side * rng.uniform(R.CENTER_GAP + 2.0, game.half_length - 1.5),
+        depth = _depth(rng.random(), prof["stance"])
+        near, far = R.CENTER_GAP + 2.0, game.half_length - 1.5
+        goal = brain.goal = (side * (near + (far - near) * depth),
                              rng.uniform(-game.half_width + 1.2, game.half_width - 1.2))
         brain.goal_until = now + rng.uniform(1.5, 4.0)
     speed = R.WALK_SPEED * 0.8
@@ -240,6 +242,13 @@ def _walk(game, p, brain, now, dt):
         look = min(enemies, key=lambda e: math.hypot(e.x - p.x, e.z - p.z), default=None)
     if look is not None:
         p.yaw = math.atan2(look.x - p.x, look.z - p.z)
+
+
+def _depth(u, stance):
+    """Where in its half a bot heads (0 at the front, 1 at the back) for a uniform random `u`: anywhere
+    at stance 0, squeezed towards the front (stance 1) or the back (-1)."""
+    squeeze = 1.0 - 0.8 * abs(stance)
+    return u * squeeze if stance > 0 else 1.0 - (1.0 - u) * squeeze
 
 
 def resting(game, p):

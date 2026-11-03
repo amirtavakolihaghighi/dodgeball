@@ -1,18 +1,22 @@
-// Settings files: the whole setup (every rule plus each player's own settings) or one player's
-// own settings (a profile, like "beginner", to put on anyone). Anyone can save them; the host
-// loads them, and the server checks every value like any other rule edit.
+// Settings files: the whole setup (every rule, each player's own settings, the bots and their
+// flags) or one player's own settings (a profile, like "beginner", to put on anyone). Anyone can
+// save them; the host loads them, and the server checks every value like any other rule edit.
+// Version 2 keys own settings by who players are (with the names they went by); version 1 files
+// went by name, and still load: the first person with that name takes them over.
 
-const VERSION = 1;
+const VERSION = 2;
 const MAX_BYTES = 1 << 20;      // a settings file is a few KB; anything this big isn't one
 
 const stamp = () => new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
 const fileSafe = (s) => s.replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '') || 'player';
 
-/** The whole setup as a file: every rule's value and each player's own settings. */
-export function setupFile(rules, players) {
+/** The whole setup as a file: every rule's value, each player's own settings (by key, with the
+ *  names they go by), and the bots: the host's own, the flags and each team's lineup. */
+export function setupFile(rules, players, labels = {}, bots = null) {
   return {
     dodgeball: 'settings', version: VERSION, saved: new Date().toISOString(),
-    rules: { ...rules }, players: JSON.parse(JSON.stringify(players ?? {})),
+    rules: { ...rules }, players: JSON.parse(JSON.stringify(players ?? {})), labels: { ...labels },
+    ...(bots ? { bots: JSON.parse(JSON.stringify(bots)) } : {}),
   };
 }
 
@@ -43,7 +47,9 @@ const ruleLike = (data, known) => Object.keys(data).some((k) => known.has(k));
 export function readSetup(text, known) {
   const data = parse(text);
   if (data.dodgeball === 'player') throw new Error("That's one player's own settings: load it from that player's ⚙ in the lobby");
-  if (data.rules && typeof data.rules === 'object') return { rules: data.rules, players: data.players ?? {} };
+  if (data.rules && typeof data.rules === 'object') {
+    return { rules: data.rules, players: data.players ?? {}, labels: data.labels ?? {}, bots: data.bots ?? null };
+  }
   if (ruleLike(data, known)) return { rules: data, players: {} };
   throw new Error("That file isn't a Dodgeball settings file");
 }

@@ -28,7 +28,8 @@ Fixes go into the next release; only the latest release is supported.
 - Traffic is **plain HTTP and WebSocket, not encrypted**. Anyone on the same network can read
   it: player names, inputs and the game state.
 - **Files it writes**, next to the app (or `server.py`):
-  - `saved_rules.json`: the host's game rules, and each player's own settings by player name;
+  - `saved_rules.json`: the host's game rules, the host's bots and flags, and each player's own
+    settings under their key (see below) with the name they last played under;
   - `logs/`: one folder per run (the 30 newest are kept) with the server's numbers and every
     browser's own log. These contain **player names, LAN IP addresses, browser and device
     details** (graphics card, CPU cores, screen size), and the host computer's CPU, memory, power,
@@ -47,8 +48,13 @@ Fixes go into the next release; only the latest release is supported.
   A modified browser can therefore **cheat** (move faster, for example). Fine among friends,
   not for strangers.
 - Player names are always shown as plain text, never as HTML.
-- **Export settings** saves a `.json` file in that browser's Downloads folder: every rule and the
-  own settings of players by name. **Import settings** (host only) sends such a file to the
+- **Who a player is:** each browser keeps a random code (`localStorage`) and sends it when it
+  joins. The server keeps a player's own settings and team under a short hash of that code (the
+  "key"), which is all the other players see. Over this unencrypted connection someone on the
+  network could read a code and pose as that player, taking their own settings; the code gives
+  no other power. Clearing the browser's site data makes a new code, and a new player.
+- **Export settings** saves a `.json` file in that browser's Downloads folder: every rule, the bots and
+  flags, and the own settings of players under their keys, with their names. **Import settings** (host only) sends such a file to the
   server, which checks every value like any rule edit: unknown rules are ignored, numbers are
   clamped to their range, and at most 64 players' settings are kept.
 

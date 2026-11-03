@@ -12,7 +12,8 @@ import { World, TEAM_COLORS } from './world.js';
 import { Hud, TEAM, TEAM_CLASS, regenLimit } from './hud.js';
 import { Sfx, KINDS, LEVELS } from './sfx.js';
 import { Lobby } from './lobby.js';
-import { RulesEditor } from './rules_ui.js';
+import { RulesEditor, formatValue } from './rules_ui.js';
+import { BotsPage } from './bots_ui.js';
 import { launchVelocity } from './physics.js';
 import { Diag } from './diag.js';
 import { Graphics, gpuInfo, LEVEL_NAMES } from './graphics.js';
@@ -56,10 +57,19 @@ net.onSnapshot = (now, late) => diag.snapshot(now, late);
 net.onStale = (n) => diag.count('stale', n);
 net.onReanchor = (ms) => diag.log('clock', { shift: Math.round(ms) });     // every update arrived late: re-anchored
 const editor = new RulesEditor(net, () => net.latest?.r.s);
+const botsPage = new BotsPage(net, {
+  openPlayer: (who) => editor.openFor(who),
+  openFlag: (id, name) => editor.openFlag(id, name),
+  describe: (rule, value) => {      // "Reacts to 1.00×": a flag's value as the editor shows it
+    const p = editor.params.get(rule);
+    return p ? `${p.label} ${formatValue(p, value)}` : rule;
+  },
+});
 const lobby = new Lobby(net, {
   onStart: () => { sfx.unlock(); input.lock(); },     // the host's click starts the match and enters it
   openRules: () => editor.open(),
   openPlayer: (who) => editor.openFor(who),          // one player's (or bot's) own settings
+  openBots: () => botsPage.open(),
   exportSettings, importSettings,
 });
 editor.onMessage = (text, cls) => hud.popup(text, cls);
@@ -88,6 +98,8 @@ addEventListener('resize', () => graphics.apply());     // also catches a move t
 if (gpu.software) {
   for (const id of ['gpuWarn', 'gpuWarnJoin']) $(id).hidden = false;
 }
+// Auto tries a sharper level only between rounds: if it's too much, that shows before the next one.
+graphics.calm = () => !['count', 'play'].includes(net.latest?.r?.s);
 graphics.onChange = (from, to, why) => {
   diag.log('gfx', { from, to, why, fps: graphics.fps === null ? null : round(graphics.fps, 1) });
   $('gfxNote').textContent = graphics.describe();
@@ -97,11 +109,14 @@ graphics.onChange = (from, to, why) => {
 let cfg = null;
 let isHost = false;
 // The lobby's rules from the server, live and waiting for the next round, and each player's own settings.
-const rules = { defaults: null, active: null, next: null, rv: -1, players: {}, nextPlayers: null };
+const rules = { defaults: null, active: null, next: null, rv: -1, players: {}, nextPlayers: null, labels: {}, bots: null, nextBots: null };
 let lastSync = 0;
 let myId = null;
 let myTeam = 0;
 let myName = '';
+let myKey = null;           // who I am to the server: own settings and my team go by it, not my name
+let shownName = null;       // the name the HUD and the tab's title show
+const NAME_LENGTH = 32;     // the longest name: rules.py NAME_LENGTH
 let me = null;          // my entry in the newest snapshot
 let view = null;        // the interpolated world on screen
 let viewTime = 0;
@@ -126,6 +141,19 @@ const watching = () => me?.team === -1;
 
 world.buildCourt(13, 7, 1);
 if (!params.has('nowarm')) world.warmUp();     // every effect's shader built now, not mid-match (?nowarm: for tests)
+// For the session log: how long the game took to load (from opening the page to the hall and the
+// athletes in place) and how much came over the network. Files from the browser's cache weigh 0.
+world.loading.then(() => {
+  const files = performance.getEntriesByType('resource');
+  const page = performance.getEntriesByType('navigation')[0];
+  const bytes = files.reduce((sum, f) => sum + (f.transferSize || 0), page?.transferSize || 0);
+  const slowest = files.reduce((a, f) => (f.duration > (a?.duration ?? 0) ? f : a), null);
+  diag.log('load', {
+    ms: Math.round(performance.now()), kb: Math.round(bytes / 1024), files: files.length + 1,
+    cached: files.filter((f) => f.transferSize === 0 && f.decodedBodySize > 0).length,
+    slowest: slowest ? [slowest.name.split('/').pop().split('?')[0], Math.round(slowest.duration)] : null,
+  });
+});
 
 // ------------------------------------------------------------------ join & menu
 
@@ -136,16 +164,36 @@ $('playBtn').addEventListener('click', join);
 $('nameInput').addEventListener('keydown', (e) => e.key === 'Enter' && join());
 if (saved?.joined) join();     // a reloaded tab rejoins under the same name (sessionStorage is per tab); the server gives back its team
 
-function join() {
-  myName = $('nameInput').value.trim().slice(0, 16) || 'Player';
+/** Who this player is to the server: a secret code the browser keeps, so own settings and the team
+ *  follow the player through reloads and renames, and nobody gets them by taking their name. A tab
+ *  keeps the code it played under; a new tab starts from the browser's own, and the server gives a
+ *  second tab playing at the same time a code of its own (testing alone with tabs). */
+function whoCode() {
+  let code = null;
+  try {
+    code = sessionStorage.getItem('dp.who') || localStorage.getItem('dp.who');
+    if (!code) {
+      code = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem('dp.who', code);
+    }
+  } catch { /* storage off: the server makes one up for this visit */ }
+  return code;
+}
+
+function rememberJoin() {
   try {
     sessionStorage.setItem('dp.join', JSON.stringify({ name: myName, joined: true }));
   } catch { /* ignore */ }
+}
+
+function join() {
+  myName = $('nameInput').value.trim().slice(0, NAME_LENGTH) || 'Player';
+  rememberJoin();
   $('join').hidden = true;
   sfx.unlock();
   diag.name = myName;
   // ?guest: join without host powers (to see what others see); ?host=KEY: the console's host link
-  const extra = { tab: diag.tab, run: diag.run };
+  const extra = { tab: diag.tab, run: diag.run, who: whoCode() };
   if (params.has('guest')) extra.guest = true;
   if (params.get('host')) extra.hostKey = params.get('host');
   net.connect(myName, extra);
@@ -161,25 +209,35 @@ function applyRules(m) {
   rules.rv = m.rv;
   rules.players = m.players ?? {};
   rules.nextPlayers = m.nextPlayers ?? null;
+  rules.labels = m.labels ?? {};
+  rules.bots = m.bots ?? null;
+  rules.nextBots = m.nextBots ?? null;
   net.interpDelay = cfg.interpDelay;
   net.gravity = cfg.gravity;
   world.setBallRadius(cfg.ballRadius);
   courtKey = '';          // the centre strip may have changed: redraw the court
-  editor.setServer(m.rules, m.next, rules.players, rules.nextPlayers);
+  editor.setServer(m.rules, m.next, rules.players, rules.nextPlayers, rules.bots, rules.nextBots);
+  botsPage.setServer(rules.bots, rules.nextBots);
   lobby.dirty();
 }
 
-/** A rule's value for one player: their own setting, or everyone's. */
-const ownValue = (name, key) => rules.players[name]?.[key] ?? rules.active[key];
+/** A rule's value for one player (`who`: their key): their own setting, or everyone's. */
+const ownValue = (who, key) => rules.players[who]?.[key] ?? rules.active[key];
 /** The colour of a player's balls (p: a snapshot player). */
-const ballColorOf = (p) => (p && p.team >= 0 ? ownValue(p.name, BALL_COLOR_KEYS[p.team][p.bot ? 1 : 0]) : null);
+const ballColorOf = (p) => (p && p.team >= 0 ? ownValue(p.k, BALL_COLOR_KEYS[p.team][p.bot ? 1 : 0]) : null);
 
 net.on('welcome', (m) => {
   myId = m.id;
+  myKey = m.key;
   isHost = m.host;
+  try {
+    if (m.who) sessionStorage.setItem('dp.who', m.who);     // the code this tab plays under, across reloads
+  } catch { /* ignore */ }
+  if (document.activeElement !== $('renameInput')) $('renameInput').value = myName;
   rules.defaults = m.defaults;
   editor.setup(m.schema, m.defaults, isHost);
   lobby.setHost(isHost, m.cfg.botsMax);
+  botsPage.setHost(isHost);
   if (isHost) graphics.setCeiling('medium');      // this computer also runs the server
   $('gfxNote').textContent = graphics.describe();
   applyRules(m);
@@ -217,6 +275,18 @@ net.on('close', () => {
   document.exitPointerLock?.();
 });
 $('reconnectBtn').addEventListener('click', () => location.reload());
+
+// Your name, changed from the menu (Your settings): you stay who you are, with your team, score and own settings.
+function rename() {
+  const name = $('renameInput').value.trim().slice(0, NAME_LENGTH);
+  if (!name) $('renameInput').value = myName;
+  else if (name !== myName) net.send({ t: 'rename', name });
+}
+$('renameBtn').addEventListener('click', rename);
+$('renameInput').addEventListener('keydown', (e) => {
+  e.stopPropagation();          // typing a name isn't playing
+  if (e.key === 'Enter') rename();
+});
 
 function showMenu() {
   $('overlay').hidden = false;
@@ -317,7 +387,8 @@ async function downloadAllLogs() {
 function exportSettings() {
   if (!rules.active) return;
   const name = settingsFile.setupFileName();
-  settingsFile.download(name, settingsFile.setupFile(rules.next ?? rules.active, rules.nextPlayers ?? rules.players));
+  settingsFile.download(name, settingsFile.setupFile(rules.next ?? rules.active, rules.nextPlayers ?? rules.players,
+    rules.labels, rules.nextBots ?? rules.bots));
   hud.popup(`Settings saved to your Downloads folder: ${name}`, 'good');
 }
 
@@ -542,9 +613,10 @@ function syncSelf() {
     local.stillX = me.x;
     local.stillZ = me.z;
   }
-  if (me.team !== myTeam || !document.title.startsWith(myName)) {
+  if (me.team !== myTeam || shownName !== myName) {
     if (me.team === -1 && myTeam !== -1) startSpectating();
     myTeam = me.team;
+    shownName = myName;
     hud.setIdentity(myName, myTeam);
     document.title = `${myName} · ${TEAM[myTeam] ?? 'SPECTATING'} | Dodgeball`;
   }
@@ -1073,6 +1145,15 @@ function onEvent(e) {
     case 'leave':
       hud.feed([[e.name], [' left']]);
       break;
+    case 'rename':
+      if (mine) {
+        myName = e.name;
+        diag.name = myName;
+        rememberJoin();         // a reload rejoins under the new name
+        if (document.activeElement !== $('renameInput')) $('renameInput').value = myName;
+        hud.popup(`You're ${myName} now`, 'good');
+      } else hud.feed([[e.was], [' is now '], who(e.p)]);
+      break;
     case 'team':     // the host moved someone
       if (e.cancel) {
         if (mine) hud.popup('Your team change was cancelled', 'dim');
@@ -1348,7 +1429,7 @@ requestAnimationFrame(frame);
 // Handle for automated tests and console poking.
 window.dp = {
   net, input, local, aim, world, lobby, editor, rules, diag, graphics, camFx, sfx, placeCamera, computeAim, showMenu, spec, followNext,
-  exportSettings, importSetupText, settingsFile, ownValue, ballColorOf,
-  get hostView() { return hostView; },
+  exportSettings, importSetupText, settingsFile, ownValue, ballColorOf, botsPage,
+  get hostView() { return hostView; }, get myKey() { return myKey; }, get myName() { return myName; },
   get me() { return me; }, get threat() { return threat; }, get view() { return view; }, get cfg() { return cfg; }, get isHost() { return isHost; },
 };

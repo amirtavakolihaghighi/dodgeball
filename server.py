@@ -75,6 +75,8 @@ class Client:
         self.queue: asyncio.Queue[str] = asyncio.Queue(maxsize=8)
         self.pid: int | None = None
         self.name = ""
+        self.key = ""           # who the player is (rules.identity_key): own settings, the team
+        self.tab = ""           # the browser tab (the same across its reloads)
         self.dropped = 0        # for the session log: messages dropped, longest queue, slowest send
         self.q_max = 0
         self.send_max = 0.0
@@ -154,6 +156,31 @@ def say(text):
                            "wall": diag.wall_ms()})
 
 
+def note_error(where: str, exc: BaseException | None = None, harmless: bool = False):
+    """Keep an error in the session log too, so it can be read even without the console's text."""
+    if session_log:
+        text = f"{type(exc).__name__}: {exc}" if exc else where
+        session_log.write({"ty": "error", "st": round(time.perf_counter(), 3), "wall": diag.wall_ms(), "where": where,
+                           "error": text[:300], "harmless": harmless})
+
+
+# A browser that drops its connection without closing it (a laptop lid shut, Wi-Fi lost, a tab
+# killed) makes Windows' asyncio complain while it closes a socket that's already gone.
+DROPPED = (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)
+
+
+def loop_error(loop, context):
+    """asyncio's handler for errors nothing else caught: a dropped connection is only noted in the
+    session log (the console used to show a frightening traceback for it); anything else is printed
+    as usual and logged."""
+    exc = context.get("exception")
+    if isinstance(exc, DROPPED):
+        note_error("a browser's connection dropped", exc, harmless=True)
+        return
+    note_error(str(context.get("message") or "asyncio"), exc)
+    loop.default_exception_handler(context)
+
+
 def version_info() -> dict:
     """Which code this is: the packaged app's build info, or git's description of the source."""
     if FROZEN:
@@ -173,26 +200,28 @@ def may_download_logs(ip: str | None, key: str | None) -> bool:
     return is_this_computer(ip) or (bool(key) and key == HOST_KEY)
 
 
-def client_config(name: str | None = None) -> dict:
+def client_config(key: str | None = None) -> dict:
     """Rules the browser needs for its HUD and its own movement (the server stays in charge):
     the ones its player plays by, with their own settings."""
-    mine = game.rules.for_player(name) if name else game.rules
+    mine = game.rules.for_player(key) if key else game.rules
     return {**mine.for_client(), "joinUrls": [f"http://{ip}:{port}" for ip in own_ips]}
 
 
-def rules_message(name: str | None = None) -> dict:
-    """The lobby's rules and every player's own settings (live, and waiting for the next round),
-    plus `cfg`: the numbers this browser's player plays by."""
+def rules_message(key: str | None = None) -> dict:
+    """The lobby's rules, every player's own settings (by key, with the names they go by) and the
+    bots (live, and waiting for the next round), plus `cfg`: the numbers this browser's player
+    plays by."""
     nxt = game.next_rules
-    return {"t": "rules", "cfg": client_config(name), "rules": game.rules.values(), "players": game.rules.players,
+    return {"t": "rules", "cfg": client_config(key), "rules": game.rules.values(), "players": game.rules.players,
+            "labels": {**game.rules.labels, **(nxt.labels if nxt is not None else {})}, "bots": game.rules.bots_data(),
             "next": nxt.values() if nxt is not None else None, "nextPlayers": nxt.players if nxt is not None else None,
-            "rv": game.rules_version}
+            "nextBots": nxt.bots_data() if nxt is not None else None, "rv": game.rules_version}
 
 
 def send_rules():
     """Everyone gets the changed rules, each with their own `cfg`."""
     for client in list(clients.values()):
-        client.send(dumps(rules_message(client.name)))
+        client.send(dumps(rules_message(client.key)))
 
 
 def clean_host_view(msg: dict) -> dict:
@@ -203,7 +232,8 @@ def clean_host_view(msg: dict) -> dict:
     out = {"t": "hostview", "m": msg.get("m") if msg.get("m") in HOST_VIEWS else "game"}
     pl = msg.get("pl")
     if isinstance(pl, dict) and isinstance(pl.get("n"), str) and rules_mod.clean_name(pl["n"]):
-        out["pl"] = {"n": rules_mod.clean_name(pl["n"]), "t": 1 if pl.get("t") == 1 else 0, "b": pl.get("b") is True}
+        out["pl"] = {"n": rules_mod.clean_name(pl["n"]), "k": rules_mod.clean_key(pl.get("k") or pl["n"]),
+                     "t": 1 if pl.get("t") == 1 else 0, "b": pl.get("b") is True}
     if msg.get("g") in GROUP_IDS:
         out["g"] = msg["g"]
     if isinstance(msg.get("q"), str):
@@ -241,7 +271,7 @@ def load_saved_rules():
     if not isinstance(saved, dict):
         return
     if isinstance(saved.get("rules"), dict):
-        game.rules = rules_mod.Rules(saved["rules"], saved.get("players"))
+        game.rules = rules_mod.Rules(saved["rules"], saved.get("players"), saved.get("labels"), saved.get("bots"))
     else:
         game.rules = rules_mod.Rules(saved)
     changed, own = game.rules.differences(), len(game.rules.players)
@@ -258,8 +288,8 @@ def save_current_rules():
     if not save_rules:
         return None
     wanted = game.next_rules or game.rules
-    data = {"rules": {k: v for k, v in wanted.values().items() if v != rules_mod.DEFAULTS[k]},
-            "players": wanted.players}
+    data = {"version": 2, "rules": {k: v for k, v in wanted.values().items() if v != rules_mod.DEFAULTS[k]},
+            "players": wanted.players, "labels": wanted.labels, "bots": wanted.bots_data()}
     path = RULES_FILE
 
     def write():
@@ -300,14 +330,16 @@ async def game_loop():
                 if snap:
                     stats.events(snap["e"], now, game)
                 stats.tick(now, game, clients)
-        except Exception:
+        except Exception as e:
             traceback.print_exc()   # keep the match running; a bug shows up in the console
+            note_error("the game loop", e)
         last = now
         await asyncio.sleep(max(0.0, tick - (time.perf_counter() - now)))
 
 
 @contextlib.asynccontextmanager
 async def lifespan(_app):
+    asyncio.get_running_loop().set_exception_handler(loop_error)
     task = asyncio.create_task(game_loop())
     yield
     task.cancel()
@@ -362,17 +394,20 @@ async def play(ws: WebSocket):
             if kind == "ping":
                 client.send(dumps({"t": "pong", "c": msg.get("c"), "st": round(now, 4)}))
             elif kind == "sync":    # the browser noticed it missed a rules update
-                client.send(dumps(rules_message(client.name)))
+                client.send(dumps(rules_message(client.key)))
             elif kind == "join" and client.pid is None:
                 ip = ws.client.host if ws.client else None
                 host = (is_this_computer(ip) and msg.get("guest") is not True) or msg.get("hostKey") == HOST_KEY
-                p = game.add_player(msg.get("name"), None, now, host=host)
+                client.tab = str(msg.get("tab", ""))[:24]
+                code = identity(msg.get("who"), client.tab)
+                client.key = rules_mod.identity_key(code)
+                p = game.add_player(msg.get("name"), None, now, host=host, key=client.key)
                 client.pid, client.name = p.id, p.name
                 clients[p.id] = client
                 extra = {"logDir": str(session_log.dir)} if host and session_log else {}
-                client.send(dumps({**rules_message(p.name), "t": "welcome", "id": p.id, "host": host,
-                                   "defaults": rules_mod.DEFAULTS, "schema": SCHEMA, "logging": session_log is not None,
-                                   "version": VERSION, **extra}))
+                client.send(dumps({**rules_message(client.key), "t": "welcome", "id": p.id, "host": host, "who": code,
+                                   "key": client.key, "defaults": rules_mod.DEFAULTS, "schema": SCHEMA,
+                                   "logging": session_log is not None, "version": VERSION, **extra}))
                 if host_view and not host:
                     client.send(dumps(host_view))
                 if session_log:
@@ -395,8 +430,16 @@ async def play(ws: WebSocket):
                     stats.message(client.pid, msg, now, game)
                 try:
                     game.handle(client.pid, msg, now)
-                except Exception:
+                except Exception as e:
                     traceback.print_exc()
+                    note_error(f"a '{str(msg.get('t'))[:20]}' message", e)
+                p = game.players.get(client.pid)
+                if p is not None and p.name != client.name:     # they renamed themselves
+                    say(f"  ~ {client.name} is now {p.name}")
+                    if session_log:
+                        session_log.write({"ty": "rename", "st": round(now, 3), "wall": diag.wall_ms(), "p": p.id,
+                                           "was": client.name, "name": p.name})
+                    client.name = p.name
     except WebSocketDisconnect as e:
         closed_code = e.code
     finally:
@@ -412,6 +455,43 @@ async def play(ws: WebSocket):
             game.remove_player(client.pid, time.perf_counter())
             if p is not None and p.host and host_view and not any(q.host for q in game.players.values()):
                 share_host_view(None)
+
+
+def identity(code, tab: str) -> str:
+    """The secret code this tab plays under. Normally the one its browser keeps, so a player is the
+    same person after a reload, a dropped connection or a rename, and keeps their own settings and
+    their team. Another tab of the same browser that's already playing gets a code of its own
+    (testing alone with several tabs); the same tab again (a reload, or back after Wi-Fi dropped)
+    takes over from its old connection."""
+    code = code if isinstance(code, str) and 16 <= len(code) <= 64 else secrets.token_urlsafe(16)
+    key = rules_mod.identity_key(code)
+    for other in list(clients.values()):
+        if other.key != key:
+            continue
+        if other.tab != tab or not tab:
+            return identity(None, tab)
+        retire(other)
+    return code
+
+
+def retire(client: Client):
+    """An older connection of a tab that has connected again: its player leaves now, and the old
+    socket closes in the background (it may be dead already)."""
+    if client.pid is not None:
+        clients.pop(client.pid, None)
+        p = game.players.get(client.pid)
+        if session_log:
+            session_log.write({"ty": "leave", "st": round(time.perf_counter(), 3), "wall": diag.wall_ms(), "p": client.pid,
+                               "name": client.name, "code": "replaced"})
+        if p is not None:
+            say(f"  - {p.name} left (reconnected)")
+        game.remove_player(client.pid, time.perf_counter())
+        client.pid = None
+
+    async def close():
+        with contextlib.suppress(Exception):
+            await client.ws.close(code=4001)
+    asyncio.get_running_loop().create_task(close())
 
 
 def first_free_port(host, preferred, tries=20):

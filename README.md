@@ -15,19 +15,27 @@ and cost more stamina. When a ball comes at you, press at the last moment to **d
 **catch** it, or **deflect** it straight back. A deflected ball gets faster every time, so
 rallies get frantic, and because stamina limits everything, mashing buttons gets you hit.
 
-![Over-the-shoulder view of a red stick figure holding a yellow ball, with two red teammates nearby. Across the court the blue team throws back, and an orange ring around the crosshair counts down to a ball arriving. The feed at the top left reads "Bot Dash hit Bot Comet 31 m/s, 41 dmg".](docs/images/gameplay.png)
+![Over-the-shoulder view of a red-team athlete holding an orange ball in a sunlit sports hall: tall windows on the left throw stripes of sun across the red court, crowds fill the stands on both sides, and green hills show through the far windows. Two red teammates run ahead; across the centre line the blue team, Bot Dash, Sam and Alex, gets ready to throw. The feed at the top left reads "Bot Blitz hit Bot Comet 21 m/s, 26 dmg ricochet!".](docs/images/gameplay.jpg)
 
 ## What's in it
 
-- **Real-time 3D in the browser:** an over-the-shoulder camera and stick figures. Throws arc a
-  little, bend gently toward the player you aim at, and can bank off the floor or a side wall.
+- **Real-time 3D in the browser:** athletes in a sunlit sports hall, with a crowd that cheers,
+  seen over your shoulder. Throws arc a little, bend gently toward the player you aim at, and can
+  bank off the floor or a side wall. The athletes run, throw three ways, parry, catch, dash and
+  flip, and every hit lands with a jolt, a flash and a sound from where it happened.
+- **Smooth on ordinary laptops:** a graphics setting lowers itself when a laptop can't keep up. On
+  an office's laptops it kept 60 frames a second on all but the oldest, the older ones at Medium
+  or Low.
 - **Bots** on either team, in three skill levels, so you can play alone or fill out a small group.
+  The host can also make bots of their own with a name and **flags**: bundles of behaviour such as
+  *Dodge master* or *Berserker*, ready-made or the host's own.
 - **The host runs the show.** The game starts in a lobby where the host sets up the teams and the
-  bots and can change every number in the game (152 of them, from throw speed to the dodge
-  window). Each comes with a plain description and an animated preview of what the change does.
-  Everyone else sees what the host is doing, live.
+  bots and can change every number in the game (164 of them, from throw speed to the dodge
+  window), with a search across them all. Each comes with a plain description and an animated
+  preview of what the change does. Everyone else sees what the host is doing, live.
 - **Settings for one player:** give a beginner more health and a wider catch window, or one bot
-  hard skill, without changing anyone else. Save the whole setup to a file and load it next time.
+  hard skill, without changing anyone else. They follow the player, not the name, so two people
+  can both be "Sam". Save the whole setup to a file and load it next time.
 - **Team health, if you like:** one shared health bar per team instead of everyone's own; the
   whole team falls together, and cash buys health for the bar.
 - **Health regeneration, if you like:** health (or the team's bar) comes back by itself after a
@@ -51,8 +59,9 @@ rallies get frantic, and because stamina limits everything, mashing buttons gets
    isn't signed by a publisher: click **More info**, then **Run anyway**.
 3. A window opens with the addresses to share, and the game opens in your browser. You're the host.
 4. Everyone else on the same Wi-Fi opens the `http://192.168.x.x:8000` address shown in that
-   window. The game is made and tested with Chrome; other desktop browsers may work but aren't
-   tested.
+   window. The first time, each browser loads about 7 MB from the host (the hall, the athletes and
+   the sounds). The game is made and tested with Chrome; other desktop browsers may work but
+   aren't tested.
 
 If the others can't connect, it's almost always Windows Firewall. Don't turn it off: double-click
 **`Allow friends to connect.bat`** (next to the exe) once instead. It lets computers on your local
@@ -90,7 +99,7 @@ time. On macOS and Linux, use `python3` if `python` isn't found. `--port 8080` p
    for it instead.
 
 <p align="center">
-  <img src="docs/images/lobby.png" width="49%" alt="The lobby as the host sees it: RED has the host, Alex, and two bots; BLUE has three bots. Each team has its own plus and minus buttons for bots. Next to them are the bot skill, the match length set to first to 3, the Game rules button, and the controls.">
+  <img src="docs/images/lobby.png" width="49%" alt="The lobby as the host, Robin, sees it: RED has Robin and two bots; BLUE has Sam, two bots and Alex, a bot the host made, tagged with its flags Dodge master and Berserker. Each team has its own plus and minus buttons and an Add a bot list. Next to them are the bot skill, the match length set to first to 3, the Game rules and Bots and flags buttons, and below, Your name with a Change button.">
   <img src="docs/images/rules-editor.png" width="49%" alt="The Game rules editor open on Ricochets. Two animated top-down previews sit side by side, the default and the host's unapplied edit, each showing a ball bouncing off a side wall and curving toward an enemy, less in the edit. Below are sliders for bounces per throw and bounce-off speed.">
 </p>
 
@@ -112,8 +121,9 @@ You need a keyboard and mouse: there are no touch controls yet.
 ### Playing alone
 
 - Add bots to both teams in the lobby (0–12 each, three skill levels).
-- Open a second browser window and join with another name to play both sides. Every tab on the
-  host's computer is a host; add `?guest` to the address to see what other players see.
+- Open a second browser window and join to play both sides (each tab is a player of its own,
+  whatever its name). Every tab on the host's computer is a host; add `?guest` to the address to
+  see what other players see.
 - Add `?lag=120` to the address to feel a 120 ms connection, and `&jitter=150` for uneven Wi-Fi.
 
 ## Safety and privacy
@@ -125,11 +135,16 @@ You need a keyboard and mouse: there are no touch controls yet.
   host's controls. Don't share it.
 - **Nothing goes to the internet.** The game makes no internet connections, and three.js is
   bundled with it.
-- **What it writes to disk**, next to the app: the host's rules and each player's own settings,
-  by player name (`saved_rules.json`), and session logs (`logs/`, the 30 newest sessions). The
-  logs contain player names, LAN addresses and device details (browser, graphics card, screen)
-  and stay on the host's computer unless you send them to someone. `--no-log` turns logging off.
-  An exported settings file holds the rules and the names of players with their own settings.
+- **What it writes to disk**, next to the app: the host's rules, the host's bots and flags, and
+  each player's own settings with the name they last played under (`saved_rules.json`), and
+  session logs (`logs/`, the 30 newest sessions). The logs contain player names, LAN addresses and
+  device details (browser, graphics card, screen) and stay on the host's computer unless you send
+  them to someone. `--no-log` turns logging off. An exported settings file holds the rules, the
+  bots and the names of players with their own settings.
+- **What each browser keeps:** your settings (volume, graphics...) and a random code that tells
+  the game you're the same player next time, so your own settings follow you. The host's computer
+  sees only a scrambled form of the code; clearing the browser's site data makes you a new
+  player.
 - **Each browser moves its own player** within the court's limits, so a player could cheat by
   editing their browser's code. It's a game for friends, not strangers.
 
@@ -143,6 +158,9 @@ The full threat model, and how to report a vulnerability privately, is in [SECUR
   architecture and the network protocol.
 - [docs/LAG_ANALYSIS.md](docs/LAG_ANALYSIS.md): what the office sessions' logs showed about lag,
   and what was done about it.
+- [docs/LOOK_AND_FEEL.md](docs/LOOK_AND_FEEL.md): how the hall, the athletes, the effects and the
+  sound were made (in Blender, from CC0 sources), and [docs/ANIMATIONS.md](docs/ANIMATIONS.md):
+  every move the athletes make.
 - [CONTRIBUTING.md](CONTRIBUTING.md): setting up, running the tests, the conventions.
 - [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md) and
   [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
@@ -151,5 +169,5 @@ The full threat model, and how to report a vulnerability privately, is in [SECUR
 
 ## Licence
 
-[MIT](LICENSE). The bundled three.js is MIT-licensed too; see
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[MIT](LICENSE). The bundled three.js is MIT-licensed too, and the recordings, music and motion
+the game uses are CC0; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

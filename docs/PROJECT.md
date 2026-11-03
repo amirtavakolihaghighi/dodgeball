@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it; then the look-and-feel cycle (graphics, juice and sound, with the art made in Blender), on the branch `look-and-feel`).
+Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it; then the look-and-feel cycle (graphics, juice and sound, with the art made in Blender), on the branch `look-and-feel`; on that branch also the office logs of 31 Oct to 2 Nov and a batch of lobby requests: longer names, players known by who they are rather than their name, renaming, a search across every tab, and bots with flags; all of it merged into `main` on 2026-11-03 and released as v2.3.0, with the athletes' animations and the HUD left on `main`'s task list).
 
 ## Contents
 
@@ -36,7 +36,7 @@ Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules edito
 - **Elimination:** 0 HP knocks you out, and teammates can spend cash to revive you.
 - **Hosting:** one PC runs the game server (Python, or the packaged `Dodgeball.exe`). Everyone on the same Wi-Fi opens a web page.
 - **The lobby:** the server starts in a lobby. The host, who plays in the browser on that PC, sets up the teams, the bots and **every rule of the game**, then starts the match. Others can join at any time, but only the host changes anything. Changes made during a match apply from the next round.
-- **The rules editor:** each of the 152 numbers has a name, a description and an animated preview that runs the default next to the lobby's value.
+- **The rules editor:** each of the 164 numbers has a name, a description and an animated preview that runs the default next to the lobby's value.
 - **One player's own settings:** the host can give any person or bot their own values for the rules about a player (health, throws, defences, a bot's skill...). The whole setup saves to a file and loads back.
 - **Team health (optional):** one shared health bar per team; the whole team falls together, and cash buys health for it.
 - **Looks:** an over-the-shoulder, Fortnite-style camera, with stick figures for characters, and each team's balls in its own colours.
@@ -50,7 +50,7 @@ Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules edito
   - Python 3.14 (python.org install).
   - Node 24, Chrome and Edge, uv, git, GitHub CLI.
   - Edited in VS Code with Claude Code (PowerShell, with Git Bash also available).
-  - **Git:** the folder is a git repository, published as the **public** GitHub repo `amirtavakolihaghighi/dodgeball` (MIT) with a history rebuilt for publishing (phase 9). The original history is gone: the user deleted the old private repo `dodge-and-parry`, and every local backup of it was deleted too. `main` holds the releases, **v1.0.0**, **v2.0.0**, **v2.1.0** and **v2.2.0** (tags, each with a GitHub release carrying the Windows zip built by GitHub Actions). Commits use GitHub's noreply address. Commit or push only when the user asks.
+  - **Git:** the folder is a git repository, published as the **public** GitHub repo `amirtavakolihaghighi/dodgeball` (MIT) with a history rebuilt for publishing (phase 9). The original history is gone: the user deleted the old private repo `dodge-and-parry`, and every local backup of it was deleted too. `main` holds the releases, **v1.0.0**, **v2.0.0**, **v2.1.0**, **v2.2.0** and **v2.3.0** (tags, each with a GitHub release carrying the Windows zip built by GitHub Actions). Commits use GitHub's noreply address. Commit or push only when the user asks.
   - The PC runs VPN/proxy tools, whose tunnel adapters show up in the join-address list.
 - **Wants simple but genuinely working prototypes.** They were burned by a ChatGPT prototype that looked polished but didn't work, with fake UI, mechanics that could never trigger and a broken renderer. No fake or decorative features: everything shown must work.
 - **Wants blunt, evidence-based judgment**, backed by screenshots, simulations and measurements, not opinion.
@@ -82,8 +82,8 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── MANUAL.md              the player and host guide: run, share, lobby, controls, every rule's default, logs
 │   ├── PROJECT.md             this document
 │   ├── LAG_ANALYSIS.md        cycle 2: measured causes of lag, options, what the office logs showed
-│   ├── LOOK_AND_FEEL.md       this branch: the look-and-feel plan, budgets, style samples, the log
-│   ├── ANIMATIONS.md          this branch: every animation and change of move, what it should look like, the tester's notes, its status
+│   ├── LOOK_AND_FEEL.md       the look-and-feel cycle: its plan, the budgets, the style samples, its log
+│   ├── ANIMATIONS.md          every animation and change of move, what it should look like, the tester's notes, its status (on hold: section 15)
 │   └── images\                the README's screenshots
 ├── run.bat                    start the server (creates/repairs .venv; opens the browser)
 ├── build_exe.bat              build the standalone Windows app -> dist\Dodgeball-windows.zip
@@ -107,6 +107,7 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── style.css
 │   ├── js\main.js             glue: join flow, rules, local player, camera, aim, preview, threat ring, events, HUD
 │   ├── js\lobby.js            the lobby / pause menu: teams, each team's bots, match settings, host controls, spectate
+│   ├── js\bots_ui.js          the Bots & flags page: the host's own bots, flags on any bot, the flags themselves
 │   ├── js\rules_ui.js         the rules editor (list, search, draft, apply, reset; following the host's screen; one player's own settings)
 │   ├── js\settings_file.js    settings files: the whole setup or one player's own settings, saved and read back
 │   ├── js\previews.js         the rules editor's animated previews (24 scenes, the game's own formulas)
@@ -128,8 +129,8 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── arena\                 the sports hall: hall.glb, its lightmaps, the sky, arena.json; built by art\arena.py
 │   └── vendor\                three.js 0.185.1: three.module.min.js + three.core.min.js; addons\: its glTF loader and two helpers
 ├── tests\
-│   ├── test_sim.py            69 rule tests: python tests\test_sim.py (or pytest)
-│   ├── test_server.py         7 server tests (lobby protocol, players' own settings and files, the host's screen, saved rules, session logs, the log report)
+│   ├── test_sim.py            74 rule tests: python tests\test_sim.py (or pytest)
+│   ├── test_server.py         9 server tests (lobby protocol, players' own settings and files, who a player is, the host's screen, saved rules, session logs, the log report, a dropped connection)
 │   └── browser\               headless-Chrome end-to-end tests (cdp.js driver + step files, freeze_server.py)
 ├── logs\                      (made at runtime) one folder of session logs per server run; the 30 newest are kept
 ├── saved_rules.json           (made at runtime) the host's rules and players' own settings, reloaded at the next start
@@ -687,7 +688,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
 
 ### Phase 15: the look and feel (2026-10-29)
 
-`main` has a short version of this phase. This branch, `look-and-feel`, has the full record. The working plan, the budgets and the log of what happened are in `docs/LOOK_AND_FEEL.md`.
+The full record of the look-and-feel cycle. It was developed on the branch `look-and-feel`, in its own folder, while `main` kept a short version of this phase; the branch was merged into `main` on 2026-11-03 and released as v2.3.0 (phase 16). The working plan, the budgets and the log of what happened are in `docs/LOOK_AND_FEEL.md`.
 
 **The question:** "If I was to perform a graphical overhaul to the whole game and polish it, make it juicy, to have better models, better animation and physics visualizations, better sound effects, better SFX and VFX (to summarize, make the game look and feel better, like a professionally made, distribution-ready AA video game), how much change should take place to the tech stack? Does the technology used make it possible for me? If so, with what cost? What can I expect the output to look like? Give examples of games with similar technology as a benchmark. How will it affect performance, network and processing?"
 
@@ -774,7 +775,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
 - **The rename:** the project renamed itself in September 2026, and the guide's `uvx blender-mcp` is now a stub that installs `mcp-for-blender`. The server is pinned to `mcp-for-blender==2.2.6`, which expects exactly the add-on's protocol (15), so an update can't silently break the match.
 - **Telemetry:** the add-on's "Allow Telemetry" (prompts, code, screenshots) is off by default. Without a switch, the server still sends anonymous usage events: a persistent random ID, tool names and timings. `DISABLE_TELEMETRY=true` turns that off.
 - **Safe mode** (`BLENDER_MCP_SAFE_MODE=1`): scripts sent through the MCP may only use `bpy`, `bmesh`, `mathutils` and pure-Python standard modules (`math` and `random` included), plus Blender's own import, export, render and save. No files, programs or network. It guards against text from downloaded assets steering Claude into harmful code.
-- **Where it's registered:** in Claude Code at user scope (every project), so it also works from this branch's folder.
+- **Where it's registered:** in Claude Code at user scope (every project), so it works from any folder of the project.
 - **Tested:**
   - the versions match;
   - Poly Haven is on and the generators are off;
@@ -787,7 +788,7 @@ This is the short version, kept on `main` while internet mode waits on its branc
   - connect one AI app to Blender at a time;
   - no API keys or "premium" are needed.
 
-**The branch** (decisions 117 and 122): `look-and-feel` starts from the `main` commit that put this phase's short version there. It's checked out as a git worktree in a folder next to the main one, so the main folder can stay on `main` or `internet-mode`. The user works on internet mode there.
+**The branch** (decisions 117 and 122): `look-and-feel` starts from the `main` commit that put this phase's short version there. It's checked out as a git worktree in a folder next to the main one, so the main folder can stay on `main` or `internet-mode`. The user works on internet mode there. (Merged into `main` on 2026-11-03, after which the worktree folder was removed: phase 16.)
 
 **How the art is made** (decisions 119, 120 and 123):
 
@@ -1106,14 +1107,89 @@ This is the short version, kept on `main` while internet mode waits on its branc
   - Committed as a checkpoint of step 8.
 - **On hold, not finished** (decision 143): the office logs and a batch of lobby requests come first. When the moves resume, the first job is the animation tool (the web tool: a viewer, then an editor), then the rest of `docs/ANIMATIONS.md`, one move at a time.
 
-**Next, in order:** the plan in `docs/LOOK_AND_FEEL.md`:
+**Where the plan ended** (`docs/LOOK_AND_FEEL.md`):
 
 1. Style samples (done: the sports hall; athletes with and without the helmet, picked at random).
 2. The performance items (done: D1, D2, B4, effects prepared in the lobby, the host's lower setting).
 3. Juice (done) and sound (the user's verdict: the dodge redone, voices, breathing and revive sounds added, the match music lower).
-4. The arena, the ball and effects, the characters (done), their moves (on hold since 2026-11-03, not finished: the animation tool comes first when they resume, decision 143; `docs/ANIMATIONS.md`; the step that matters most to the user), then the HUD.
-5. An office session.
-6. The merge into `main`, when the user says so.
+4. The arena, the ball and effects, the characters (done), their moves (on hold since 2026-11-03, not finished: the animation tool comes first when they resume, decision 143; `docs/ANIMATIONS.md`; the step that matters most to the user), then the HUD (not started). Both moved to `main`'s task list (section 15).
+5. An office session (done: 1 and 2 Nov, phase 16).
+6. The merge into `main` (done: 2026-11-03, v2.3.0, phase 16).
+
+### Phase 16: the office logs, and the lobby batch (2026-11-03)
+
+On the branch `look-and-feel`, just before its merge into `main`. The animations (step 8) went on hold first, not finished (decision 143).
+
+**The office logs.** Three sessions on 31 Oct ran `main` (stick figures); two days, 1 and 2 Nov, ran this branch (the hall, the athletes and their moves).
+
+- **The error in the server's window** (31 Oct, also seen in step 4 and never caught then): `ConnectionResetError: [WinError 10054]` in asyncio's `_ProactorBasePipeTransport._call_connection_lost`, printed when the host closed their tab after downloading the logs.
+  - Windows' asyncio closing a socket the browser had already cut. Harmless: nobody was affected and the session log shows no freeze.
+  - Fixed: the server's loop has its own error handler. A dropped connection is only noted in the session log; any other error is printed as before and noted too, and so are errors in the game loop and in a player's message. The report lists them under SERVER.
+- **What else the 31 Oct logs showed:**
+  - The host's saved rules had sidestep compensation off and the lockout at 0. With it off, each player was hit 27–79 times a session while their own screen showed them already clear, by up to 1.95 m. That's the setting doing what it says; the user was told what each Network setting does (with a story) and advised to switch it back on unless that was deliberate.
+  - Two people with the same name played at once, and both played by the own settings the host had given one of them: this phase's request (b).
+  - One Linux laptop's connection dropped 83 world updates; otherwise the same Wi-Fi delays as in `LAG_ANALYSIS.md`.
+- **Step 10's questions, on real laptops** (the look-and-feel build), frame rates during play (60 is the screens' limit):
+
+  | Graphics chip | `main` (stick figures) | the look-and-feel build |
+  | --- | --- | --- |
+  | AMD Radeon 780M | 60 | 60 at High |
+  | Intel UHD 630 (Windows and Linux) | 60 | 60–72 at High |
+  | Intel UHD 620 (Linux), HD 530 | 60 | 60 at Medium |
+  | Intel UHD (Comet Lake), a 4-core HD 530 | 60 | 60 at Low (about 55 at Medium) |
+  | The host's laptop (Intel UHD, Alder Lake) | 102 | 78 at Medium |
+  | Intel HD 4600 (2013, Linux, 4 cores) | 60 | 28 at High |
+
+  - Every laptop but one still reached 60, the older Intel chips at Medium or Low. The game's own code per frame went from about 2–3.5 ms to 3.5–6 ms (of the 16.7 ms a frame has at 60), so the graphics chip carries the new cost, which is what the levels are for.
+  - **Auto failed the HD 4600 laptop:** it tried Medium for 3 s, judged it no better (34 → 27 fps, a noisy measurement: over the session Medium did 39 against 30), went back to High and stopped trying. That player spent 22 minutes at 28 fps and never got Low; the next day they picked Medium themselves.
+  - **Auto see-sawed on borderline laptops:** it tried High again after 20 smooth seconds, twice a session, mostly mid-round (16 of its 27 step-downs happened during play), each failed try costing 3–5 s at 30–45 fps.
+  - **Loading:** every long stutter (0.3–1 s) came within 3 s of a browser opening the game (building the athletes and the hall), never mid-match, and nobody stuttered when someone else joined. How long the download took wasn't measured: a browser's log starts after the page has loaded.
+  - **Fine everywhere:** all 43 sounds loaded on every browser (no download manager trouble); every browser drew with its graphics card; no press was held late by a busy page; the server ran at 10–15% CPU with no stall during play.
+  - **The host's memory** reached 97% (0.3 GB free) on 2 Nov, with one 0.4 s stall at the server's start: close big programs, such as Blender, before hosting.
+  - **Not bugs:** a player with 795 presses that did nothing was mashing dodge and clicking throw during the dodge's recovery (that day had the default lockout); two Linux laptops' 2–3 s freezes on 1 Nov were their own Wi-Fi (no one joined, the server was fine); two 0.3 s freezes for five players on 2 Nov, 60 s apart, were the host's Wi-Fi (the server was on time, and its Wi-Fi poll runs at other moments).
+- **Fixed from them** (decision 150):
+  - **Auto:** a step down that doesn't help is followed by one more (Low halves the sharpness); only if even that doesn't help does Auto go back and stop. A step is judged over 5 s, not 3. A level Auto had to leave after stepping up isn't tried again, and it steps up only between rounds.
+  - **The browser log records loading:** a `load` line with the seconds from opening the page to the hall and the athletes in place, the megabytes that came over the network (the browser's cache weighs nothing), and the slowest file. The report has a LOADING section, and calls out a load over 15 s.
+
+**The lobby batch** (the user's requests, before the merge):
+
+- **(a) Names up to 32 characters** (were 16; decision 144). The HUD's name, the scoreboard and the team lists cut long names with an ellipsis.
+- **(b) Players are known by who they are, not their name** (decision 145). Names never have to be unique.
+  - Each browser keeps a secret code (`localStorage`). The server turns it into a public key (`rules.identity_key`: the first 10 hex digits of its SHA-256), and own settings, the team a player comes back to and the server's labels go by that key.
+  - Nobody gets someone's settings by taking their name, and the key is all the others ever see.
+  - A second tab of the same browser playing at the same time gets a code of its own (testing alone with tabs). The same tab connecting again (a reload, or back after Wi-Fi dropped, while the old connection may still look alive) takes over from its old connection.
+  - Own settings saved by name (older `saved_rules.json` and files) wait under that name (`n:Name`) and go to the first person who joins with it. A built-in bot's name ("Bot Ace") is that bot (`b:ace`).
+  - Two players with the same name get a small #1 and #2 in the lobby, in the order they joined.
+  - Files: version 2, own settings by key with the names they were last seen with (`labels`); version 1 files still load.
+- **Renaming** (decision 146): the user chose one way of the four offered: a name box under Your settings. Type a name and press Enter (or Change): it applies at once, even mid-match. Team, score and own settings stay, the others' feed says "X is now Y", and a reload rejoins under the new name.
+- **(c) Exporting and importing one player's own settings** already existed (each ⚙ page: Export, and the host's Import…). The user hadn't found it (decision 147). Its buttons now sit under "Their settings as a file:" at normal size, and the lobby's note under the teams mentions it.
+- **(d) The rules search across every tab** (decision 148): it already listed matches from every tab, but the old tab stayed highlighted and only the exact phrase matched.
+  - Now each word may be anywhere: a rule's name, description, heading or tab, so "network" lists the whole Network tab and "dash time" finds the dodge's dash time.
+  - "Every tab" heads the list with the number of matches, each tab shows its own count (and greys out with none), a click on a tab jumps to its matches, and the words are marked.
+- **(e) Bots with flags** (decision 149; the user chose a roster of named bots):
+  - **Flags** are named bundles of behaviour: any rule a bot may have its own value for (health, speed, throws, defences...), plus its skill numbers, given once and applied at whatever skill the bot plays (they're stored as the normal profile's). A bot can carry several, later ones winning where they overlap, and its own settings win over all of them.
+  - Eight come with a new setup: Dodge master, Berserker, Sniper, Catcher, Parry king, Trickster, Rookie and Tank. The host can change, add and delete flags.
+  - **New bot numbers**, so flags can say more (per skill, like the others): the weakest and strongest throw (Berserker: always full power), where it stands (−1 at the back to 1 at the centre line), and how often it walks out of a slow ball's way. Their defaults are the old fixed behaviour.
+  - **The host's own bots:** "Bots & flags…" in the lobby. Make a bot with a name (and a team), give any bot flags, rename or delete the host's own bots. Each bot keeps its name, flags and own settings wherever it plays.
+  - **On teams:** each team's "Add a bot…" puts one of the host's own bots on it, ⇄ moves a bot to the other team, ✕ takes it off, and − / + still fill with the built-in bots (Ace, Comet... for RED; Blitz, Dash... for BLUE).
+  - **Saved** with the setup in `saved_rules.json` and settings files (`bots`: the roster, the flags and each team's lineup). Changes apply like rules: at once in the lobby, from the next round in a match.
+- **Tests:**
+  - Rule tests: 74 (5 new: the same name kept apart, settings saved by name claimed by the first person with it, renaming, the host's bots with flags on teams, counts and files).
+  - Server tests: 9 (2 new: who a player is over real connections, with a second tab, a reconnecting tab and a rename; a dropped connection only noted).
+  - New browser test `people_bots.json`: a twin with the same name (#1 and #2, settings for one only), renaming (the HUD follows), the search, Alex made and flagged through the bots page, its ⚙ page showing its flags' values, a flag edited in the editor, and Alex moved, taken off and added back.
+  - Re-run and passing: `own_settings.json`, the lobby tests (one and two browsers), `graphics.json` (Auto's new rules), `logs.json`, the smoke test, and `moves.json` (the locks hold).
+
+**The merge into `main`, and v2.3.0** (the same day; decisions 151 and 152). The user hadn't tested the lobby batch yet: "merge this with the master branch… commit and push… create a release following the publishing standards… I will test the changes when I have the time."
+
+- **The merge:** `main` hadn't moved since the branch began, so it was a fast-forward: `main` now holds the branch's commits as they are. The one docs commit `main` had locally (this phase's short version) went up with it.
+- **Before it** (the user's publishing standard, `github-publishing.md`):
+  - **A privacy scan** of every file of every commit about to be pushed, and of the commits' authors: all GitHub's noreply address. It found one problem, in this phase's own work: a new rule test used a real office player's first name; it's "Robin" now.
+  - **Every image looked at:** the hall's, the athletes', the moves' and the effects' pictures and the Blender renders show only made-up names (ArenaShot, Robin, Sam, the bots) and the game itself. Their metadata holds Blender's render notes (`<untitled>` for the file, dates, camera and scene names) and no paths.
+  - **The README:** new pictures (the hall in play, the new lobby) in place of the stick figures, and its text brought up to date. `SECURITY.md` says what the browser's code is and isn't.
+  - **Tested from a fresh clone** of the branch, with the locked dependencies, on the oldest and the newest Python the game claims (3.10 and 3.14): the rule and server tests pass.
+- **The version, 2.3.0 (minor;** decision 151): new features, and nothing hosts or players relied on stops working. Settings saved by v2.2.0 still load: own settings saved by name go to the first person with that name, and the bot counts still pick the same built-in bots. The look of the game changed completely, but how it's played and hosted didn't.
+- **The worktree folder goes** at the user's word once `main` is pushed; its git-ignored contents worth keeping move to the main folder first (git-ignored there too): the office logs into `testlog/`, the Blender output into `art/out/`.
+- **The release checksum:** the `.sha256` file is now written with a Unix line ending, so `sha256sum -c` accepts it (v2.2.0's CRLF made it fail; reported then).
 
 ## 5. Decision log
 
@@ -1257,6 +1333,15 @@ This is the short version, kept on `main` while internet mode waits on its branc
 | 141 | The moves as the user described them after playing the first version: three throws at random (overhead at full charge; at the stomach's height, further out to the right as it charges; below the waist, like bowling); while charging, the left forearm across in front of the face; a deflect is a backhand parry with the left hand, like Dark Souls' (mid-charge too); a catch is one-handed, the left arm out with the palm turned forward and the left shoulder forward, like Iron Man's palm blast; a dash to a side lifts the near foot while the far foot pushes, the upper body tilted forward, landing on the near foot; forwards, a half crouch and one big step; backwards, a jump back still facing forward; going backwards, a perfect dodge is a backflip | U | The user, 2026-10-31, after playing: the first version's legs ran the wrong way when strafing, its deflect looked like a punch and its forward dash flicked the right hand. The backpedal looked natural and stays |
 | 142 | Step 8 from 2026-11-01: one animation at a time. `docs/ANIMATIONS.md` lists every move and every change from one move into another, with what it should look like, the tester's notes and its status. The user tries one move, compares it with what they want and says what differs; Claude fixes that move only; once the user approves it, it's locked: not changed again without the user's say, and checked by the moves test. If prompting doesn't work for a move, the user may make or fix it themselves: in Blender (Claude teaching the basics), in a free online tool, or in a small web tool Claude makes | U | The user's second test: some fixes worked, some moves broke again, some are still faulty; fixing everything at once from descriptions was inefficient. Claude can't see motion. Claude's advice: a page that shows any move on a loop, slowed down and frame by frame, first; then the web tool for the moves made here; pictures of the wanted pose rather than words |
 | 143 | Step 8 is on hold from 2026-11-03, not finished: the office logs and a batch of lobby requests (longer names, players' identities, renaming, the lobby's search, bots with flags) come first. When the moves resume, the animation tool is built first: the web tool (a viewer for every move, then an editor), not Blender or an outside tool | U | "The three fixes are good and I'm happy with the animations, for now. I have a few changes that have priority… For the animations, I want the tool we discussed that I can use to adjust the animations to be developed first." The three fixes were locked; the moves test now fails when a locked move changes |
+| 144 | Player names up to 32 characters (were 16) | U | "Double the character limit for names" |
+| 145 | Own settings, the team a player returns to and the server's labels follow who a player is, not their name; names never have to be unique | U | "If 2 players pick the same name, they both get custom rules that I have set for 1… I don't want people to be forced to pick unique names; assign ids to players or something." How (C): a secret code per browser, made public only as its hash; another tab playing at once gets its own; the same tab reconnecting takes over; settings saved by name go to the first person with that name; duplicates get #1, #2 in the lobby |
+| 146 | Renaming: a name box under Your settings, at once and mid-match too; team, score and own settings stay; the feed says "X is now Y" | U | Chosen from four options (also offered: clicking your name in the team list, the host renaming anyone, remembering the name on the computer) |
+| 147 | One player's own settings to and from a file already existed (⚙ › Export, Import…); made easier to find, nothing new | U | The user hadn't found it ("I didn't know it existed") |
+| 148 | The rules editor's search covers every tab: each word anywhere in a rule's name, description, heading or tab; "Every tab" with counts per tab; matches marked | U | "A global mode that searches and lists all the options related to the query, not just filter that tab." The word matching and the counts: C |
+| 149 | Bots with flags: the host makes named bots (a roster) and puts them on teams; flags are named bundles of behaviour (any rule a bot can have, plus its skill numbers given once); a bot carries several, later ones winning, its own settings over all; eight ready-made flags; saved with the setup | U | "Define a flag, a list of behaviours… like dodge master… or berserker… assign flags to bots and save them… say I want Alex bot… on blue team." The roster: the user's pick over flags on the slot bots. Details C: the new numbers (throw power range, stance, sidestepping), flags' skill numbers stored as the normal profile's, built-in bots carry flags but keep their names, − / + still fill with built-in bots |
+| 150 | From the office logs: the harmless "connection reset" traceback is only noted in the session log, and every server error is noted there; Auto takes one more step down before giving up, judges over 5 s, doesn't retry a level it had to leave and steps up only between rounds; the browser log records the loading time and download | C | Decision 129's Auto stuck an old laptop at 28 fps for 22 minutes after a noisy 3-second judgement, and retried High mid-round on borderline laptops. The error had alarmed the user twice; the download was step 10's unanswered question |
+| 151 | The look-and-feel cycle and the lobby batch are version 2.3.0 (minor) | C | New features; settings saved by v2.2.0 still load (own settings by name go to the first person with that name; bot counts pick the same built-in bots), and hosts and players use the game as before. A judgement call between minor and major: the game looks completely different, but nothing anyone relied on stopped working |
+| 152 | The branch `look-and-feel` is merged into `main` (2026-11-03), released as v2.3.0, and its worktree folder removed; the athletes' animations (with the animation tool first) and the HUD move to `main`'s task list | U | "Merge this with the master branch, and I think then we can delete this folder… We move the animation tasks to the main branch tasks list." The user will test the lobby batch later |
 
 ## 6. Current features
 
@@ -1281,10 +1366,12 @@ This is the short version, kept on `main` while internet mode waits on its branc
 - **Spectating (host):** watch instead of playing, with a free camera or riding behind any player.
 - **The host's screen, live:** everyone else sees which menu and rule the host is on and the edits they haven't applied yet; with "Follow the host", their rules editor follows along.
 - **The rules editor:**
-  - 152 rules in 18 groups: search, sliders, number boxes and colour pickers, per-rule reset, reset all, undo, apply.
+  - 164 rules in 18 groups: a search across every tab, sliders, number boxes and colour pickers, per-rule reset, reset all, undo, apply.
   - Animated previews compare the default with this lobby's value.
   - Mid-match edits are marked "next round (now X)".
-- **Each player's own settings:** a ⚙ next to every person and bot opens the editor for just them (the 90 rules that may differ per player). Everyone sees who has their own settings.
+- **Each player's own settings:** a ⚙ next to every person and bot opens the editor for just them (the rules that may differ per player), with Export and Import for a file of them. Everyone sees who has their own settings. They follow who a player is, not their name: names may repeat (#1, #2 in the lobby).
+- **Renaming:** a name box under Your settings, at once, keeping everything else.
+- **Bots & flags:** the host's own named bots, put on any team, and flags (bundles of behaviour like Dodge master or Berserker) on any bot.
 - **Settings files:** export the whole setup (anyone) and import it (the host); each player's page exports and imports just their settings.
 - **Saved rules:** the host's rules and players' own settings survive restarts (`saved_rules.json`).
 
@@ -1423,9 +1510,9 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 - **Spectating:** the host can switch to watching (team −1: never hit, never revived, not counted) and back, at once in free play, otherwise from the next round.
 - **Host changes** (rules, bots, match length) apply at once in the lobby or while waiting; during a match, at the next round's countdown.
 
-**Bots:** the host sets each team's bots (`BOTS_RED` 1, `BOTS_BLUE` 2 by default; 0–12 each), and nothing changes them but the host; with no human connected there are none. Skill can be easy, normal or hard; the profiles (section 12) are rules too. Bots keep 30 stamina for defending (`BOT_STAMINA_RESERVE`). Their names go by their slot on the team: RED Ace, Comet, Echo, Gale, Ion, Kite, Mako, Onyx, Quill, Sable, Umbra, Wisp; BLUE Blitz, Dash, Flick, Hex, Jinx, Lux, Nova, Pike, Rook, Tango, Vex, Zed. Fewer bots takes the last slots away first.
+**Bots:** the host sets each team's bots (`BOTS_RED` 1, `BOTS_BLUE` 2 by default; 0–12 each), and nothing changes them but the host; with no human connected there are none. Skill can be easy, normal or hard; the profiles (section 12) are rules too. Bots keep 30 stamina for defending (`BOT_STAMINA_RESERVE`). Their names go by their slot on the team: RED Ace, Comet, Echo, Gale, Ion, Kite, Mako, Onyx, Quill, Sable, Umbra, Wisp; BLUE Blitz, Dash, Flick, Hex, Jinx, Lux, Nova, Pike, Rook, Tango, Vex, Zed. Fewer bots takes the last slots away first. The host can also make bots of their own (a name, flags, own settings), put any bot on either team, and define flags (section 12).
 
-**Players' own settings:** 102 of the 152 rules may differ per player (`Param.who`: `all`, `people` or `bots`): the throwing, damage and health, aim assist, dodge, catch, deflect, stamina and movement rules, the cash earned, revived health and protection, health regeneration, each team's colour for its people or bots, the network fairness rules for people (view delay, lag compensation, press grace, sidestep compensation), the lockout for everyone, and the skill rules for bots. A player plays by `Rules.for_player(name)`; none of the rest can differ.
+**Players' own settings:** 114 of the 164 rules may differ per player (`Param.who`: `all`, `people` or `bots`): the throwing, damage and health, aim assist, dodge, catch, deflect, stamina and movement rules, the cash earned, revived health and protection, health regeneration, each team's colour for its people or bots, the network fairness rules for people (view delay, lag compensation, press grace, sidestep compensation), the lockout for everyone, and the skill rules for bots. A player plays by `Rules.for_player(key)`, by who they are (section 9's `key`); none of the rest can differ. A bot's flags come under its own settings.
 
 **Network fairness:** browsers render the world 0.10 s in the past (`INTERP_DELAY`). Lag compensation is capped at 0.25 s (`MAX_LAG_COMP`). A person's defence counts from 0.02 s before the press (`PRESS_GRACE`). Sidestep compensation is on (`SIDESTEP_COMP`). After a defence that meets no ball you can press another after its window plus recovery × `LOCKOUT_SCALE` (1 = normal, 0 = at once).
 
@@ -1670,7 +1757,7 @@ JSON over one WebSocket at `/ws`. Snapshot entries are **arrays**, to keep messa
 
 | Message | Fields | Notes |
 | --- | --- | --- |
-| `join` | `name`, `guest?` (true = no host powers), `hostKey?`, `tab`, `run` | Must be first. Team = the one this name had before, else auto (fewer humans, then fewer players, then red). `tab`/`run` identify the browser tab and page load in the logs |
+| `join` | `name`, `guest?` (true = no host powers), `hostKey?`, `tab`, `run`, `who` | Must be first. `who`: the browser's secret code (16–64 characters; the server makes one up if it's missing or another tab is playing with it). Team = the one this person had before (by key), else auto (fewer humans, then fewer players, then red). `tab`/`run` identify the browser tab and page load in the logs; the same `tab` joining again replaces its old connection |
 | `log` | `run, seq, tab, lines:[…]` | A chunk of the browser's diagnostics log. The server stores it once per (run, seq) and replies `logack` |
 | `ping` | `c` (client ms) | Server replies `pong {c, st}`; used for the ping display |
 | `sync` | none | A snapshot showed a newer rules version than the client has: the server resends `rules` |
@@ -1680,19 +1767,21 @@ JSON over one WebSocket at `/ws`. Snapshot entries are **arrays**, to keep messa
 | `cancel` | none | Cancel the wind-up (tab lost focus) |
 | `act` | `a` (dodge/catch/deflect), `wt, dir:[dx,dz]` or null, `aim, tg` | `dir` = dash direction for dodge |
 | `revive` | none | R: revives the longest-down teammate; with team health, buys health for the team's bar |
-| `rules` | `set: {KEY: value}`, or `reset: true`, or `discard: true`; `player: NAME` with `set: {KEY: value or null}` or `replace: {...}`; `import: {rules, players}` | **Host only.** Edit rules (at once in free play, else from the next round), back to all defaults (players' own settings too), or drop the waiting changes. With `player`: that player's own settings (null: everyone's value again; `replace`: all of theirs). `import`: a settings file replaces the whole setup |
+| `rules` | `set: {KEY: value}`, or `reset: true`, or `discard: true`; `player: KEY` with `set: {KEY: value or null}` or `replace: {...}`; `bot: {do, ...}`; `import: {rules, players, labels?, bots?}` | **Host only.** Edit rules (at once in free play, else from the next round), back to all defaults (players' own settings and the bots too), or drop the waiting changes. With `player` (a key; a plain name is read the old way): that player's own settings (null: everyone's value again; `replace`: all of theirs). `bot`: `add {team, bot?}`, `remove {bot}`, `move {bot}`, `make {name, team?}`, `edit {bot, name?, flags?}`, `delete {bot}`, `flag {flag?, name, desc, values}`, `unflag {flag}` (`rules.Rules.bot_change`). `import`: a settings file replaces the whole setup |
+| `rename` | `name` | Their own name (cleaned, 32 characters at most; an empty one changes nothing). Everything else stays; a `rename` event tells everyone |
 | `start` | none | **Host only.** Lobby → the match's first countdown |
 | `end` | none | **Host only.** End the match: back to the lobby |
 | `move` | `p` (player id) | **Host only.** Move that human to the other team (again before it applies = cancel) |
 | `shuffle` | none | **Host only.** Deal the humans into random, even teams (a spectator keeps watching; bots stay put) |
 | `spectate` | `on` (true/false) | **Host only.** Watch instead of playing, or come back (to the team they had, else the one with fewer people). At once in free play, otherwise next round; asking the other way before then cancels |
-| `hostview` | `m` (game/menu/rules), `g?` (rules group), `q?` (search), `f?` (rule in focus), `d?` ({KEY: unapplied value}), `pl?` ({n, t, b}: whose own settings, their team, a bot) | **Host's browser only** (others are ignored, no deny). Relayed to everyone else |
+| `hostview` | `m` (game/menu/rules), `g?` (rules group), `q?` (search), `f?` (rule in focus), `d?` ({KEY: unapplied value}), `pl?` ({n, k, t, b}: whose own settings (name and key), their team, a bot) | **Host's browser only** (others are ignored, no deny). Relayed to everyone else |
 
 Host-only messages from anyone else get a `deny` with `why: host`. The old `team` (players switching themselves) and `cfg` (anyone changing bots) messages are gone.
 
 **Server → client:**
 
-- **`welcome {id, host, cfg, rules, next, rv, defaults, schema, logging, version, logDir?}`:**
+- **`welcome {id, host, who, key, cfg, rules, next, players, nextPlayers, labels, bots, nextBots, rv, defaults, schema, logging, version, logDir?}`:**
+  - `who`: the secret code this tab plays under (the browser keeps it for the tab's reloads); `key`: who the player is to everyone (`u` + 10 hex digits).
   - `logging`: whether the server keeps logs (then the browser sends its own). `version`: `{commit, built?}` of the server. `logDir`: where the logs are, for the host only.
   - `cfg` holds what the client needs, derived from the live rules as this player plays by them (`Rules.for_player(name).for_client`):
     - `centerGap`, `gravity`, `ricochet{normalKeep, tangentKeep, minSpeed, max}`, `damage{min, perSpeed, max}`
@@ -1702,9 +1791,10 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
     - `assistCone`, `deflectCone`, `assistRange`, `reviveCost`, `interpDelay`, `pressGrace`, `sidestepComp`, `lockoutScale`, `teamCash`, `botsMax`, `joinUrls[]`
     - `teamHealth`, `teamHeal{mode, amount, perCash}`, `regen` and `teamRegen` (`{on, mode, share, amount, delay, still, stillTime}`: where regeneration stops and when standing still matters, for the bars' markers and the hint)
   - `rules` / `next`: flat `{KEY: value}` dicts, live and waiting for the next round (`next` is null when nothing waits). `rv` is the rules version. `defaults` uses the same shape.
-  - `players` / `nextPlayers`: everyone's own settings, `{name: {KEY: value}}`, live and from the next round (null when nothing waits). Browsers use them for other players' ball colours and name tags, the lobby's tags and the editor's player pages.
+  - `players` / `nextPlayers`: everyone's own settings, `{key: {KEY: value}}`, live and from the next round (null when nothing waits). Keys: a person's `u…`, a bot's `b:<id>`, or `n:<name>` for settings waiting for a person of that name. `labels`: `{key: name}`, the name each was last seen with. Browsers use them for other players' ball colours and name tags, the lobby's tags and the editor's player pages.
+  - `bots` / `nextBots`: `{roster: {id: {name?, flags: [...]}}, flags: {id: {name, desc, values}}, lineup: [[RED ids], [BLUE ids]]}`, live and from the next round.
   - `schema` (sent once): `{groups: [{id, title, blurb}], params: [{key, group, label, desc, lo, hi, step, unit, kind, choices, preview, sub}], pairs, caps}`.
-- **`rules {cfg, rules, players, next, nextPlayers, rv}`:** sent to everyone after any change, each with its own `cfg`.
+- **`rules {cfg, rules, players, labels, bots, next, nextPlayers, nextBots, rv}`:** sent to everyone after any change, each with its own `cfg`.
 - **`logack {run, seq}`:** that log chunk (and everything before it) is stored.
 - **`hostview {m, g?, q?, f?, d?}`:** the host's screen (the cleaned copy of the host's own message), sent to everyone but the host when it changes and to each newcomer after `welcome`. `{m: null}`: no host is connected any more.
 - **HTTP `GET /logs/download`:** the host's zip of the last 24 h of sessions. It answers 403 to anyone else (allowed: this computer, or `?key=` with the host key) and 404 when the server isn't logging. The filename comes in `X-Filename`, not `Content-Disposition` (see section 14).
@@ -1716,7 +1806,7 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
     - `res`: the last match's result, `[winner or null if ended by the host, red, blue]`.
     - `pend`: how many rule changes wait for the next round.
     - `rv`: the rules version.
-  - `p` (players): each is `[id, name, team, x, z, yaw, pitch, hp, stamina, cash, flags, act, actAge, cooldownLeft, tp, charge, stats, next]`.
+  - `p` (players): each is `[id, name, team, x, z, yaw, pitch, hp, stamina, cash, flags, act, actAge, cooldownLeft, tp, charge, stats, next, key]`.
     - `team`: 0 RED, 1 BLUE, −1 spectating. `cash`: what they can spend (their team's pot with shared team cash).
     - `flags`: alive=1, charging=2, hasBall=4, bot=8, invuln=16, host=32, switching team next round=64.
     - `next`: the team the host's move takes them to at the next round (−1 = spectating), or null.
@@ -1877,7 +1967,8 @@ Other parts of `main.js`:
 
 **`lobby.js`:** the lobby / pause menu.
 
-- The team lists, with the host's ⇄ buttons and "→ BLUE next round" tags.
+- The team lists, with the host's ⇄ buttons and "→ BLUE next round" tags; bots get ⇄ and ✕ too, their flags as tags on a line under the name, and players sharing a name #1, #2.
+- Each team's "Add a bot…": one of the host's own bots, or a new one (the Bots & flags page).
 - Status and title lines for host and guests.
 - Start, and End (two clicks), and Shuffle.
 - Quick controls for each team's bots (in its column), bot skill and match length. They send `rules` edits, count rapid clicks from the value asked for, and show "next round (now X)".
@@ -1893,8 +1984,12 @@ Other parts of `main.js`:
 - `enforce()` mirrors the server's pair and cap limits while dragging.
 - Read-only for guests. Esc or a click outside closes it.
 - **Following the host:** `follow(view)` shows the host's page (one player's own settings too, `view.pl`), rule in focus (outlined) and draft; `unfollow()`; `describe(view)` puts the host's screen in words; `hostView()` is what the host's browser reports. A guest who closes a followed editor stops following.
-- **A player's page:** `openFor({name, team, bot})`; `who`, `applies(p)` (the rules that may differ for them; a bot's own skill profile only), `shared()` / `ownOf()` / `effective()` / `base()` / `reference()` (everyone's values, theirs, and what they make together), Apply sending null for "same as everyone", `exportPlayer()` and `importPlayerText()`. `keepConsistent()` mirrors `Rules._fix` for both the draft and a player's own settings.
+- **The search** (`matches()`): every word anywhere in a rule's name, description, heading or tab; "Every tab" with counts in the nav (`renderNav`), the words marked (`markWords`).
+- **A flag's page:** `openFlag(id, name)`: the rules a flag may set (`flagRule`, rules.py `FLAG_RULES`), the bot-skill numbers once; Apply sends the flag's whole `values`.
+- **A player's page:** `openFor({key, name, team, bot})`; `who`, `applies(p)` (the rules that may differ for them; a bot's own skill profile only), `shared()` / `ownOf()` / `effective()` / `base()` / `reference()` (everyone's values, theirs, and what they make together), Apply sending null for "same as everyone", `exportPlayer()` and `importPlayerText()`. `keepConsistent()` mirrors `Rules._fix` for both the draft and a player's own settings.
 - Colour rows get a colour picker and a swatch; choices read by their `labels`; `%` units sit right after the number.
+
+**`bots_ui.js`:** the Bots & flags page (`BotsPage`): the host's own bots (rename, team, flags, ⚙, delete with a second click), the built-in bots playing or carrying flags, and the flags (name, description, a summary of what they change, "What it changes…" opening the editor's flag page). Read-only for guests. It doesn't redraw a box while it's being typed in.
 
 **`previews.js`:** the editor's animated previews. 24 scenes, each tied to its rules through `preview` in `rules.py`:
 
@@ -1999,17 +2094,20 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **`_throw`:**
   - The bot doesn't throw when a ball arrives within 0.7 s, and keeps 30 stamina in reserve (`BOT_STAMINA_RESERVE`).
   - Target weighting: closer is preferred, low stamina ×1.6, low HP ×1.3 (low = under 40% of the maximum).
-  - Power is random up to what the reserve allows.
+  - Power is random between its `power_min` and `power_max` (0.15–1 by default), and never more than the reserve allows.
   - Aim leads the target's velocity (40–100%), plus Gaussian error.
   - With the profile's `bank` chance it throws a bank shot instead: the floor 45–70% of the way to the target, or the nearer side wall via the target's mirror image.
-- **`_walk`:** wanders to random points in its own half every 1.5–4 s and faces its target or the nearest enemy.
+- **`_walk`:** wanders to random points in its own half every 1.5–4 s, nearer the front or the back with its `stance`, and faces its target or the nearest enemy.
 - **`_revive`:** when affordable (from the team's pot with shared team cash), revives after a 0.8–2.5 s delay.
 
 - **With team health** `_revive` buys health instead (`_heal_worth_it`): a pack when the bar has room for one and the price is affordable; all their cash when the bar misses at least what it buys, or a quarter of itself.
 - **A bot's own settings:** every number a bot reads comes from `p.rules`, so its own skill (and its own profile numbers, stamina reserve and the rest) count for it alone.
 - **Standing still to regenerate** (`resting`, `BOT_STAND_TO_REGEN`): below the regeneration limit, when standing still would make it faster or is needed, `_walk` keeps the bot where it is (it only turns), and `_plan` skips the sidestep; it still throws, catches, deflects and dodges.
 
-**Profiles** (defaults in `config.BOT_PROFILES`; each number is a rule, `BOT_<SKILL>_<FIELD>`, in the editor's Bots group):
+- **Who the bots are:** each team's `lineup` lists its bots in order (`BOTS_RED` / `BOTS_BLUE` are its lengths; − / + add the next free built-in bot or drop the last one). A bot is a built-in one (`b:ace`, named "Bot Ace") or one the host made (the `roster`), and keeps its own settings and flags wherever it plays (`sim._sync_bots`).
+- **Flags** (`config.BOT_FLAGS`, then the host's): `Rules.own_of(key)` lays a bot's flags in order under its own settings, the flags' `BOT_NORMAL_…` numbers landing on the profile of the skill it plays at. `rules_ui.js ownOf()` is its twin.
+
+**Profiles** (defaults in `config.BOT_PROFILES`; each number is a rule, `BOT_<SKILL>_<FIELD>`, in the editor's Bots group; every skill also has `power_min` 0.15, `power_max` 1, `stance` 0 and `sidestep` 0.35):
 
 | Skill | React chance | Timing spread | Aim error | Extra throw pause | Mix (dodge/catch/deflect) | Bank shots |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -2098,6 +2196,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 - **The regeneration test** (`regen.json` + `regen.js`): the round-time buttons, both regeneration previews, and a player's health and a team bar sampled ten times a second (the pause after each hit, the speed, where it stops) with the limit markers. Re-run it after touching regeneration or the round-time buttons.
 - **The standing-still test** (`still.json` + `still.js`): with a bot that hits for 40 every 20 s, holds keys like a player through standing, walking and two kinds of dodge, and checks what each part regains and the hint, for a player and a team bar. Re-run it after touching standing still.
 - **The own-settings test** (`own_settings.json` + `own_settings.js`): a bot's and a person's own settings through the ⚙ pages, the ball colours editor, export → reset → import, a profile moved between bots, wrong files, and the colour every ball in flight is drawn in. Re-run it after touching players' own settings, the ball colours or the settings files.
+- **The people and bots test** (`people_bots.json` + `people_bots.js`): two players with the same name kept apart (#1, #2, settings for one), renaming (the HUD follows), the search across every tab, a bot made and flagged on the Bots & flags page, its ⚙ page showing its flags, a flag edited, and the bot moved, taken off and brought back. Re-run it after touching who players are, renaming, the search, or the bots page, flags and lineups.
 - **The graphics test** (`graphics.json` + `graphics.js`):
   - the no-graphics-card warning and Auto at Low in headless Chrome, and the host's ceiling;
   - Auto's rules on a stand-in world fed made-up frame times;
@@ -2182,7 +2281,7 @@ print(lengths, g.score, dict(counts))
   - **Scenery outside can hide a low sun:** round 1's green hills blocked a 21° sun and left the whole hall in shade. Outside terrain and trees get `visible_shadow = False`.
   - **AgX turns a saturated red pink in warm light:** the kit's cloth uses a deeper red (and blue) than the team colours on screen.
   - **A mirror-like court washes out the far half:** at a grazing angle it reflects the bright windows, and the blue team disappeared against it. The court paint is satin.
-  - **In a worktree session, Claude Code's guard refuses a program run by its quoted path with spaces.** Put Blender's folder on the PATH for that one command: `PATH="/c/Program Files/Blender Foundation/Blender 5.2:$PATH" blender.exe --background ...`.
+  - **Claude Code's guard can refuse a program run by its quoted path with spaces** (seen in a worktree session). Put Blender's folder on the PATH for that one command: `PATH="/c/Program Files/Blender Foundation/Blender 5.2:$PATH" blender.exe --background ...`.
 - **three.js deletes a shader when the last material using it is disposed:** building an effect early and then disposing it saves nothing, because its shader goes with it.
   - Keep one material of each kind alive: `world.warmUp()` keeps them, hidden.
   - Dispose an old court only after the new one has been drawn.
@@ -2268,7 +2367,7 @@ print(lengths, g.score, dict(counts))
 - **The perfect-dodge spin** starts when the server confirms it, about 0.1 s after the press, not instantly.
 - **Movement is trusted** to each browser within the court limits: fine among friends, not for strangers.
 - **One lobby per server:** no separate rooms.
-- **No reconnect-with-state:** a reloaded tab rejoins as a fresh player with the same name and team (full HP, no cash). Only the host's rules persist between server runs.
+- **No reconnect-with-state:** a reloaded tab rejoins as a fresh player with the same name, team and own settings (full HP, no cash). Only the host's rules persist between server runs.
 - **The host is whoever plays on the server's PC** (or holds the host link). Anyone with access to that PC's browser has host powers, and with several local tabs, every one of them is a host.
 - **Rule previews are illustrations, though computed with the game's formulas:**
   - top views ignore gravity;
@@ -2277,12 +2376,19 @@ print(lengths, g.score, dict(counts))
 - **Lag:** analysed (`LAG_ANALYSIS.md`, with three office sessions of logs). The game-side fixes are settings now (view delay 0.10, press grace, sidestep compensation, the ricochet curve, the adjustable lockout). The worst cases were players' own Wi-Fi (mostly Linux laptops), which the game can't fix. QuickEdit is measured, not fixed.
 - **Sidestep compensation favours the person dodging:** a thrower can see a ball pass through someone who had already stepped clear on their own screen, and a sidestepped ball hangs at the contact point for up to ~0.15 s before flying on.
 - **Only the host can spectate**, and nobody can choose their own team.
-- **Own settings go by name:** two people with the same name share them, and a person who takes a bot's name ("Bot Comet") gets that bot's.
+- **Own settings follow a browser:** a person who comes back on another computer, another browser or in a private window is someone new to the game; the host gives them their settings again. Settings from older files go to the first person with that name.
+- **A flag can't set a value back to everyone's:** on a bot's ⚙ page, an own value equal to everyone's counts as no own setting, so the flag's value stays; take the flag off instead.
 - **Uneven teams stay uneven:** 2 bots against 4 lose nearly every round, and team health with a fixed bar hardly changes that (the bigger team throws twice as many balls). Players' own settings (more health, say) are the tool for it.
-- **The README's gameplay screenshot** still shows the yellow ball from before the team colours.
 - **Untested on a real GPU:** visual tuning (afterimage density, trail lengths, ring sizes) was judged from headless screenshots.
 - **The standalone app is Windows-only and unsigned**, so SmartScreen warns and antivirus may flag it.
 - **Phones/touch:** none yet. The user deferred them.
+
+**Open tasks, in order** (moved here from the look-and-feel plan when it was merged; decision 152):
+
+1. **The athletes' animations: on hold, not finished** (decisions 142 and 143). First the animation tool: a page in the game showing any move or change of move on a loop, slowed down and frame by frame, then an editor for the moves placed by hand. Then `docs/ANIMATIONS.md`, one move at a time: the user tries a move, Claude fixes only that one, and an approved move is locked (and checked by the moves test).
+2. **The HUD and menus** in the new look (the look-and-feel plan's step 9): not started.
+3. **The lobby batch of v2.3.0, tested by the user** (names, renaming, same names, the search, bots with flags): built and tested by Claude, not yet by the user.
+4. **Internet mode:** on its own branch, waiting for the user's friend to test it on a cloud server (phase 14).
 
 **Ideas, not started:**
 

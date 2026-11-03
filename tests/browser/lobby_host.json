@@ -8,7 +8,7 @@
   {"wait": 4500},
   {"eval": "document.getElementById('rulesRevert').click(); document.getElementById('rulesClose').click(); 'host closes the rules without applying'"},
   {"wait": 2500},
-  {"eval": "(() => { document.querySelector('#listRed button[data-own=\"Bot Ace\"]').click(); const ed = dp.editor; ed.group = 'damage'; ed.renderNav(); ed.renderList(); ed.setFocus('MAX_HP'); ed.setDraft('MAX_HP', 250); return 'host opens the own settings of Bot Ace and drafts Health 250 (not applied)'; })()"},
+  {"eval": "(() => { document.querySelector('#listRed button[data-own=\"b:ace\"]').click(); const ed = dp.editor; ed.group = 'damage'; ed.renderNav(); ed.renderList(); ed.setFocus('MAX_HP'); ed.setDraft('MAX_HP', 250); return 'host opens the own settings of Bot Ace and drafts Health 250 (not applied)'; })()"},
   {"wait": 4500},
   {"eval": "document.getElementById('rulesRevert').click(); document.getElementById('rulesClose').click(); 'host closes them without applying'"},
   {"wait": 2500},

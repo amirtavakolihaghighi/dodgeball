@@ -10,18 +10,14 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 
 ### Added
 
-- **A graphics setting** (Esc › Your settings › Graphics): Auto (the default), High, Medium and Low.
-  - Auto lowers itself when the game gets choppy (under 45 frames a second for 3 seconds), undoes a step that doesn't help, and tries a level up after 20 smooth seconds.
-  - Medium draws 3/4 of the sharpness, Low half, with fewer decorative effects. Nothing that matters for play changes.
-  - On the host's computer, which also runs the server, Auto stays at Medium or lower.
-  - The top-right corner shows the level next to the frame rate.
-- **A warning when the browser draws without the graphics card** (on the join screen and in the menu), with the setting that fixes it. The game runs at about 19 frames a second that way.
-- **Juice:**
-  - An impact freeze on the player who's hit (balls and everyone else keep moving).
-  - Specks of light from hits, catches, deflects, ricochets and perfect dodges.
-  - Balls that stretch with speed and spin (they have seams now).
-  - A camera that shakes and jolts on impacts and zooms in slightly while you charge.
-- **Screen shake** (Esc › Your settings) scales the camera motion, down to none. It never moves your aim.
+- **Athletes instead of stick figures:** every player is an athlete in their team's kit, with a sports helmet or a face and hair, and one of six skin and hair colours, picked when they join and the same on every screen. Low graphics draw lighter ones. They move with real motion and moves made for the game:
+  - runs that follow your speed and direction, and a backpedal;
+  - three kinds of throw at random (overhead, side-arm, underarm like bowling), with the left forearm covering the face while you charge, and the ball carried in front of you;
+  - deflects as a backhand parry with the left hand, catches as a one-handed palm blast that pulls the ball in;
+  - dodges: a side step, a lunge forward or a jump back, with a faint trail;
+  - a corkscrew, an aerial side flip or a butterfly twist for perfect dodges, and a backflip going backwards;
+  - knockouts that throw players away from the ball, getting up when revived, and celebrating or kneeling at a round's end.
+- **A sports hall to play in:** tall windows with a low golden sun and soft shafts of light, sky and hills outside, a wooden floor with the court painted on it, padded boards in bright colours, and stands with a crowd that cheers. Its light is worked out in advance, so it's cheap to draw; Low graphics draw a third of the crowd and no shafts. A wall or stand between the camera and you turns see-through, with a faint outline, so you never lose sight of yourself.
 - **Recorded sounds** in place of the synthesized ones (all CC0; see `THIRD_PARTY_NOTICES.md`):
   - hits, throws, catches, deflects and bounces, each with several takes, a little different every time, from the side they happen on and quieter far away, with the echo of a sports hall;
   - a dodge that whooshes the moment you press it and lands hard as the dash ends;
@@ -31,24 +27,41 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
   - music in the lobby, and lower in the background during a match.
 - **A volume for each kind of sound** (Esc › Your settings): Music, Effects, Announcer, Interface and Crowd, under the main Volume.
 - **A "Hear every sound" page**, linked under the sliders, that plays every moment of the game and every recording.
-- **A sports hall to play in:** tall windows with a low golden sun and soft shafts of light, sky and hills outside, a wooden floor with the court painted on it, padded boards in bright colours, and stands with a crowd that cheers. Its light is worked out in advance, so it's cheap to draw; Low graphics draw a third of the crowd and no shafts. A wall or stand between the camera and you turns see-through, with a faint outline, so you never lose sight of yourself.
-- **The athletes move for real:**
-  - runs that follow your speed and direction, and a backpedal;
-  - three kinds of throw at random (overhead, side-arm, underarm like bowling), with the left forearm covering the face while you charge;
-  - deflects as a backhand parry with the left hand, catches as a one-handed palm blast that pulls the ball in;
-  - dodges: a side step, a lunge forward or a jump back, with a faint trail;
-  - a corkscrew, an aerial side flip or a butterfly twist for perfect dodges, and a backflip going backwards;
-  - knockouts that throw players away from the ball, getting up when revived, and celebrating or kneeling at a round's end.
-- **Athletes instead of stick figures:** every player is an athlete in their team's kit, with a sports helmet or a face and hair, and one of six skin and hair colours, picked when they join and the same on every screen. They move as the stick figures did (real animation comes next), carry the ball in front of them, and Low graphics draw lighter ones.
-- **New effects:** a starburst and a shockwave in the team's colour on hits, a swipe on deflects, a flare and sparkles on perfect plays, dust on floor bounces. The ball is grippy rubber with a bright edge in its colour, and players and balls cast long shadows from the low sun wherever it shines.
 - **The incoming-ball sound** (Esc › Your settings): a whoosh that comes from the ball's side and is loudest as it arrives (the default), a tick, or nothing.
+- **New effects:** a starburst and a shockwave in the team's colour on hits, a swipe on deflects, a flare and sparkles on perfect plays, dust on floor bounces. The ball is grippy rubber with a bright edge in its colour, and players and balls cast long shadows from the low sun wherever it shines.
+- **Juice:**
+  - An impact freeze on the player who's hit (balls and everyone else keep moving).
+  - Specks of light from hits, catches, deflects, ricochets and perfect dodges.
+  - Balls that stretch with speed and spin (they have seams now).
+  - A camera that shakes and jolts on impacts and zooms in slightly while you charge.
+- **Screen shake** (Esc › Your settings) scales the camera motion, down to none. It never moves your aim.
+- **A graphics setting** (Esc › Your settings › Graphics): Auto (the default), High, Medium and Low.
+  - Auto lowers itself when the game gets choppy (under 45 frames a second for 3 seconds). A step that doesn't help is followed by one more, to Low; if even that doesn't help, Auto goes back and leaves things alone. After 20 smooth seconds it tries a sharper level, only between rounds, and never again one it had to leave.
+  - Medium draws 3/4 of the sharpness, Low half, with fewer decorative effects. Nothing that matters for play changes.
+  - On the host's computer, which also runs the server, Auto stays at Medium or lower.
+  - The top-right corner shows the level next to the frame rate.
+- **A warning when the browser draws without the graphics card** (on the join screen and in the menu), with the setting that fixes it. The game runs at about 19 frames a second that way.
+- **Bots & flags** (in the lobby, under Match): make bots of your own with a name, and give any bot flags, bundles of behaviour like Dodge master (defends nearly every ball, almost always by dodging, near-perfect timing) or Berserker (every throw at full power, at once, from the front line). Eight come ready: Dodge master, Berserker, Sniper, Catcher, Parry king, Trickster, Rookie and Tank; change them or make your own. Each team's **Add a bot…** puts your bots on it, and bots get ⇄ (other team) and ✕ (off the team) like people. Bots keep their name, flags and own settings wherever they play, and they're saved with the setup and in settings files.
+- **Three new numbers for bots** (Game rules › Bots, for each skill): the weakest and the strongest throw, where it stands in its half, and how often it walks out of a slow ball's way. The defaults behave as before.
+- **Rename yourself any time** (Esc › Your settings › Your name), mid-match too: your team, score and own settings stay with you.
+- **Loading in the session log:** how long the game took to load and how much came over the network, in the report's new LOADING section.
 
 ### Changed
 
+- **Names can be 32 characters long** (were 16).
+- **Players are known by who they are, not their name:** own settings, and the team you come back to, follow your browser. Two people can pick the same name without sharing settings (the lobby numbers them #1, #2), and nobody gets someone else's settings by taking their name. Settings saved by name go to the first person who joins with that name.
+- **The rules editor's search looks through every tab at once**, with every word anywhere in a rule's name, description or tab; it says how many rules match in each tab and marks the words.
+- **One player's settings as a file** is easier to find: "Their settings as a file: Export / Import…" at the bottom of each ⚙ page.
 - **Presses are timed from the key itself,** not from when the page got round to them: a slow laptop no longer loses up to a frame (50 ms at 20 frames a second) on every dodge, catch, deflect and throw.
 - **Every effect is prepared while the game loads,** so none freezes the picture the first time it appears in a match. A rebuilt court (when the teams change size) no longer builds its shaders again either.
-- The log report notes automatic graphics changes, and presses the browser held for a while.
-- The incoming-ball tick is louder, so it stands out among the recorded sounds (it's now an option; the default is the whoosh). The old synthesized sounds remain as a fallback, and the log report notes a browser whose recordings didn't load.
+- The first visit downloads about 7 MB from the host (the hall, the athletes and the sounds), up from about 1 MB.
+- The log report notes automatic graphics changes, presses the browser held for a while, and a browser whose recordings didn't load.
+- The incoming-ball tick is louder, so it stands out among the recorded sounds (it's now an option; the default is the whoosh). The old synthesized sounds remain as a fallback.
+
+### Fixed
+
+- **The server's window no longer shows an alarming error** when a browser drops its connection (a laptop shut, Wi-Fi lost): it was harmless. The session log notes it, and any real error in the server is now kept in the session log too.
+- The release's checksum file ends its line the Unix way, so `sha256sum -c` accepts it.
 
 ## [2.2.0] - 2026-10-29
 

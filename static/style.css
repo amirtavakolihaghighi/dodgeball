@@ -87,9 +87,11 @@ button.danger:hover { background: rgba(255, 90, 90, 0.18); }
 .teamCol.blue h4 { color: var(--blue); }
 .teamCol h4 span { color: var(--dim); font-weight: 600; }
 .teamCol ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
-.teamCol li { display: flex; align-items: center; gap: 6px; font-size: 14px; min-height: 26px; }
+.teamCol li { font-size: 14px; }
+.teamCol li .line { display: flex; align-items: center; gap: 6px; min-height: 26px; }
+.teamCol li .sub { display: flex; flex-wrap: wrap; gap: 4px; margin: -1px 0 4px 10px; }
 .teamCol li.bot { color: var(--dim); }
-.teamCol li .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.teamCol li .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 3.5em; flex: 0 1 auto; }
 .teamCol li .move { margin-left: auto; padding: 1px 9px; }
 .teamCol .botRow { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dim); margin: 0 0 6px; flex-wrap: wrap; }
 .teamCol .botRow b { min-width: 16px; text-align: center; color: var(--text); }
@@ -102,7 +104,7 @@ button.danger:hover { background: rgba(255, 90, 90, 0.18); }
 .teamCol .tag.host { background: rgba(255, 201, 64, 0.18); color: var(--gold); }
 .teamCol .tag.own { background: rgba(93, 255, 155, 0.14); color: var(--good); }
 .teamCol li .gear { margin-left: auto; padding: 1px 7px; }
-.teamCol li .gear + .move { margin-left: 0; }
+.teamCol li .gear + .move, .teamCol li .move + .move { margin-left: 0; }
 .rulesRow { margin-top: 14px !important; }
 .pending { margin-top: 8px; padding: 8px 10px; border-radius: 9px; background: rgba(255, 201, 64, 0.1); border: 1px solid rgba(255, 201, 64, 0.35); color: #ffe39a; font-size: 13px; }
 .controls { margin: 0; padding-left: 18px; line-height: 2; font-size: 14px; }
@@ -127,6 +129,42 @@ button.danger:hover { background: rgba(255, 90, 90, 0.18); }
 #rulesNav button span { flex: 1; }
 #rulesNav button i { color: var(--gold); font-style: normal; font-size: 10px; }
 #rulesNav button em { font-style: normal; font-size: 11px; font-weight: 800; color: #1a1300; background: var(--gold); border-radius: 9px; padding: 0 6px; }
+#rulesNav button em.hits { background: #8fd0ff; color: #04121f; }
+#rulesNav button.all { margin-bottom: 6px; border: 1px solid rgba(143, 208, 255, 0.4); }
+#rulesNav button.none { opacity: 0.4; }
+.rule mark { background: rgba(255, 201, 64, 0.32); color: inherit; border-radius: 3px; padding: 0 1px; }
+.fileBox { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 13px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.fileBox button { padding: 3px 10px; }
+.nameRow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.nameRow input { flex: 1; min-width: 0; font: inherit; background: #1b2235; color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; }
+.botAdd { max-width: 130px; }
+.botsPanel select { font: inherit; font-size: 13px; background: #1b2235; color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 2px 5px; }
+.teamCol .tag.nth { background: rgba(143, 208, 255, 0.16); color: #bfe4ff; }
+.teamCol .tag.flag { background: rgba(196, 140, 255, 0.18); color: #dcc0ff; text-transform: none; letter-spacing: 0; }
+#botsModal { position: fixed; inset: 0; z-index: 12; display: grid; place-items: center; background: rgba(4, 7, 14, 0.72); }
+.panel.botsPanel { width: min(1100px, 96vw); max-height: 92vh; padding: 0; display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+.botsPanel header { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.botsPanel header h2 { margin: 0; font-size: 22px; }
+.botsPanel header p { margin: 4px 0 0; }
+.botsPanel header #botsClose { margin-left: auto; }
+.botsBody { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 10px 18px 18px; overflow: auto; }
+.botsBody h3 { margin: 12px 0 4px; }
+.botList { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 6px; }
+.botList li.empty { color: var(--dim); font-size: 13px; }
+.botItem, .flagItem { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; }
+.botHead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.botHead input, .flagDesc, #newBotName, #newFlagName { font: inherit; background: #1b2235; color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 3px 7px; }
+.botHead input { width: 150px; font-weight: 700; }
+.botHead .tag { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); color: var(--dim); }
+.botHead .tag.red { color: var(--red); }
+.botHead .tag.blue { color: var(--blue); }
+.flagDesc { width: 100%; margin-top: 6px; font-size: 13px; }
+.flagSum { margin: 6px 0 0; font-size: 12px; color: #dcc0ff; line-height: 1.5; }
+.flagChips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; }
+.flagChips .note { margin: 0; }
+.chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(196, 140, 255, 0.18); color: #dcc0ff; border-radius: 12px; padding: 1px 4px 1px 9px; font-size: 12px; font-weight: 700; }
+.chipX { background: transparent; border: 0; color: inherit; padding: 0 4px; font-size: 11px; cursor: pointer; }
+@media (max-width: 860px) { .botsBody { grid-template-columns: 1fr; } }
 .rulesMain { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
 .previewBox { margin: 0; padding: 12px 16px 8px; border-bottom: 1px solid var(--line); background: rgba(0, 0, 0, 0.18); }
 #previewCanvas { display: block; width: 100%; height: 252px; border-radius: 10px; }
@@ -248,7 +286,8 @@ button.danger:hover { background: rgba(255, 90, 90, 0.18); }
 #deadmsg { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); padding: 12px 20px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 15px; text-align: center; }
 
 #vitals { position: absolute; left: 16px; bottom: 16px; width: 300px; padding: 12px 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
-.who { display: flex; justify-content: space-between; font-weight: 800; margin-bottom: 8px; }
+.who { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; margin-bottom: 8px; }
+#myName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #myTeam.red { color: var(--red); }
 #myTeam.blue { color: var(--blue); }
 .bar { position: relative; height: 16px; border-radius: 6px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin-top: 6px; }
@@ -289,6 +328,7 @@ button.danger:hover { background: rgba(255, 90, 90, 0.18); }
 #scoreboard th { font-size: 11px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; padding: 6px 10px; text-align: right; }
 #scoreboard td { padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; border-top: 1px solid rgba(255, 255, 255, 0.06); }
 #scoreboard th:first-child, #scoreboard td:first-child { text-align: left; }
+#scoreboard td:first-child { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #scoreboard tr.red td:first-child { color: var(--red); font-weight: 700; }
 #scoreboard tr.blue td:first-child { color: var(--blue); font-weight: 700; }
 #scoreboard tr.me td { background: rgba(255, 255, 255, 0.06); }

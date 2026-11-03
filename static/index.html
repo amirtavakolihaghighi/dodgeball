@@ -88,10 +88,12 @@
         <div class="teamCols">
           <div class="teamCol red"><h4>RED <span id="countRed"></span></h4>
             <div class="botRow">Bots <button id="botsRedMinus" class="small hostCtl">−</button><b id="botsRedValue">0</b><button id="botsRedPlus" class="small hostCtl">+</button>
+              <select id="addRed" class="small hostCtl botAdd" hidden title="Put one of your own bots on RED, or make a new one"></select>
               <span class="soon" id="botsRedSoon"></span></div>
             <ul id="listRed"></ul></div>
           <div class="teamCol blue"><h4>BLUE <span id="countBlue"></span></h4>
             <div class="botRow">Bots <button id="botsBlueMinus" class="small hostCtl">−</button><b id="botsBlueValue">0</b><button id="botsBluePlus" class="small hostCtl">+</button>
+              <select id="addBlue" class="small hostCtl botAdd" hidden title="Put one of your own bots on BLUE, or make a new one"></select>
               <span class="soon" id="botsBlueSoon"></span></div>
             <ul id="listBlue"></ul></div>
         </div>
@@ -113,6 +115,7 @@
           <span class="soon" id="timeSoon"></span>
         </div>
         <div class="row rulesRow"><button id="rulesBtn">Game rules…</button><span id="rulesSummary" class="note"></span></div>
+        <div class="row"><button id="botsBtn" title="Your own bots, and flags: bundles of behaviour like Dodge master or Berserker">Bots &amp; flags…</button></div>
         <div class="row"><button id="exportBtn" class="small" title="Save every rule and each player's own settings as a file">Export settings</button>
           <button id="importBtn" class="small hostOnly" hidden title="Load a settings file: it replaces every rule and each player's own settings">Import settings…</button></div>
         <div id="pendingBox" class="pending" hidden><span id="pendingText"></span> <button id="discardBtn" class="small hostOnly" hidden>Cancel them</button></div>
@@ -122,6 +125,9 @@
     <div class="cols">
       <section>
         <h3>Your settings</h3>
+        <div class="row nameRow"><label for="renameInput">Your name</label>
+          <input id="renameInput" maxlength="32" autocomplete="off" spellcheck="false" title="Change it any time: you keep your team, score and own settings">
+          <button id="renameBtn" class="small">Change</button></div>
         <label>Mouse sensitivity <input id="sensInput" type="range" min="0.3" max="2.5" step="0.05"></label>
         <div class="soundMix">
           <label>Volume <input id="volInput" type="range" min="0" max="1" step="0.05"></label>
@@ -200,10 +206,45 @@
       <button id="rulesResetAll" class="hostOnly">Reset all to defaults</button>
       <button id="rulesRevert" class="hostOnly">Undo my edits</button>
       <span id="rulesEditCount"></span>
-      <button id="rulesExportPlayer" class="small" hidden title="Save this player's own settings as a file (a profile you can load onto anyone)">Export</button>
-      <button id="rulesImportPlayer" class="small hostOnly" hidden title="Load a player's settings file onto this player: it replaces their own settings">Import…</button>
+      <span id="rulesFileBox" class="fileBox" hidden>Their settings as a file:
+        <button id="rulesExportPlayer" title="Save this player's own settings in your Downloads folder: a profile you can load onto anyone">Export</button>
+        <button id="rulesImportPlayer" class="hostOnly" title="Load a player's settings file onto this player: it replaces their own settings">Import…</button></span>
       <button id="rulesApply" class="primary hostOnly">Apply</button>
     </footer>
+  </div>
+</div>
+
+<!-- Bots and flags: the host's own bots, flags on any bot, and the flags themselves (bots_ui.js). -->
+<div id="botsModal" hidden>
+  <div class="panel botsPanel">
+    <header>
+      <div class="rulesTitle">
+        <h2>Bots &amp; flags</h2>
+        <p id="botsMode" class="note"></p>
+      </div>
+      <span id="botsWaiting" class="soon" hidden>Some of this waits for the next round</span>
+      <button id="botsClose" class="small" title="Close (Esc)">✕</button>
+    </header>
+    <div class="botsBody">
+      <section>
+        <h3>Your bots</h3>
+        <p class="note">A bot you make keeps its name, its flags and its own settings (⚙), and plays wherever you put it: here, or with “Add a bot…” in the team lists.</p>
+        <ul id="rosterList" class="botList"></ul>
+        <div id="newBotRow" class="row" hidden><input id="newBotName" maxlength="32" placeholder="A new bot's name" autocomplete="off" spellcheck="false">
+          <select id="newBotTeam" class="small"><option value="">not on a team yet</option><option value="0">on RED</option><option value="1">on BLUE</option></select>
+          <button id="newBotBtn" class="small">Make it</button></div>
+        <h3>The built-in bots</h3>
+        <p class="note">Ace, Blitz, Comet… fill the teams when you press + next to Bots. Those playing now, or carrying flags:</p>
+        <ul id="builtinList" class="botList"></ul>
+      </section>
+      <section>
+        <h3>Flags</h3>
+        <p class="note">A flag is a bundle of behaviour that a bot carries: how it defends, throws and moves, or its health and speed. A bot can carry several; where they overlap, the later one wins, and the bot's own settings win over all of them.</p>
+        <ul id="flagList" class="botList"></ul>
+        <div id="newFlagRow" class="row" hidden><input id="newFlagName" maxlength="32" placeholder="A new flag's name" autocomplete="off" spellcheck="false">
+          <button id="newFlagBtn" class="small">Make it</button></div>
+      </section>
+    </div>
   </div>
 </div>
 
@@ -211,7 +252,7 @@
   <div class="panel">
     <div class="logo">DODGE<span>BALL</span></div>
     <p class="tag">Schoolyard dodgeball with Souls-style stamina. Throw hard, read the ball, then dodge, catch or deflect at the last moment.</p>
-    <label class="field">Name <input id="nameInput" maxlength="16" autocomplete="off"></label>
+    <label class="field">Name <input id="nameInput" maxlength="32" autocomplete="off"></label>
     <button id="playBtn" class="primary">Join game</button>
     <p class="warn" id="gpuWarnJoin" hidden>Your browser is drawing the game without the graphics card, so it will be choppy. In Chrome or Edge, open Settings › System, switch on “Use graphics acceleration when available”, and restart the browser.</p>
     <p class="note">The host (whoever runs the game on their computer) sets up the teams and the rules, and starts the match. Testing alone? Open more tabs or windows, and add bots to either team in the lobby.</p>

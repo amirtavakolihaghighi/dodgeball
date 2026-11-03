@@ -21,7 +21,7 @@ from collections import deque
 from dataclasses import dataclass, field
 
 import bots
-from rules import Rules, clean_name, display_name
+from rules import BY_KEY, PERSON_KEY, Rules, clean_key, clean_name, display_name, key_label
 
 ACTION_CODE = {"dodge": 1, "catch": 2, "deflect": 3}
 BALL_STATE_CODE = {"live": 0, "pending": 1, "dead": 2}
@@ -175,7 +175,8 @@ class Player:
     seen: deque = field(default_factory=lambda: deque(maxlen=48))   # (view time, x, z): where they were on their own screen
     brain: object = None
     rules: Rules | None = None      # the rules they play by: everyone's, or theirs on top (Game._refresh_rules)
-    slot: int = -1                  # a bot's place on its team (0 = first): it gives the bot its name
+    slot: int = -1                  # a bot's place in its team's lineup (0 = first)
+    key: str = ""                   # who they are for own settings and their team: rules.clean_key
 
 
 @dataclass
@@ -244,7 +245,7 @@ class Game:
     @bots_each.setter
     def bots_each(self, value):
         """The same number of bots on both teams."""
-        self.rules.BOTS_RED = self.rules.BOTS_BLUE = value
+        self.rules.update({"BOTS_RED": value, "BOTS_BLUE": value})
 
     @property
     def bot_skill(self):
@@ -277,15 +278,20 @@ class Game:
 
     # ------------------------------------------------------------------ players
 
-    def add_player(self, name, team, now, bot=False, host=False, slot=-1):
+    def add_player(self, name, team, now, bot=False, host=False, slot=-1, key=None):
+        """`key`: who they are (a person's from their browser, a bot's from its id); without one, they
+        go by name like in older versions (tests)."""
         pid = self._new_id()
         name = _clean_name(name, f"Player {pid}")
+        key = key or clean_key(name) or f"n:{name}"
+        if not bot and PERSON_KEY.fullmatch(key):
+            self._claim(key, name)
         if team not in (0, 1) or isinstance(team, bool):
-            team = None if bot else self.recent_teams.get(name)
+            team = None if bot else self.recent_teams.get(key)
             if team is None:
                 team = self._auto_team()
-        p = Player(id=pid, name=name, team=team, bot=bot, host=host, slot=slot)
-        p.rules = self.rules.for_player(name)       # their own settings, if the host gave them any
+        p = Player(id=pid, name=name, team=team, bot=bot, host=host, slot=slot, key=key)
+        p.rules = self.rules.for_player(key)        # their own settings, if the host gave them any
         p.hp, p.stamina = p.rules.MAX_HP, p.rules.MAX_STAMINA
         if bot:
             p.brain = bots.Brain()
@@ -307,12 +313,33 @@ class Game:
         self._fit_court(shrink=self.state in FREE_PLAY)
         self._resize_team_health()
 
+    def _claim(self, key, name):
+        """A person arrived (or renamed themselves) as `name`: own settings an older file left under
+        that name become theirs, and the name they go by is remembered with their own settings."""
+        changed = False
+        for rules in (self.rules, self.next_rules):
+            if rules is not None:
+                changed = rules.claim(key, name) | rules.label(key, name) | changed
+        if changed:
+            self.rules_version += 1
+
+    def rename(self, p, name, now):
+        """A person changes their name (Esc › Your settings): everything else stays theirs."""
+        name = clean_name(name)
+        if p is None or p.bot or not name or name == p.name:
+            return
+        old, p.name = p.name, name
+        if PERSON_KEY.fullmatch(p.key):
+            self._claim(p.key, name)
+            p.rules = self.rules.for_player(p.key)
+        self._event(now, "rename", p=p.id, name=name, was=old)
+
     def _remember_team(self, p):
         team = p.team if p.next_team is None else p.next_team
         if team == WATCHING:
             return          # keep the team they had, to come back to
-        self.recent_teams.pop(p.name, None)
-        self.recent_teams[p.name] = team
+        self.recent_teams.pop(p.key, None)
+        self.recent_teams[p.key] = team
         while len(self.recent_teams) > RECENT_TEAMS_KEPT:
             self.recent_teams.pop(next(iter(self.recent_teams)))
 
@@ -384,6 +411,8 @@ class Game:
             self.shuffle_teams(now)
         elif kind == "spectate":
             self.spectate(p, msg.get("on") is True, now)
+        elif kind == "rename" and isinstance(msg.get("name"), str):
+            self.rename(p, msg["name"], now)
 
     @staticmethod
     def _view_time(p, msg, now):
@@ -897,16 +926,26 @@ class Game:
         """The host's edits to one player's (or bot's) own settings, {key: value or None for
         everyone's value}; `replace`: these become all of their own settings. When they apply:
         like any rule change. Returns what changed, as (name, key) pairs."""
-        if replace:
-            return self._change_rules(lambda target: target.set_player(name, values), now)
-        return self._change_rules(lambda target: target.update_player(name, values), now)
+        def edit(target):
+            changed = target.set_player(name, values) if replace else target.update_player(name, values)
+            for p in self.players.values():         # whose they are, for files and the menus
+                if not p.bot:
+                    target.label(p.key, p.name)
+            return changed
+        return self._change_rules(edit, now)
+
+    def change_bots(self, op, now):
+        """The host's edits to the bots (rules.Rules.bot_change): which bots play on which team, the
+        host's own bots and the flags. When they apply: like any rule change."""
+        return self._change_rules(lambda target: target.bot_change(op), now)
 
     def import_rules(self, data, now):
-        """The host loaded a settings file: its rules (any it leaves out go back to their default)
-        and every player's own settings replace the current ones."""
+        """The host loaded a settings file: its rules (any it leaves out go back to their default),
+        every player's own settings and the bots replace the current ones."""
         if not isinstance(data, dict):
             return []
-        return self._change_rules(lambda target: target.replace(data.get("rules"), data.get("players")), now)
+        return self._change_rules(lambda target: target.replace(data.get("rules"), data.get("players"),
+                                                                data.get("labels"), data.get("bots")), now)
 
     def _change_rules(self, edit, now):
         """Apply `edit` (it changes a copy of the rules and returns what changed: rule keys and
@@ -917,7 +956,8 @@ class Game:
             return changed
         later = self.state not in FREE_PLAY
         if later:
-            same = not target.differences(self.rules) and not target.player_differences(self.rules)
+            same = (not target.differences(self.rules) and not target.player_differences(self.rules)
+                    and not target.bots_differ(self.rules))
             self.next_rules = None if same else target
             self.rules_version += 1
         else:
@@ -929,12 +969,18 @@ class Game:
         self._event(now, "rules", n=len(changed), names=[self._change_name(c) for c in changed[:3]], next=later)
         return changed
 
-    @staticmethod
-    def _change_name(change):
-        """A rule key, or a (player, key) pair of their own settings, as messages name it."""
+    def who_name(self, key):
+        """The name that goes with a key: a bot's, or the name a player was last seen with."""
+        if key.startswith("b:"):
+            return (self.next_rules or self.rules).bot_name(key[2:])
+        return key_label(key, {**self.rules.labels, **(self.next_rules.labels if self.next_rules else {})})
+
+    def _change_name(self, change):
+        """A rule key, a (player key, rule) pair of their own settings, or a note about the bots, as
+        messages name it."""
         if isinstance(change, tuple):
-            return f"{change[0]} › {display_name(change[1])}"
-        return display_name(change)
+            return f"{self.who_name(change[0])} › {display_name(change[1])}"
+        return display_name(change) if change in BY_KEY else change
 
     def _host_rules(self, msg, now):
         if msg.get("discard"):
@@ -943,9 +989,11 @@ class Game:
                 self.rules_version += 1
                 self._event(now, "rules", n=0, names=[], next=False, discard=True)
             return
-        if isinstance(msg.get("player"), str):          # one player's (or bot's) own settings
+        if isinstance(msg.get("player"), str):          # one player's (or bot's) own settings, by key
             values = msg.get("replace") if isinstance(msg.get("replace"), dict) else msg.get("set")
             self.set_player_rules(msg["player"], values, now, replace=isinstance(msg.get("replace"), dict))
+        elif isinstance(msg.get("bot"), dict):          # the bots: who plays where, the roster, the flags
+            self.change_bots(msg["bot"], now)
         elif isinstance(msg.get("import"), dict):       # a settings file: the whole setup
             self.import_rules(msg["import"], now)
         elif msg.get("reset"):                          # everything back to the defaults, players' own settings too
@@ -958,16 +1006,17 @@ class Game:
         self.rules, self.next_rules = rules, None
         self.rules_version += 1
         for p in self.players.values():
-            p.rules = rules.for_player(p.name)
+            p.rules = rules.for_player(p.key)
         if rules.TEAM_CASH != shared_before:
             self._regroup_cash(rules.TEAM_CASH)
 
     def pending_changes(self):
-        """What waits for the next round: rule keys, and "name: KEY" for players' own settings."""
+        """What waits for the next round: rule keys, "name: KEY" for players' own settings, and "bots"."""
         if self.next_rules is None:
             return []
-        return self.next_rules.differences(self.rules) + [f"{name}: {key}" for name, key in
-                                                         self.next_rules.player_differences(self.rules)]
+        return (self.next_rules.differences(self.rules)
+                + [f"{self.who_name(who)}: {key}" for who, key in self.next_rules.player_differences(self.rules)]
+                + (["bots"] if self.next_rules.bots_differ(self.rules) else []))
 
     def move_player(self, p, now):
         """Put a human on the other team: at once in free play, otherwise from the next round
@@ -1045,27 +1094,24 @@ class Game:
         p.alive, p.charging, p.action = False, False, None
 
     def _sync_bots(self, now):
-        """Each team gets exactly the bots the host set (none while no person is here). Nothing
-        else adds, removes or balances them. A team's bots fill its first slots, and each slot has
-        its own name, so a bot with its own settings is the same bot whenever its slot is filled."""
+        """Each team gets exactly the bots in its lineup (none while no person is here). Nothing
+        else adds, removes or balances them. Every bot is someone (a built-in one, or one the host
+        made), so its own settings and flags stay with it wherever and whenever it plays."""
         present = self.bots_play_alone or any(not p.bot for p in self.players.values())
-        for t in (0, 1):
-            wanted = self.rules.bots_for(t) if present else 0
-            team_bots = [p for p in self.players.values() if p.bot and p.team == t]
-            for extra in [p for p in team_bots if p.slot >= wanted]:
-                del self.players[extra.id]
-            filled = {p.slot for p in team_bots}
-            for slot in range(wanted):
-                if slot not in filled:
-                    self.add_player(self.bot_name(t, slot), t, now, bot=True, slot=slot)
+        wanted = {f"b:{bid}": (t, i) for t in (0, 1) for i, bid in enumerate(self.rules.lineup[t] if present else [])}
+        for p in [p for p in self.players.values() if p.bot]:
+            place = wanted.pop(p.key, None)
+            if place is None or place[0] != p.team:
+                del self.players[p.id]          # not playing any more, or moved: it comes back on its new team
+                if place is not None:
+                    wanted[p.key] = place
+            else:
+                p.slot = place[1]
+                p.name = self.rules.bot_name(p.key[2:])
+        for key, (t, i) in sorted(wanted.items(), key=lambda kv: kv[1]):
+            self.add_player(self.rules.bot_name(key[2:]), t, now, bot=True, slot=i, key=key)
         self._fit_court(shrink=self.state in FREE_PLAY)
         self._resize_team_health()
-
-    @staticmethod
-    def bot_name(team, slot):
-        """RED's bots are Ace, Comet, Echo...; BLUE's Blitz, Dash, Flick... (every other name)."""
-        names = bots.NAMES[team::2]
-        return f"Bot {names[slot]}" if slot < len(names) else f"Bot {TEAM_NAMES[team].title()} {slot + 1}"
 
     # ------------------------------------------------------------------ simulation
 
@@ -1415,6 +1461,7 @@ class Game:
                 round(clamp((now - p.charge_started_at) / p.rules.CHARGE_TIME, 0.0, 1.0), 2) if p.charging else 0,
                 [p.stats[k] for k in STAT_KEYS],
                 p.next_team,                # where the host's move takes them next round (WATCHING = spectating)
+                p.key,                      # who they are for own settings (two players may share a name)
             ])
         balls = []
         for b in self.balls.values():
