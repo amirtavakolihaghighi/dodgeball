@@ -8,6 +8,14 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-03
+
+The game gets a new look and feel: athletes in a sunlit sports hall instead of stick figures,
+real motion, recorded sounds and music, and effects with some punch, all made in Blender or taken
+from CC0 sources, and light enough for office laptops. The host also gets bots of their own with
+flags (bundles of behaviour), a search across every rule, and players are now known by their
+browser rather than their name, so two people can share a name.
+
 ### Added
 
 - **Athletes instead of stick figures:** every player is an athlete in their team's kit, with a sports helmet or a face and hair, and one of six skin and hair colours, picked when they join and the same on every screen. Low graphics draw lighter ones. They move with real motion and moves made for the game:
@@ -212,7 +220,8 @@ The first stable version, released as Dodge & Parry: real-time 3D dodgeball for 
 - A standalone Windows app (`build_exe.bat`), `run.bat`, and 30 rule tests plus headless-browser
   tests.
 
-[Unreleased]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/amirtavakolihaghighi/dodgeball/compare/v1.0.0...v2.0.0
