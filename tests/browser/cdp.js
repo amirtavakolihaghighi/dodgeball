@@ -42,15 +42,17 @@ const proc = spawn(chrome, [
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  let targets;
-  for (let i = 0; i < 50 && !targets; i++) {
+  // Wait up to 30 s for Chrome's debug port: on GitHub's Linux machines it sometimes takes over 10 s.
+  let page;
+  for (let i = 0; i < 150 && !page; i++) {
     try {
-      targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-    } catch {
-      await sleep(200);
-    }
+      const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+      page = targets.find((t) => t.type === 'page');
+    } catch { /* not up yet */ }
+    if (!page) await sleep(200);
   }
-  const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
+  if (!page) throw new Error('headless Chrome did not open its debug port within 30 s');
+  const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((r) => (ws.onopen = r));
   let id = 0;
   const pending = new Map();
