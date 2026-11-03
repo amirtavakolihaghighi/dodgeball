@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '/static/vendor/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from '/static/vendor/addons/utils/SkeletonUtils.js';
-import { Athlete, loadAthlete } from './athlete.js';
+import { ACROBATICS_TIME, Athlete, CAUGHT_TIME, loadAthlete } from './athlete.js';
 import { effectTextures } from './fxtex.js';
 
 export const TEAM_COLORS = [0xff4d5e, 0x3fa9ff];
@@ -405,6 +405,8 @@ export class World {
     const params = new URLSearchParams(location.search);
     this.headChoice = params.get('head');
     this.athlete = null;    // the athlete's meshes and maps (athlete.js), once loaded
+    this.timing = null;     // the rules' timings the athletes' moves fit (setTiming)
+    this.round = null;      // the round's state and winner: the athletes celebrate or kneel at its end
     this.ready = false;     // the hall and the athlete have loaded, or won't
     const athlete = params.has('noathlete') ? null : loadAthlete().catch((err) => {
       console.warn('The athlete could not be loaded; the stick figures stay.', err);
@@ -938,12 +940,12 @@ export class World {
 
   /** A fading glowing copy of a stick figure's current pose (perfect-dodge afterimage). Low
    *  graphics skip it: each copies the whole figure, and the popup and sound say "perfect" too. */
-  ghostMan(man) {
+  ghostMan(man, strength = 1) {
     if (this.quality === 'low') return;
     const group = new THREE.Group();
     group.position.copy(man.root.position);
     group.rotation.copy(man.root.rotation);
-    const opacity = man.isMe ? 0.22 : 0.45;     // your own sit right in front of the camera
+    const opacity = (man.isMe ? 0.22 : 0.45) * strength;     // your own sit right in front of the camera
     const mat = new THREE.MeshBasicMaterial({ color: man.ghostColor, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending });
     const body = man.athlete ? cloneSkinned(man.body) : man.body.clone(true);   // an athlete's copy gets its own bones, held still
     body.traverse((o) => { if (o.isMesh) o.material = mat; });
@@ -1009,6 +1011,12 @@ export class World {
 
   setBallRadius(r) {
     this.ballScale = r / 0.2;
+  }
+
+  /** The rules' timings (the server's config): the athletes' dodges, catches, deflects and throws
+   *  are stretched to fit them. */
+  setTiming(cfg) {
+    this.timing = { dash: cfg.dash, chargeTime: cfg.chargeTime, actions: cfg.actions };
   }
 
   cameraRay() {
@@ -1101,6 +1109,13 @@ class Stickman {
     this.spinT = 9;
     this.spinDir = 1;
     this.lastGhost = 0;
+    this.lastDash = -1;
+    this.reviveT = 9;
+    this.moveF = this.moveR = this.rawF = this.rawR = 0;
+    this.hitInfo = null;
+    this.throws = 0;
+    this.caughtT = 9;
+    this.catchBall = null;
     if (world.athlete) this.dress(world.athlete);
   }
 
@@ -1150,12 +1165,27 @@ class Stickman {
     for (const m of this.capsules) m.removeFromParent();
     this.body.add(a.model);
     a.hold(this.held, 0.15 * this.world.ballScale);
+    this.catchBall = new THREE.Mesh(heldGeo, this.heldMat);   // a caught ball, a moment in the left palm
+    this.catchBall.visible = false;
+    a.holdLeft(this.catchBall, 0.15 * this.world.ballScale);
     a.setLow(this.world.quality === 'low');
     this.fadeMats = [...a.mats, this.heldMat];
   }
 
   playThrow() {
     this.throwT = 0;
+    this.throws++;                            // which throw this is: an athlete's style for the next
+  }
+
+  /** Caught a ball: an athlete shows it in the left palm a moment, then pulls it in. */
+  caught() {
+    this.caughtT = 0;
+    this.athlete?.caughtBall();
+  }
+
+  /** Deflected a ball: an athlete's parry plays through (the game ends the deflect at once). */
+  deflected() {
+    this.athlete?.deflected(this);
   }
 
   flinch() {
@@ -1164,16 +1194,20 @@ class Stickman {
 
   /** Impact freeze (hitstop): the pose holds and shudders for `dur` seconds, with the hit flash,
    *  then the flinch plays. Only this figure stops: the balls and everyone else keep moving. */
-  impact(dur) {
+  impact(dur, info = null) {
     this.freezeT = this.freezeDur = dur;
     this.hitT = 0;
+    this.hitInfo = info;                       // { speed, from: {x, z} }: an athlete's knockout falls away from the thrower
+    if (this.athlete) this.athlete.flinch = Math.random() < 0.5 ? 'flinch_chest' : 'flinch_head';
   }
 
-  /** Perfect dodge: a full spin out of the way, leaving glowing afterimages. */
-  perfectDodge() {
+  /** Perfect dodge: a full spin out of the way, leaving glowing afterimages (an athlete: one of
+   *  its acrobatics, picked by seed so every screen shows the same one). */
+  perfectDodge(seed = 0) {
     this.spinT = 0;
     this.lastGhost = -1;
     this.spinDir = this.side > 0 ? -1 : 1;     // spin the way we're moving
+    this.athlete?.startAcrobatics(seed, this.side, this.moveF < -1.5);   // going backwards: a backflip
   }
 
   // Joint sign conventions (limbs hang down, the model faces +z, its right is -x):
@@ -1183,7 +1217,8 @@ class Stickman {
     const frozen = this.freezeT > 0;
     if (frozen) this.freezeT -= dt;
     const pdt = frozen ? 0 : dt;              // the pose's own clock, stopped by an impact freeze
-    if (!this.last) this.last = { x: s.x, z: s.z };
+    // placed by the server (a round's start, a spawn): a jump, not running
+    if (!this.last || Math.hypot(s.x - this.last.x, s.z - this.last.z) > 2.5) this.last = { x: s.x, z: s.z };
     const inv = 1 / Math.max(dt, 1e-3);
     const vx = (s.x - this.last.x) * inv;
     const vz = (s.z - this.last.z) * inv;
@@ -1193,17 +1228,23 @@ class Stickman {
     this.throwT += pdt;
     this.hitT += pdt;
     this.spinT += pdt;
+    this.reviveT += pdt;
+    if (s.alive && this.downT > 0) this.reviveT = 0;   // back up: revived
     this.downT = s.alive ? 0 : this.downT + pdt;
 
     const sy = Math.sin(s.yaw);
     const cy = Math.cos(s.yaw);
     const vf = vx * sy + vz * cy;       // velocity along facing
     const vr = -vx * cy + vz * sy;      // velocity to the right
+    this.rawF = vf;
+    this.rawR = vr;
+    this.moveF = damp(this.moveF, vf, 10, dt);          // smoothed, for the athlete's running
+    this.moveR = damp(this.moveR, vr, 10, dt);
     this.side = damp(this.side, vr, 20, dt);
     this.phase += pdt * this.speed * 1.9;
     const w = Math.min(1, this.speed / 6);
     const sw = Math.sin(this.phase);
-    const spinning = this.spinT < SPIN_TIME && s.alive;
+    const spinning = this.spinT < (this.athlete ? ACROBATICS_TIME : SPIN_TIME) && s.alive;
     const T = {
       legL: sw * 0.75 * w, legR: -sw * 0.75 * w,
       kneeL: Math.max(0, Math.sin(this.phase + 1.2)) * w, kneeR: Math.max(0, Math.sin(this.phase + 1.2 + Math.PI)) * w,
@@ -1289,22 +1330,33 @@ class Stickman {
     this.armR.elbow.rotation.x = damp(this.armR.elbow.rotation.x, T.elbowR, 26, pdt);
     this.chest.rotation.y = damp(this.chest.rotation.y, T.twist, 24, pdt);
     this.hips.position.y = damp(this.hips.position.y, 0.95 - T.crouch, 20, pdt);
-    if (this.athlete) {
-      this.athlete.setLow(this.world.quality === 'low');
-      this.athlete.pose(this);
+    const a = this.athlete;
+    if (a) {
+      a.setLow(this.world.quality === 'low');
+      a.animate(pdt, s, this);
     }
 
     let spin = 0;
     let hop = 0;
     if (spinning) {
-      const k = this.spinT / SPIN_TIME;
-      spin = this.spinDir * Math.PI * 2 * (1 - (1 - k) ** 3);
-      hop = Math.sin(Math.PI * k) * 0.3;
+      const k = this.spinT / (a ? ACROBATICS_TIME : SPIN_TIME);
+      if (!a) {                                         // the stick figure spins; an athlete does its acrobatics
+        spin = this.spinDir * Math.PI * 2 * (1 - (1 - k) ** 3);
+        hop = Math.sin(Math.PI * k) * 0.3;
+      }
       if (this.spinT - this.lastGhost >= 0.065) {
         this.lastGhost = this.spinT;
         this.root.rotation.y = s.yaw + spin;
         this.root.position.set(s.x, 0, s.z);
         this.world.ghostMan(this);
+      }
+    } else if (a && s.alive && s.act === 1 && s.actAge < (this.world.timing?.dash.time ?? 0.22) + 0.04) {
+      if (s.actAge < this.lastDash) this.lastDash = -1;   // a ghost dash: a faint trail of afterimages
+      if (s.actAge - this.lastDash >= 0.045) {
+        this.lastDash = s.actAge;
+        this.root.rotation.y = s.yaw;
+        this.root.position.set(s.x, 0, s.z);
+        this.world.ghostMan(this, 0.45);
       }
     }
     this.root.position.set(s.x, 0, s.z);
@@ -1317,7 +1369,10 @@ class Stickman {
     const shudder = frozen ? 0.05 * (this.freezeT / this.freezeDur) : 0;
     this.body.position.x = shudder * (Math.random() * 2 - 1);
     this.body.position.z = shudder * (Math.random() * 2 - 1);
-    if (s.alive) {
+    if (a && a.moving) {                                // the athlete's moves lean, hop and fall by themselves
+      this.body.rotation.x = this.body.rotation.z = 0;
+      this.body.position.y = 0;
+    } else if (s.alive) {
       this.body.rotation.x = damp(this.body.rotation.x, T.leanX, 14, pdt);
       this.body.rotation.z = damp(this.body.rotation.z, T.leanZ, 14, pdt);
       this.body.position.y = hop;
@@ -1328,7 +1383,8 @@ class Stickman {
       this.body.position.y = 0.12 * k;
     }
     let opacity = 1;
-    if (!s.alive) opacity = 1 - clamp((this.downT - 1.4) / 0.6, 0, 1);
+    const fadeAt = a && a.moving ? 2.2 : 1.4;           // an athlete fades once it has landed
+    if (!s.alive) opacity = 1 - clamp((this.downT - fadeAt) / 0.6, 0, 1);
     else if (s.invuln) opacity = Math.sin(performance.now() / 45) > 0 ? 0.85 : 0.3;
     if (s.camDist < 2.6 && !s.isMe) opacity = Math.min(opacity, 0.2);   // don't block the camera
     this.root.visible = opacity > 0.01;
@@ -1337,12 +1393,22 @@ class Stickman {
       m.transparent = opacity < 1;
       m.opacity = opacity;
     }
-    const glow = Math.max(0, 1 - this.hitT / 0.18) * 1.6 + (spinning ? 0.6 : 0);     // the hit flash, a perfect dodge
+    const glow = Math.max(0, 1 - this.hitT / 0.18) * 1.6 + (spinning ? (a ? 0.3 : 0.6) : 0);     // the hit flash, a perfect dodge
     if (this.athlete) this.athlete.glow(glow);
     else this.mat.emissiveIntensity = 0.18 + glow;
     this.held.visible = s.alive && s.hasBall && this.throwT > 0.12;
     this.held.scale.setScalar(this.world.ballScale);
-    if (this.athlete) this.athlete.hold(this.held, 0.15 * this.world.ballScale);
+    if (this.athlete) {
+      this.athlete.hold(this.held, 0.15 * this.world.ballScale);
+      this.caughtT += pdt;
+      if (s.charging) this.caughtT = Math.max(this.caughtT, CAUGHT_TIME);   // winding up: it's in the right hand
+      this.catchBall.visible = s.alive && this.caughtT < CAUGHT_TIME;
+      if (this.catchBall.visible) {
+        this.held.visible = false;                      // then it passes to the right hand
+        this.catchBall.scale.setScalar(this.world.ballScale);
+        this.athlete.holdLeft(this.catchBall, 0.15 * this.world.ballScale);
+      }
+    }
     if (s.ballColor !== this.ballColor) {      // the ball in hand is the colour it'll fly in
       this.ballColor = s.ballColor;
       this.heldMat.color.setHex(hex(s.ballColor));

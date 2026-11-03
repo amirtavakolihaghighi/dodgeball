@@ -106,7 +106,14 @@ To read a session: `python tools\log_report.py <the zip or a session folder>`. I
 
 - **Every player is an athlete** in their team's kit: red or blue shirt with white trims, navy shorts with stripes in the team's colour, white socks and shoes.
 - **Two versions:** a sports helmet with a dark visor, or a face with hair. Each player gets one when they join, with one of six skin, hair and eye colours, and everyone sees them the same.
-- **They move as the stick figures did,** for now: the same running, throws, catches, deflects, dodges and falls. Holding a ball, they carry it in front of them.
+- **They move like athletes,** with real motion from free (public domain) animation libraries, and moves made for the game:
+  - they run as fast as you go, legs towards where you're running while the chest keeps facing your aim; backwards, they backpedal;
+  - during play they stand in a boxer's guard; holding a ball, they carry it in the right hand, in front of the hip.
+- **Throws** come in three kinds, at random: overhead, side-arm at the stomach's height (the arm reaching further out as you charge), or underarm like bowling. While you charge, the left forearm covers the face.
+- **Deflects** are a backhand parry with the left hand, swinging out to the left. **Catches** are one-handed: the left arm shoots out, palm forward, then pulls the ball in to the right hand.
+- **Dodges:** sideways, a quick side step (the far foot pushes, the near foot lands); forwards, a half-crouched lunge; backwards, a jump back. Every dash leaves a faint trail of afterimages (not on Low graphics).
+- **Perfect dodges:** a corkscrew, an aerial side flip or a butterfly twist, picked at random (everyone sees the same one), with afterimages; going backwards, a backflip.
+- **Hits** make them flinch. **Knockouts** throw them down, away from the ball, harder the faster it came. **Revived**, they get up from the floor. **At a round's end** the winners celebrate and the losers kneel.
 - **Low graphics** draw lighter versions (about a third of the detail).
 - **Until they have loaded** (a moment at start), the stick figures of before stand in.
 

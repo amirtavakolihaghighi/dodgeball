@@ -92,5 +92,69 @@
   "palm": "palm_R",
   "centre": "ball_R",
   "radius": 0.15
+ },
+ "fps": 30,
+ "moves": {
+  "idle": {
+   "duration": 3.1333
+  },
+  "guard": {
+   "duration": 1.6667
+  },
+  "jog": {
+   "duration": 1.1667,
+   "stride": 5.376,
+   "speed": 4.608,
+   "footfall": 0.0
+  },
+  "sprint": {
+   "duration": 0.8333,
+   "stride": 3.304,
+   "speed": 3.965,
+   "footfall": 0.96
+  },
+  "throw": {
+   "duration": 1.8333,
+   "cock": 0.4333,
+   "release": 0.7
+  },
+  "flip": {
+   "duration": 2.4667,
+   "takeoff": 0.4667,
+   "touchdown": 1.6333
+  },
+  "air": {
+   "duration": 2.0
+  },
+  "flinch_chest": {
+   "duration": 0.4
+  },
+  "flinch_head": {
+   "duration": 0.5333
+  },
+  "ko_back": {
+   "duration": 2.1667
+  },
+  "ko_fly": {
+   "duration": 1.8333
+  },
+  "ko_tumble": {
+   "duration": 2.1667
+  },
+  "getup": {
+   "duration": 1.5
+  },
+  "win_jump": {
+   "duration": 1.6333
+  },
+  "win_pump": {
+   "duration": 2.2333
+  },
+  "cheer": {
+   "duration": 1.6
+  },
+  "beaten": {
+   "duration": 0.8
+  }
  }
 }

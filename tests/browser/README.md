@@ -172,8 +172,22 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\athletes
 
 - **Everyone dressed:** 4 of 4 (you and three bots), the helmet and the face both among them (from the players' ids: 1 and 2 face, 3 and 4 helmet), each drawing two meshes (the body and its head).
 - **Low:** the light meshes (`body_lo`, ...) show instead, and the shader count doesn't change (37).
-- **The pose follows the stick figure:** in the lobby and in a match, and with your own player held in a wind-up, a dodge, a catch and a deflect, each athlete's hands are within 10 cm of the stick figure's (their arms differ a little) and no ankle goes under its resting height (7 cm: no foot through the floor).
+- **No foot through the floor:** in the lobby and in a match, and with your own player held in a wind-up, a dodge, a catch and a deflect, no ankle goes under its resting height (7 cm). (Since step 8 the moves' clips place the hands, not the stick figure.)
 - **Pictures** (`athletes_*.png`): your player from the front, back and side and its face close up, in each pose, a blue player, both heads close up, Low, and the game's own view. The camera is moved only while drawing (`world.render` wrapped), with everyone else hidden for that frame and the HUD faded.
+
+## The athletes' moves
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\moves.json
+```
+
+`moves.json` (+ `moves.js`, and `athletes.js` for the pictures) holds your own player (standing in the lobby's warm-up) in each move, at a chosen moment, by overriding its state and timers each frame (a frame early, since the frame moves them on before the pose is made):
+
+- **The moves:** standing; strafing right and left, a backpedal, and strafing right again right after it (the player walked steadily); each throw's wind-up and release (overhead, side-arm, underarm); the parry's start, peak and follow-through; the catch (from the front and the side); a caught ball pulled in; carrying; the dashes (right, its landing, left, forward, back); the corkscrew, the side flip, the butterfly and the backflip, and a corkscrew in the middle of a dash; the three knockouts, lying, getting up, and walking during a get-up; winning and losing.
+- **Pictures:** `moves_*.png`, each from the side or the front.
+- **Positions:** each move prints where the hands, feet, hips and head are, the legs' turn (`legYaw`) and the hips' turn measured from the bones (`hipsTurn`, + to the right). Healthy: strafing right and left, `hipsTurn` about +1.3 and −1.3, and +1.3 with `back` false right after the backpedal; the corkscrew in a dash, the hips about 1.5 m up like the corkscrew alone; walking during a get-up, the hips about 0.9 m up (standing still, 0.29); the side-arm wind-up's right hand 0.6 m out; the parry's left hand 0.4 m out at its peak; the catch's 0.6 m forward; the forward dash's hips about 0.8 m up; lying, the hips about 0.24 m up and the head 0.23; kneeling, the hips 0.49; the acrobatics, the hips about 1.5 m up.
+- **Locked moves:** the moves the user approved (Locked in `docs/ANIMATIONS.md`) are checked after they're held: `__lock(name)` compares their key numbers (`LOCKS` in `moves.js`) with what the user approved, within a tolerance, and prints `locked ok: ...` or `FAIL locked move ... changed: ...`. Any `FAIL` makes the run exit with 1 (`cdp.js` does that for every test). Locked since 2026-11-03: strafing right and left (and right after a backpedal), the four acrobatics and a corkscrew in a dash, getting up, and walking during a get-up.
+- **Running:** then a match, with pictures of a running player from each team.
 
 ## Juice: the camera never moves the aim
 

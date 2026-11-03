@@ -43,7 +43,7 @@
   };
 
   // Pictures from a chosen place: who ('me', 'helmet', 'face', 'red', 'blue': someone else first),
-  // and from where around them ('front', 'back', 'side', 'face').
+  // and from where around them ('front', 'back', 'side', 'face', 'top': from above and behind, 'hips': close, low).
   const render = world.render.bind(world);
   window.__cam = null;
   const pick = (who) => {
@@ -65,6 +65,7 @@
     const views = {
       front: [at(3.2, 0.9, 1.3), at(0, 0, 0.95), 38], back: [at(-3.2, 0.7, 1.45), at(0, 0, 0.95), 38],
       side: [at(0.4, 3.3, 1.2), at(0, 0, 0.95), 38], face: [at(1.15, 0.3, 1.62), at(0, 0, 1.56), 30],
+      top: [at(-1.4, 0, 3.4), at(0.3, 0, 0.3), 42], hips: [at(1.5, 0.2, 0.6), at(0, 0, 0.72), 28],
     };
     const [from, to, fov] = views[c.view];
     cam.position.set(...from);
@@ -87,13 +88,11 @@
     return who ? `${who} (${m?.man.athlete?.head}, team ${m?.man.team}) from the ${view}` : 'the game camera';
   };
 
-  /** The athlete's hands follow the stick figure's (their arms differ a little in length and where
-   *  they hang from), and no foot is under the floor. */
+  /** No foot under the floor (the moves' clips put the ankles about 7 cm up when a foot is down). */
   window.__follows = () => JSON.stringify(men().filter((m) => m.man.athlete).map(({ id, man }) => {
     const b = man.athlete.bones;
-    const hand = (side) => v3(b[`hand_${side}`]).distanceTo(v3(man[`arm${side}`].hand));
     const feet = ['L', 'R'].map((x) => v3(b[`foot_${x}`]).y - man.root.position.y);
-    return { id, handL: r2(hand('L')), handR: r2(hand('R')), lowestAnkle: r2(Math.min(...feet)), alive: man.downT === 0 };
+    return { id, lowestAnkle: r2(Math.min(...feet)), alive: man.downT === 0 };
   }));
 
   /** Low graphics: the light meshes show instead, and the pictures still draw. */

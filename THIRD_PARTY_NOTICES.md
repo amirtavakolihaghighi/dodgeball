@@ -24,6 +24,15 @@ them, cuts and levels them, and writes what the game loads into `static/sounds/`
 | [Kenney](https://kenney.nl): Interface Sounds | "Not now", reviving and buying team health | CC0 |
 | MintoDog: [Sunny City](https://opengameart.org/content/sunny-city) and its climax version (OpenGameArt) | The music in the lobby and in a match | CC0 |
 
+## Animation
+
+CC0 (public domain). `art/moves.py` downloads them and retargets the clips the game uses onto the
+athlete's skeleton, into `static/characters/athlete.glb`.
+
+| Source | What the game uses it for | Licence |
+| --- | --- | --- |
+| [Mesh2Motion](https://github.com/Mesh2Motion/mesh2motion-app) by Scott Petrovic: its human animation library (`human-base-animations.glb`, `human-addon-animations.glb`, `human-mocap-animations.glb`), which includes Quaternius's [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) | The players' idle and boxer's guard, jogging and sprinting, the overhead throw, the acrobatics' backflip and mid-air pose, flinches, knockouts, getting up, celebrating and kneeling | CC0 (Mesh2Motion's art, and Quaternius's library) |
+
 ## Installed when you run the game
 
 Installed by `pip install -r requirements.txt` (exact versions there), and bundled

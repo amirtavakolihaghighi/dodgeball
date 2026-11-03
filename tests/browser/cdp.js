@@ -16,7 +16,8 @@
 //   {"shot": "part.png", "clip": {"x": 0, "y": 0, "width": 400, "height": 300, "scale": 2}}   part of the page, zoomed
 //   {"key": "KeyW"} / {"key": "KeyW", "down": false}        key down / up (KeyboardEvent.code)
 //   {"mouse": "down"|"up"|"move", "button": "left"|"right", "x": 640, "y": 360}
-// Page console output and exceptions are printed at the end.
+// Page console output and exceptions are printed at the end. A step whose result starts with
+// "FAIL" (a check that didn't hold, like a locked move that changed) makes the run exit with 1.
 const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -74,7 +75,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     if (r.result?.exceptionDetails) console.log('eval EXCEPTION:', r.result.exceptionDetails.exception?.description || r.result.exceptionDetails.text);
     return r.result?.result?.value;
   };
-  const print = (v) => v !== undefined && console.log('->', typeof v === 'string' ? v : JSON.stringify(v));
+  let failed = 0;
+  const print = (v) => {
+    if (v === undefined) return;
+    const text = typeof v === 'string' ? v : JSON.stringify(v);
+    if (text.startsWith('FAIL')) failed++;
+    console.log('->', text);
+  };
 
   await send('Runtime.enable');
   await send('Log.enable');
@@ -109,9 +116,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }
   }
   console.log(logs.length ? logs.join('\n') : '(no console output or errors)');
+  if (failed) console.log(`${failed} check(s) FAILED`);
   ws.close();
   proc.kill();
-  process.exit(0);
+  process.exit(failed ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   proc.kill();

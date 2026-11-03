@@ -32,6 +32,13 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 - **A volume for each kind of sound** (Esc › Your settings): Music, Effects, Announcer, Interface and Crowd, under the main Volume.
 - **A "Hear every sound" page**, linked under the sliders, that plays every moment of the game and every recording.
 - **A sports hall to play in:** tall windows with a low golden sun and soft shafts of light, sky and hills outside, a wooden floor with the court painted on it, padded boards in bright colours, and stands with a crowd that cheers. Its light is worked out in advance, so it's cheap to draw; Low graphics draw a third of the crowd and no shafts. A wall or stand between the camera and you turns see-through, with a faint outline, so you never lose sight of yourself.
+- **The athletes move for real:**
+  - runs that follow your speed and direction, and a backpedal;
+  - three kinds of throw at random (overhead, side-arm, underarm like bowling), with the left forearm covering the face while you charge;
+  - deflects as a backhand parry with the left hand, catches as a one-handed palm blast that pulls the ball in;
+  - dodges: a side step, a lunge forward or a jump back, with a faint trail;
+  - a corkscrew, an aerial side flip or a butterfly twist for perfect dodges, and a backflip going backwards;
+  - knockouts that throw players away from the ball, getting up when revived, and celebrating or kneeling at a round's end.
 - **Athletes instead of stick figures:** every player is an athlete in their team's kit, with a sports helmet or a face and hair, and one of six skin and hair colours, picked when they join and the same on every screen. They move as the stick figures did (real animation comes next), carry the ball in front of them, and Low graphics draw lighter ones.
 - **New effects:** a starburst and a shockwave in the team's colour on hits, a swipe on deflects, a flare and sparkles on perfect plays, dust on floor bounces. The ball is grippy rubber with a bright edge in its colour, and players and balls cast long shadows from the low sun wherever it shines.
 - **The incoming-ball sound** (Esc › Your settings): a whoosh that comes from the ball's side and is loudest as it arrives (the default), a tick, or nothing.

@@ -17,6 +17,7 @@ import { launchVelocity } from './physics.js';
 import { Diag } from './diag.js';
 import { Graphics, gpuInfo, LEVEL_NAMES } from './graphics.js';
 import { CameraFx } from './juice.js';
+import { hash } from './athlete.js';
 import * as settingsFile from './settings_file.js';
 
 const $ = (id) => document.getElementById(id);
@@ -154,6 +155,7 @@ function join() {
 /** The rules changed (or arrived): everything derived from them follows. */
 function applyRules(m) {
   cfg = m.cfg;
+  world.setTiming(cfg);
   rules.active = m.rules;
   rules.next = m.next;
   rules.rv = m.rv;
@@ -953,7 +955,8 @@ function onEvent(e) {
       }
       break;
     case 'hit': {
-      world.man(e.p)?.impact(e.ko ? 0.15 : 0.085);     // an impact freeze on the hit player only
+      // an impact freeze on the hit player only; how fast and from where: an athlete's knockout falls away from it
+      world.man(e.p)?.impact(e.ko ? 0.15 : 0.085, { speed: e.speed, from: posOf(e.by) });
       if (e.ko) world.cheer(0.5);                          // the crowd jumps at a knockout
       if (pos) {
         world.burst(pos.x, 1.2, pos.z, 0xffffff, e.ko ? 2.6 : 1.8);
@@ -1005,6 +1008,7 @@ function onEvent(e) {
       sfx.bounce(e, e.y < 0.5);
       break;
     case 'catch':
+      world.man(e.p)?.caught();          // an athlete holds it up in the left palm a moment
       // Your own catches/deflects get the popup and gold flash; a ring at the camera would blind you.
       if (pos && !mine) e.perfect ? world.ring(pos.x, 1.3, pos.z, 0xffc940) : world.burst(pos.x, 1.3, pos.z, 0x5dff9b);
       if (pos) world.burstOf(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x5dff9b, (e.perfect ? 20 : 12) * (mine ? 0.6 : 1), { speed: 3, up: 0.6, life: 0.5, drag: 4, star: e.perfect });
@@ -1020,6 +1024,7 @@ function onEvent(e) {
       if (e.perfect || e.rally) hud.feed([who(e.p), [e.perfect ? ' perfectly caught ' : ' caught '], who(e.by), ["'s ball"]]);
       break;
     case 'deflect':
+      world.man(e.p)?.deflected();       // an athlete's parry plays through
       if (pos && !mine) world.ring(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x6ff3ff);
       if (pos) world.burstOf(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x6ff3ff, (e.perfect ? 22 : 14) * (mine ? 0.6 : 1), { speed: 7, up: 0.2, life: 0.35, star: e.perfect });
       if (pos) world.slash(pos.x, 1.3, pos.z, e.perfect ? 0xffc940 : 0x6ff3ff, mine ? 0.7 : 1);
@@ -1035,7 +1040,7 @@ function onEvent(e) {
       break;
     case 'dodge':
       if (e.perfect) {
-        world.man(e.p)?.perfectDodge();
+        world.man(e.p)?.perfectDodge(hash(e.p * 7919 + Math.round(e.t * 1000)));   // the same acrobatics on every screen
         if (pos) world.burstOf(pos.x, 1.0, pos.z, 0xffc940, 14, { speed: 2.5, up: 0.7, life: 0.6, drag: 3, star: true });
         if (mine) camFx.jolt(0, 0, 0, -3);
       }
@@ -1321,6 +1326,7 @@ function drawFrame(tMs) {
   } else world.setPreview(null);
   if (me && !watching()) sendInput(t);
   for (const e of net.takeEvents(viewTime)) onEvent(e);
+  world.round = net.latest.r;       // the athletes celebrate or kneel when a round ends
   world.syncPlayers(playerStates(t), dt);
   world.syncBalls(balls, t);
   world.updateFx(dt, t);

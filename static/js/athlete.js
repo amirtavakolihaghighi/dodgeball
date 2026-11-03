@@ -1,8 +1,20 @@
 // The athlete (art/athlete.py): a skinned body in two versions, a sports helmet or a face with
 // hair (one picked for each player, decision 128), each in two sizes (High and Low graphics).
-// The stick figure's joints still carry the animation (world.js Stickman): each frame the
-// athlete's bones take the same turns. Each pixel of a mesh's map holds a colour slot, not a
-// colour, so every player's copy is painted in their team's kit and their own skin, hair and eyes.
+// Each pixel of a mesh's map holds a colour slot, not a colour, so every player's copy is painted
+// in their team's kit and their own skin, hair and eyes.
+//
+// How it moves (step 8), in layers, each frame:
+// - running and standing: clips of real motion (art/moves.py: CC0 Mesh2Motion / Quaternius clips
+//   retargeted onto this skeleton). The run follows the player's speed; the legs turn where the
+//   player goes while the chest and head keep facing the aim; backwards, a backpedal;
+// - the whole body: the perfect dodges' acrobatics (a corkscrew, an aerial side flip, a butterfly
+//   twist; a backflip going backwards), flinches, knockouts that fall away from the ball, getting
+//   up when revived, winning and losing (clips);
+// - the dodges' footwork, and the arms: placed by hand in the body's frame and reached with
+//   two-bone IK, because no library has them: a side step pushed off the far foot, a half-crouched
+//   step forwards, a jump back; three throws (overhead, side-arm, underarm like bowling), the left
+//   forearm guarding the face while charging, a backhand parry and a one-handed palm catch with it.
+// Every action is stretched to the host's timings (world.timing: the game's rules).
 import * as THREE from 'three';
 import { GLTFLoader } from '/static/vendor/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from '/static/vendor/addons/utils/SkeletonUtils.js';
@@ -35,11 +47,149 @@ const JOINT = {
   upper_R: 'shoulderR', fore_R: 'elbowR', hand_R: 'elbowR', thigh_L: 'hipL', shin_L: 'kneeL', foot_L: 'kneeL',
   thigh_R: 'hipR', shin_R: 'kneeR', foot_R: 'kneeR',
 };
+const LIMBS = {
+  L: ['upper_L', 'fore_L', 'hand_L'], R: ['upper_R', 'fore_R', 'hand_R'],
+  legL: ['thigh_L', 'shin_L', 'foot_L'], legR: ['thigh_R', 'shin_R', 'foot_R'],
+};
 const STICK_HIPS = 0.95;              // the stick figure's hips above its feet (world.js)
+
+// Which bones a layer moves (and how much).
+const UPPER = { chest: 0.55, head: 0.55, upper_L: 1, fore_L: 1, hand_L: 1, upper_R: 1, fore_R: 1, hand_R: 1 };
+const LEGS = ['hips', 'thigh_L', 'shin_L', 'foot_L', 'thigh_R', 'shin_R', 'foot_R'];
+const RIGHT_ARM = { upper_R: 1, fore_R: 1, hand_R: 1 };
+const LEFT_ARM = { upper_L: 1, fore_L: 1, hand_L: 1 };
+const LEFT_TURN = { upper_L: 1, fore_L: 1, hand_L: 1, chest: 1, head: 1, hips: 1 };
+const RIGHT_TURN = { upper_R: 1, fore_R: 1, hand_R: 1, chest: 1, head: 1, hips: 1 };
+
+// The moves' own numbers (the rest are the game's rules, world.timing).
+const ACRO_TIME = 0.5;                // a perfect dodge's acrobatics (s)
+const ACROBATICS = ['corkscrew', 'sideflip', 'butterfly'];
+const RELEASE = 0.42;                 // a throw's release, from the wound-up arm through (s)
+const FOLLOW = 0.35;                  // the overhead throw's clip: on past its release into the follow-through (s)
+const MIN_STRIDE = 4.2;               // metres a running cycle, at least
+const CORK_HEIGHT = 0.28;             // the corkscrew (and backflip) fly this share of the clip's height
+const GETUP = 1.1;                    // getting up when revived (s)
+const RISE_CUT = 0.15;                // moving while getting up: the get-up gives way to the run over this long (s)
+const CAUGHT = 0.35;                  // a caught ball shows in the left palm this long (s)
+const WINS = ['win_jump', 'win_pump', 'cheer'];
+const THROW_STYLES = ['over', 'side', 'under'];
+const ACTS = { 1: 'dodge', 2: 'catch', 3: 'deflect' };     // the game's action codes
+const TIMING = {                      // the game's defaults, until the server's arrive
+  dash: { time: 0.22 }, chargeTime: 0.9,
+  actions: { dodge: { window: 0.32, recovery: 0.15 }, catch: { window: 0.3, recovery: 0.25 }, deflect: { window: 0.18, recovery: 0.3 } },
+};
+
+// ------------------------------------------------------------------ the moves made here
+// No CC0 library has these, so hands and feet are placed by hand in the body's frame (X: the
+// athlete's left, Y: up, Z: forward; metres from the feet), and the limbs bend to reach them.
+// Keys are [time, value]; values in between ease from one key to the next.
+
+// The left forearm across in front of the face while charging, its palm towards it (where the
+// face is standing straight: it follows the head when the body bends).
+const GUARD_L = { hand: [-0.08, 1.55, 0.3], pole: [1, -0.4, 0.3], fingers: [-1, 0.05, 0.1], palm: [0, 0, -1] };
+// Carrying the ball: the right hand holds it in front of the right hip, palm up, steady as the player runs;
+// meet: where it comes to take a caught ball from the left hand.
+const CARRY_R = { hand: [-0.24, 1.0, 0.24], pole: [-0.3, -0.5, -1], fingers: [0, -0.2, 1], palm: [0.4, 0.9, 0], meet: [-0.28, 1.06, 0.3] };
+// The catch: the left arm straight out in front at the shoulder's height, the palm turned forward and
+// the fingers up (a palm blast), the left shoulder turned forward.
+const CATCH_L = { hand: [0.16, 1.33, 0.6], pole: [0.5, -1, 0], fingers: [0, 1, 0.15], palm: [0, 0.05, 1], chest: -0.55 };
+// A caught ball: the left hand pulls it in to the stomach, palm turned towards the right hand, which takes it.
+const PULL_L = { hand: [0.02, 1.12, 0.3], fingers: [0, 0.2, 1], palm: [-1, 0.3, 0] };
+// The deflect, a backhand parry with the left hand: the forearm across the chest, the back of the
+// hand to the ball; then it swings out to the left like a door on its hinge, the back of the hand
+// leading, the chest unwinding with it; over the deflect's window and recovery (0..1).
+const PARRY_L = {
+  hand: [[0, [-0.16, 1.3, 0.32]], [0.12, [-0.14, 1.32, 0.36]], [0.32, [0.42, 1.36, 0.4]], [0.5, [0.52, 1.3, 0.26]], [0.75, [0.34, 1.1, 0.15]], [1, [0.24, 1.0, 0.1]]],
+  fingers: [[0, [-1, -0.1, 0.15]], [0.12, [-1, 0, 0.25]], [0.32, [0.1, 0.15, 1]], [0.5, [0.6, 0.05, 0.8]], [0.75, [0.3, -0.6, 0.6]], [1, [0.1, -1, 0.1]]],
+  palm: [[0, [0, 0, -1]], [0.12, [0, 0, -1]], [0.32, [-1, 0, 0.05]], [0.5, [-0.8, 0, 0.6]], [0.75, [-1, 0, 0.2]], [1, [-1, 0, 0]]],
+  chest: [[0, -0.25], [0.12, -0.25], [0.32, 0.3], [0.6, 0.25], [1, 0]],
+  pole: [0.6, -0.8, 0],
+};
+// The side-arm and underarm throws: the right hand wound up with the charge (0..1), then released
+// (0..1 over RELEASE); the chest turns (side-arm) or bends forward (underarm). (Not the hips: moving
+// them would put the feet through the floor, and apply() would lift the whole body back up.)
+const THROWS = {
+  side: {                             // the hand out to the right at the stomach's height, further as it charges
+    wind: [[0, [-0.3, 1.02, 0.26]], [1, [-0.62, 1.08, -0.06]]],
+    release: [[0, [-0.62, 1.08, -0.06]], [0.25, [-0.38, 1.1, 0.5]], [0.5, [0.18, 1.14, 0.46]], [1, [-0.3, 1.02, 0.26]]],
+    fingers: [-1, 0, 0.35], palm: [0, 0.25, 1], pole: [0, -1, -0.4],
+    turnWind: [[0, 0], [1, -0.4]], turnRelease: [[0, -0.4], [0.3, 0.2], [0.55, 0.45], [1, 0]],
+  },
+  under: {                            // like bowling: the hand down and back, below the waist, then swung through low
+    wind: [[0, [-0.3, 1.02, 0.26]], [0.45, [-0.27, 0.86, 0.02]], [1, [-0.26, 0.88, -0.3]]],
+    release: [[0, [-0.26, 0.88, -0.3]], [0.3, [-0.24, 0.76, 0.34]], [0.6, [-0.2, 1.08, 0.62]], [1, [-0.3, 1.02, 0.26]]],
+    fingers: [0, -1, 0.15], palm: [0, 0, 1], pole: [0, 0, 1],
+    bendWind: [[0, 0], [1, 0.3]], bendRelease: [[0, 0.3], [0.4, 0.35], [1, 0]],
+  },
+};
+// The dodges' footwork. Time: 0..1 the dash itself (the rules' dash time), 1..2 the landing and
+// settling. hips: offsets [across, up, forward]; the feet: ankles [across, lift, forward]; bend: the
+// upper body bent forward (rad).
+const DASH_SIDE = {   // to the right (the left mirrors it), across = towards that side: the lead (right) foot lifts a
+  // little, the trail foot pushes the body across, the upper body tilts forward and down; the lead foot comes down and takes the weight
+  hips: [[0, [0, 0, 0]], [0.2, [-0.05, -0.06, 0]], [0.7, [0.05, -0.03, 0.02]], [1, [0.08, -0.09, 0.02]], [1.4, [0.03, -0.04, 0]], [2, [0, 0, 0]]],
+  lead: [[0, [0.11, 0, 0]], [0.2, [0.2, 0.1, 0.03]], [0.75, [0.33, 0.08, 0.04]], [1, [0.28, 0, 0.03]], [1.5, [0.2, 0, 0.01]], [2, [0.11, 0, 0]]],
+  trail: [[0, [-0.11, 0, 0]], [0.2, [-0.27, 0, -0.03]], [0.7, [-0.4, 0.07, -0.05]], [1, [-0.24, 0.05, -0.03]], [1.4, [-0.14, 0, 0]], [2, [-0.11, 0, 0]]],
+  bend: [[0, 0], [0.2, 0.25], [1, 0.28], [2, 0]],
+};
+const DASH_FORWARD = {   // half-crouched, one big step forward with the left foot, the right pushing behind
+  hips: [[0, [0, 0, 0]], [0.3, [0, -0.1, 0.04]], [1, [0, -0.13, 0.1]], [1.45, [0, -0.07, 0.05]], [2, [0, 0, 0]]],
+  L: [[0, [0.11, 0, 0]], [0.3, [0.12, 0.15, 0.24]], [0.8, [0.12, 0.07, 0.58]], [1, [0.12, 0, 0.55]], [1.45, [0.12, 0, 0.28]], [2, [0.11, 0, 0]]],
+  R: [[0, [-0.11, 0, 0]], [0.3, [-0.11, 0, -0.26]], [1, [-0.12, 0.05, -0.46]], [1.45, [-0.11, 0, -0.2]], [2, [-0.11, 0, 0]]],
+  bend: [[0, 0], [0.3, 0.25], [1, 0.32], [2, 0]],
+};
+const DASH_BACK = {   // a jump back, still facing forward: down, up and back, landing soft
+  hips: [[0, [0, 0, 0]], [0.15, [0, -0.09, 0]], [0.55, [0, 0.12, -0.03]], [1, [0, -0.1, 0]], [1.45, [0, -0.04, 0]], [2, [0, 0, 0]]],
+  L: [[0, [0.11, 0, 0]], [0.15, [0.12, 0, 0]], [0.55, [0.13, 0.24, 0.12]], [1, [0.12, 0, 0.05]], [2, [0.11, 0, 0]]],
+  R: [[0, [-0.11, 0, 0]], [0.15, [-0.12, 0, 0]], [0.55, [-0.13, 0.24, 0.12]], [1, [-0.12, 0, 0.05]], [2, [-0.11, 0, 0]]],
+  bend: [[0, 0], [0.4, 0.2], [1, 0.15], [2, 0]],
+};
+
 // A faint cool light on the edges, where the body turns away from you: the athletes stand out
 // from the warm, busy hall, and the dark visor gets a glossy rim.
 const RIM = new THREE.Color(0xcfe6ff);
 const RIM_STRENGTH = 0.35;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const smooth = (a, b, x) => {
+  const t = clamp((x - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
+const approach = (cur, target, step) => (cur < target ? Math.min(target, cur + step) : Math.max(target, cur - step));
+const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+/** 1 in the middle of a move, rising over its first `rise` seconds and falling over its last `fall`. */
+const fades = (t, span, rise, fall) => Math.min(rise > 0 ? clamp(t / rise, 0, 1) : 1, clamp((span - t) / fall, 0, 1));
+
+/** Through keyframes [[time, value], ...] at u, easing from one to the next; vector values go into out. */
+function at(keys, u, out = null) {
+  let i = 0;
+  while (i < keys.length - 2 && u > keys[i + 1][0]) i++;
+  const [u0, a] = keys[i];
+  const [u1, b] = keys[Math.min(i + 1, keys.length - 1)];
+  const k = u1 > u0 ? smooth(0, 1, (u - u0) / (u1 - u0)) : 1;
+  if (typeof a === 'number') return a + (b - a) * k;
+  return out.set(lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k));
+}
+
+const AXIS_X = new THREE.Vector3(1, 0, 0);
+const AXIS_Y = new THREE.Vector3(0, 1, 0);
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+const tq = new THREE.Quaternion();
+const tq2 = new THREE.Quaternion();
+const tq3 = new THREE.Quaternion();
+const tq4 = new THREE.Quaternion();
+const tq5 = new THREE.Quaternion();
+const tq6 = new THREE.Quaternion();
+const tv = new THREE.Vector3();
+const tv2 = new THREE.Vector3();
+const tv3 = new THREE.Vector3();
+const tv4 = new THREE.Vector3();
+const tv5 = new THREE.Vector3();
+const tv6 = new THREE.Vector3();
+const tv7 = new THREE.Vector3();
+const tm = new THREE.Matrix4();
 
 function rimmed(mat) {
   const c = `vec3(${RIM.r.toFixed(4)}, ${RIM.g.toFixed(4)}, ${RIM.b.toFixed(4)})`;
@@ -52,7 +202,7 @@ function rimmed(mat) {
 }
 
 /** A repeatable number from a player's id: everyone's screen picks the same head and look. */
-function hash(n) {
+export function hash(n) {
   let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
   h ^= h >>> 13;
   h = Math.imul(h, 0xc2b2ae35);
@@ -129,14 +279,177 @@ function palette(info, teamColor, team, look) {
   return pal;
 }
 
-/** What the retargeting needs from the athlete at rest: each bone's turn in the body's frame,
- *  with the limbs straightened to hang down like the stick figure's at rest (the athlete stands
- *  with arms a little out and elbows a little bent). */
+// ------------------------------------------------------------------ poses and clips
+// A pose: each bone's turn (local, as three.js holds it) and the hips' position.
+
+function newPose(from) {
+  const p = { q: {}, p: new THREE.Vector3() };
+  for (const b of BONES) p.q[b] = from ? from.q[b].clone() : new THREE.Quaternion();
+  if (from) p.p.copy(from.p);
+  return p;
+}
+
+function copyPose(dst, src) {
+  for (const b of BONES) dst.q[b].copy(src.q[b]);
+  dst.p.copy(src.p);
+  return dst;
+}
+
+/** dst moves towards src by w, on the bones the mask names (all of them without one). */
+function mix(dst, src, w, mask = null) {
+  if (w <= 0.001) return dst;
+  for (const b of BONES) {
+    const k = mask ? w * (mask[b] ?? 0) : w;
+    if (k >= 0.999) dst.q[b].copy(src.q[b]);
+    else if (k > 0.001) dst.q[b].slerp(src.q[b], k);
+  }
+  const k = mask ? w * (mask.hips ?? 0) : w;
+  if (k > 0.001) dst.p.lerp(src.p, Math.min(1, k));
+  return dst;
+}
+
+/** One of art/moves.py's clips, with its measurements (duration; for run cycles the stride and
+ *  footfall; for jumps the takeoff and touchdown; for the throw the cocked arm and the release). */
+class Clip {
+  constructor(anim, meta = {}) {
+    Object.assign(this, meta);
+    this.duration = meta.duration ?? anim.duration;
+    this.rot = new Map();
+    this.pos = null;
+    for (const track of anim.tracks) {
+      const dot = track.name.lastIndexOf('.');
+      const node = track.name.slice(0, dot);
+      const prop = track.name.slice(dot + 1);
+      if (prop === 'quaternion') this.rot.set(node, track.createInterpolant(new Float32Array(4)));
+      else if (prop === 'position' && node === 'hips') this.pos = track.createInterpolant(new Float32Array(3));
+    }
+  }
+
+  /** The pose t seconds in, into out: a loop wraps round, anything else holds its ends. Bones the
+   *  clip doesn't move keep out's. */
+  sample(t, out, loop = false) {
+    const d = this.duration;
+    const t1 = loop ? ((t % d) + d) % d : clamp(t, 0, d);
+    for (const [name, it] of this.rot) {
+      const v = it.evaluate(t1);
+      out.q[name].set(v[0], v[1], v[2], v[3]);
+    }
+    if (this.pos) {
+      const v = this.pos.evaluate(t1);
+      out.p.set(v[0], v[1], v[2]);
+    }
+    return out;
+  }
+}
+
+// ------------------------------------------------------------------ reaching
+// The pose's bones in the body's frame (forward kinematics), and two-bone IK on top of it.
+
+class Frame {
+  constructor() {
+    this.pos = {};
+    this.rot = {};
+    for (const b of BONES) {
+      this.pos[b] = new THREE.Vector3();
+      this.rot[b] = new THREE.Quaternion();
+    }
+  }
+
+  /** Every bone's place and turn in the body's frame, from a pose. */
+  of(P, R) {
+    this.rot.hips.multiplyQuaternions(R.armQ, P.q.hips);
+    this.pos.hips.copy(P.p).applyQuaternion(R.armQ);
+    for (const b of BONES) {
+      if (b === 'hips') continue;
+      const p = PARENT[b];
+      this.rot[b].multiplyQuaternions(this.rot[p], P.q[b]);
+      this.pos[b].copy(R.local[b]).applyQuaternion(this.rot[p]).add(this.pos[p]);
+    }
+    return this;
+  }
+}
+
+/** Turns a bone (not the hips) by angle about a body-frame axis, the bones below it coming along;
+ *  keep: a child whose turn in the body's frame stays as it was (the head, looking ahead). */
+function turnBone(P, F, bone, axis, angle, keep = null) {
+  if (Math.abs(angle) < 1e-4) return;
+  const was = keep ? tq6.copy(F.rot[keep]) : null;
+  const body = tq5.setFromAxisAngle(axis, angle).multiply(F.rot[bone]);
+  P.q[bone].copy(F.rot[PARENT[bone]]).invert().multiply(body);
+  F.rot[bone].copy(body);
+  if (keep) P.q[keep].copy(body).invert().multiply(was);
+}
+
+/** Bends a limb (an arm: 'L' or 'R'; a leg: 'legL' or 'legR') so its end reaches target (body
+ *  frame), the middle joint bending towards pole. Updates the pose and the frame. */
+function reach(P, F, R, limb, target, pole) {
+  const [ra, mi, en] = LIMBS[limb];
+  const A = F.pos[ra];
+  const B = F.pos[mi];
+  const C = F.pos[en];
+  const la = A.distanceTo(B);
+  const lb = B.distanceTo(C);
+  const dir = tv.subVectors(target, A);
+  const d = clamp(dir.length(), Math.abs(la - lb) + 1e-3, la + lb - 1e-3);
+  dir.normalize();
+  const cosA = clamp((la * la + d * d - lb * lb) / (2 * la * d), -1, 1);
+  const side = tv2.copy(pole).addScaledVector(dir, -pole.dot(dir)).normalize();
+  const E = tv3.copy(A).addScaledVector(dir, la * cosA).addScaledVector(side, la * Math.sqrt(1 - cosA * cosA));
+  const T = tv4.copy(A).addScaledVector(dir, d);
+  const q1 = tq.setFromUnitVectors(tv5.subVectors(B, A).normalize(), tv6.subVectors(E, A).normalize());
+  const rootRot = tq2.multiplyQuaternions(q1, F.rot[ra]);
+  const midNow = tv5.subVectors(C, B).normalize().applyQuaternion(q1);
+  const q2 = tq3.setFromUnitVectors(midNow, tv6.subVectors(T, E).normalize());
+  const midRot = tq4.multiplyQuaternions(q2, q1).multiply(F.rot[mi]);
+  P.q[ra].copy(F.rot[PARENT[ra]]).invert().multiply(rootRot);
+  P.q[mi].copy(rootRot).invert().multiply(midRot);
+  F.rot[ra].copy(rootRot);
+  F.rot[mi].copy(midRot);
+  F.pos[mi].copy(E);
+  F.pos[en].copy(R.local[en]).applyQuaternion(midRot).add(E);
+  F.rot[en].multiplyQuaternions(midRot, P.q[en]);
+}
+
+/** Turns a hand so its fingers point along `fingers` and its palm faces `palm` (body frame). */
+function aimHand(P, F, R, side, fingers, palm) {
+  const ax = R.hands[side];
+  const f = tv.copy(fingers).normalize();
+  const p = tv2.copy(palm).addScaledVector(f, -palm.dot(f)).normalize();
+  const c = tv3.crossVectors(f, p);
+  tm.makeBasis(f, p, c).multiply(ax.inv);
+  const body = tq.setFromRotationMatrix(tm);
+  const hand = `hand_${side}`;
+  P.q[hand].copy(F.rot[`fore_${side}`]).invert().multiply(body);
+  F.rot[hand].copy(body);
+}
+
+/** A foot flat on the floor, pointing ahead (its rest turn in the body's frame). */
+function flatFoot(P, F, R, side) {
+  P.q[`foot_${side}`].copy(F.rot[`shin_${side}`]).invert().multiply(R.restRot[`foot_${side}`]);
+}
+
+/** The legs turned yaw (radians, + to the right) towards where the player runs; the chest keeps a
+ *  quarter of it and the head none, so both keep facing the aim. */
+function turnLegs(P, R, yaw) {
+  if (Math.abs(yaw) < 1e-3) return;
+  const bh = tq.multiplyQuaternions(R.armQ, P.q.hips);
+  const bc = tq2.multiplyQuaternions(bh, P.q.chest);
+  const bd = tq3.multiplyQuaternions(bc, P.q.head);
+  bh.premultiply(tq4.setFromAxisAngle(AXIS_Y, -yaw));          // a turn to the right is a negative turn about up
+  P.q.hips.multiplyQuaternions(R.armInv, bh);
+  bc.premultiply(tq4.setFromAxisAngle(AXIS_Y, -yaw * 0.25));
+  P.q.chest.copy(bh).invert().multiply(bc);
+  P.q.head.copy(bc).invert().multiply(bd);
+}
+
+/** What the moves need from the athlete at rest: each bone's place and turn in the body's frame,
+ *  the stick-figure retargeting's straightened rests, and each hand's fingers and palm. */
 function restOf(scene) {
   scene.updateMatrixWorld(true);
   const pos = {};
   const rot = {};
   const local = {};
+  const pose = newPose();
   const p = new THREE.Vector3();
   const q = new THREE.Quaternion();
   const s = new THREE.Vector3();
@@ -146,9 +459,11 @@ function restOf(scene) {
     pos[name] = p.clone();
     rot[name] = q.clone();
     local[name] = bone.position.clone();
+    pose.q[name].copy(bone.quaternion);
   }
+  pose.p.copy(local.hips);
   scene.getObjectByName('hips').parent.matrixWorld.decompose(p, q, s);
-  const armInv = q.clone().invert();       // the skeleton's own node
+  const armQ = q.clone();                   // the skeleton's own node
   const down = new THREE.Vector3(0, -1, 0);
   const straight = (a, b) => new THREE.Quaternion().setFromUnitVectors(pos[b].clone().sub(pos[a]).normalize(), down);
   const fix = {};
@@ -160,10 +475,27 @@ function restOf(scene) {
   }
   const rest = {};
   for (const name of BONES) rest[name] = (fix[name] || new THREE.Quaternion()).clone().multiply(rot[name]);
-  return { rest, local, armInv, ankle: pos.foot_L.y };
+  // the right hand's fingers and palm at rest, from where a held ball sits (the left mirrors them)
+  const palmAt = scene.getObjectByName('palm_R').getWorldPosition(new THREE.Vector3());
+  const ballAt = scene.getObjectByName('ball_R').getWorldPosition(new THREE.Vector3());
+  const palmR = ballAt.clone().sub(palmAt).normalize();
+  const fingersR = palmAt.clone().sub(pos.hand_R);
+  fingersR.addScaledVector(palmR, -fingersR.dot(palmR)).normalize();
+  const hands = {};
+  for (const [side, f, pl] of [['R', fingersR, palmR], ['L', new THREE.Vector3(-fingersR.x, fingersR.y, fingersR.z), new THREE.Vector3(-palmR.x, palmR.y, palmR.z)]]) {
+    const inv = rot[`hand_${side}`].clone().invert();
+    const fl = f.clone().applyQuaternion(inv);
+    const pl2 = pl.clone().applyQuaternion(inv);
+    pl2.addScaledVector(fl, -pl2.dot(fl)).normalize();
+    hands[side] = { fingers: fl, palm: pl2, inv: new THREE.Matrix4().makeBasis(fl, pl2, fl.clone().cross(pl2)).invert() };
+  }
+  return {
+    rest, local, pose, restRot: rot, armQ, armInv: armQ.clone().invert(), ankle: pos.foot_L.y, head: pos.head.clone(), hands,
+    twist: local.chest.clone().normalize(),  // the hips' own length (a corkscrew's twist turns round it)
+  };
 }
 
-/** Loads the athlete: its meshes and skeleton, the maps, and what the retargeting needs. */
+/** Loads the athlete: its meshes and skeleton, the slot maps, the clips, and what the poses need. */
 export async function loadAthlete() {
   const info = await (await fetch(`${DIR}athlete.json`)).json();
   const names = Object.keys(info.maps);
@@ -173,7 +505,7 @@ export async function loadAthlete() {
   ]);
   const rm = new Uint8Array(64);             // roughness (green) and metalness (blue) per slot
   info.slots.forEach((_, i) => rm.set([0, Math.round(info.rough[i] * 255), Math.round(info.metal[i] * 255), 255], i * 4));
-  const t = { info, scene: gltf.scene, maps: {}, rm: {}, painted: new Map(), rest: null };
+  const t = { info, scene: gltf.scene, maps: {}, rm: {}, painted: new Map(), rest: null, clips: new Map() };
   names.forEach((name, i) => {
     t.maps[name] = maps[i];
     t.rm[name] = paint(maps[i], rm, THREE.NoColorSpace);
@@ -182,14 +514,16 @@ export async function loadAthlete() {
     if (o.isMesh) o.material.dispose();      // each player gets their own
   });
   t.rest = restOf(gltf.scene);
+  for (const anim of gltf.animations) t.clips.set(anim.name, new Clip(anim, info.moves?.[anim.name]));
   return t;
 }
 
-/** One player's athlete: their head, their colours, their own skeleton. */
+/** One player's athlete: their head, their colours, their own skeleton, their moves. */
 export class Athlete {
   /** opts: { id, team, teamColor, head: 'helmet' | 'face' to force one (a URL's ?head=) } */
   constructor(t, { id, team, teamColor, head }) {
     const h = hash(id);
+    this.id = id;
     this.head = head || t.info.heads[h & 1];
     this.look = (h >>> 1) % LOOKS.length;
     this.model = cloneSkinned(t.scene);
@@ -222,11 +556,36 @@ export class Athlete {
     this.palm = palm.position.clone();
     this.reach = centre.position.clone().sub(this.palm).divideScalar(t.info.held.radius);
     this.rest = t.rest;
+    this.clips = t.clips;
+    this.moving = t.clips.size > 0;                                      // an older file without clips: the stick figure's poses
     this.low = null;
+    // the stick figure's joints, turned into the body's frame (stickPose)
     this.joint = { none: new THREE.Quaternion() };
     for (const j of ['chest', 'shoulderL', 'elbowL', 'shoulderR', 'elbowR', 'hipL', 'kneeL', 'hipR', 'kneeR']) this.joint[j] = new THREE.Quaternion();
     this.turn = Object.fromEntries(BONES.map((name) => [name, new THREE.Quaternion()]));
     this.at = { hips: new THREE.Vector3(), thigh: new THREE.Vector3(), shin: new THREE.Vector3(), foot: new THREE.Vector3() };
+    // the moves: the pose being built, the layers' poses, a body frame, and their state
+    const rp = t.rest.pose;
+    this.out = newPose(rp);
+    this.buf = { run: newPose(rp), sprint: newPose(rp), arms: newPose(rp), stick: newPose(rp), full: newPose(rp), reach: newPose(rp) };
+    this.frame = new Frame();
+    this.target = new THREE.Vector3();
+    this.pole = new THREE.Vector3();
+    this.fingers = new THREE.Vector3();
+    this.palmDir = new THREE.Vector3();
+    this.clock = Math.random() * 10;                         // idles out of step with each other
+    this.phase = 0;
+    this.back = false;
+    this.legYaw = 0;
+    this.w = { throw: 0, guard: 0, carry: 0, meet: 0, end: 0 };
+    this.style = 'over';
+    this.act = null;                                         // the action being played: action()
+    this.acro = null;
+    this.ko = null;
+    this.flinch = 'flinch_chest';
+    this.win = null;
+    this.rise = 1;                                           // how much of the get-up is left (moving cuts it)
+    this.rose = 9;                                           // the get-up's last moment, to tell a new one
   }
 
   /** High or Low graphics: which size of the meshes shows. */
@@ -237,9 +596,9 @@ export class Athlete {
     for (const m of this.meshes.lo) m.visible = low;
   }
 
-  /** Every bone takes its stick-figure joint's turn (in the body's frame), on top of its own rest
-   *  turn; the hips go down with the stick figure's crouch, but never put a foot through the floor. */
-  pose(man) {
+  /** The bones' turns from the stick figure's joints (in the body's frame, on top of each bone's
+   *  own rest turn), into out; the hips go down with its crouch. */
+  stickPose(man, out) {
     const J = this.joint;
     const T = this.turn;
     const R = this.rest;
@@ -254,15 +613,317 @@ export class Athlete {
     J.kneeR.multiplyQuaternions(J.hipR, man.legR.knee.quaternion);
     for (const name of BONES) T[name].multiplyQuaternions(J[JOINT[name]], R.rest[name]);
     for (const name of BONES) {
-      const q = this.bones[name].quaternion;
+      const q = out.q[name];
       if (PARENT[name]) q.copy(T[PARENT[name]]).invert().multiply(T[name]);
       else q.copy(R.armInv).multiply(T[name]);
     }
-    const hips = this.bones.hips.position.copy(R.local.hips);
-    hips.y += man.hips.position.y - STICK_HIPS;
+    out.p.copy(R.local.hips);
+    out.p.y += man.hips.position.y - STICK_HIPS;
+    return out;
+  }
+
+  /** The stick figure's pose as it is (an athlete file without clips). */
+  pose(man) {
+    this.apply(this.stickPose(man, this.out), true);
+  }
+
+  /** This frame's pose (dt: the pose's own clock, stopped by an impact freeze; s: the player's
+   *  state; man: their Stickman, with its timers and the stick figure's joints). */
+  animate(dt, s, man) {
+    if (!this.moving) {
+      this.pose(man);
+      return;
+    }
+    const tm = man.world.timing || TIMING;
+    const round = man.world.round || {};
+    this.clock += dt;
+    const A = this.action(dt, s, man, tm);
+    const moving = this.run(dt, man, round);
+    // a dodge's footwork first, the whole-body moves over it (a perfect dodge's acrobatics over its dash)
+    let full = this.footwork(man, A);
+    full = Math.max(full, this.wholeBody(dt, s, man, round, moving));
+    turnLegs(this.out, this.rest, this.legYaw * (1 - full));
+    if (s.alive && full < 0.99) {
+      this.throwArm(dt, s, man, moving, A);
+      this.leftArm(dt, s, man, A);
+      this.carry(dt, s, man);
+    }
+    this.apply(this.out, s.alive && !(man.spinT < ACRO_TIME && this.acro));
+  }
+
+  /** The action being played (a dodge, a catch, a deflect): from when the game first shows it, on
+   *  this figure's own clock to its end (the rules' window and recovery). The game's own stops early
+   *  (a catch or deflect that meets the ball ends at once; your own press shows for 0.4 s), and
+   *  other players' comes in steps, with the updates. Returns { kind, age, span, fall } or null. */
+  action(dt, s, man, tm) {
+    let A = this.act;
+    if (A) A.age += dt;
+    if (!s.alive) A = null;
+    else if (s.act && (!A || A.kind !== s.act || s.actAge < A.age - 0.12)) A = this.startAction(s.act, s.actAge, man, tm);
+    if (A && A.age >= A.span) A = null;
+    return (this.act = A);
+  }
+
+  /** An action began age seconds ago (also from the game's events, for one only seen by its result). */
+  startAction(kind, age, man, tm = man.world.timing || TIMING) {
+    const spec = tm.actions[ACTS[kind]];
+    this.act = { kind, age, span: spec.window + spec.recovery, fall: spec.recovery, dodge: null, done: false };
+    return this.act;
+  }
+
+  /** The game's events: a caught ball (the catch is over: the left hand pulls it in), a deflect. */
+  caughtBall() {
+    if (this.act?.kind === 2) this.act.done = true;
+  }
+
+  deflected(man) {
+    if (this.act?.kind !== 3) this.startAction(3, 0.1, man);   // the sweep, from about where it meets the ball
+  }
+
+  /** Running and standing: the cycles follow the speed; the legs turn where the player goes (up to
+   *  75° from the aim; backwards, the run plays in reverse: a backpedal). Returns how much it runs. */
+  run(dt, man, round) {
+    const C = this.clips;
+    const B = this.buf;
+    const speed = man.speed;
+    const moving = smooth(0.25, 1.4, speed);
+    const ang = Math.atan2(man.moveR, man.moveF);          // 0: towards the aim; + to the right
+    // a backpedal past 103° from the aim, running forwards again under 97°: pure sideways (90°) always
+    // runs forwards, whatever came before
+    if (speed > 0.6 && (this.back ? Math.abs(ang) < 1.7 : Math.abs(ang) > 1.8)) this.back = !this.back;
+    const legs = this.back ? wrapAngle(ang - Math.PI) : ang;
+    this.legYaw = damp(this.legYaw, clamp(legs, -1.3, 1.3) * moving, 8, dt);
+    const sprint = smooth(3, 5.5, speed);
+    const jog = C.get('jog');
+    const fast = C.get('sprint');
+    // metres a cycle: the clips' own, but never so short the legs blur (a little slide reads better)
+    const stride = Math.max(MIN_STRIDE, lerp(jog.stride || 4, fast.stride || 4, sprint));
+    this.phase = (this.phase + (this.back ? -1 : 1) * dt * speed / stride + 1) % 1;
+    C.get(round.s === 'play' || round.s === 'count' ? 'guard' : 'idle').sample(this.clock, this.out, true);
+    if (moving > 0) {
+      jog.sample((this.phase + (jog.footfall || 0)) * jog.duration, B.run, true);
+      fast.sample((this.phase + (fast.footfall || 0)) * fast.duration, B.sprint, true);
+      mix(this.out, mix(B.run, B.sprint, sprint), moving);
+    }
+    return moving;
+  }
+
+  /** The whole body's clips: a perfect dodge's acrobatics, a flinch, a knockout, getting up, a
+   *  round's end. Returns how much they took over. */
+  wholeBody(dt, s, man, round, moving) {
+    const C = this.clips;
+    const B = this.buf;
+    const O = this.out;
+    const alive = s.alive;
+    let full = 0;
+    if (alive && man.spinT < ACRO_TIME && this.acro) {
+      this.acrobatics(man.spinT / ACRO_TIME, B.full);
+      const w = fades(man.spinT, ACRO_TIME, 0.03, 0.08);
+      mix(O, B.full, w);
+      full = w;
+    }
+    if (alive && man.hitT < 0.5) {                           // a hit that didn't knock out: a flinch, once the freeze lets go
+      const clip = C.get(this.flinch);
+      clip.sample(man.hitT, B.full);
+      mix(O, B.full, 0.85 * fades(man.hitT, Math.min(0.5, clip.duration), 0.03, 0.15));
+    }
+    if (!alive) {                                            // knocked out: down, away from the ball, harder the faster it came
+      if (!this.ko) {
+        const speedHit = man.hitInfo?.speed ?? 15;
+        this.ko = speedHit > 24 ? 'ko_tumble' : speedHit > 16 ? 'ko_fly' : 'ko_back';
+        const from = man.hitInfo?.from;               // turned to face the ball's thrower: these falls go backwards
+        this.model.rotation.y = from ? wrapAngle(Math.atan2(from.x - man.root.position.x, from.z - man.root.position.z) - man.root.rotation.y) : 0;
+      }
+      C.get(this.ko).sample(man.downT, B.full);
+      copyPose(O, B.full);
+      full = 1;
+    } else if (this.ko) {
+      this.ko = null;
+      this.model.rotation.y = 0;
+    }
+    if (alive && man.reviveT < GETUP) {                      // revived: getting up from the floor
+      if (man.reviveT < this.rose) this.rise = 1;            // a new get-up
+      this.rose = man.reviveT;
+      if (moving > 0.3) this.rise = approach(this.rise, 0, dt / RISE_CUT);   // moving off: it gives way to the run
+      C.get('getup').sample(man.reviveT * (C.get('getup').duration / GETUP), B.full);
+      const w = fades(man.reviveT, GETUP, 0, 0.3) * this.rise;
+      mix(O, B.full, w);
+      full = Math.max(full, w);
+    }
+    // the end of a round: the winners celebrate, the losers kneel (standing still, doing nothing)
+    const ended = round.s === 'over' && alive && round.w !== undefined && round.w !== null && round.w >= 0;
+    const calm = (alive ? s.act : 0) === 0 && !s.charging && moving < 0.3;
+    if (ended && !this.win) this.win = round.w === man.team ? WINS[hash(this.id * 31 + (round.n || 0)) % WINS.length] : 'beaten';
+    if (!ended) this.win = null;
+    this.w.end = approach(this.w.end, ended && calm ? 1 : 0, dt / 0.3);
+    if (this.w.end > 0 && this.win) {
+      C.get(this.win).sample(this.clock, B.full, true);
+      mix(O, B.full, this.w.end);
+      full = Math.max(full, this.w.end);
+    }
+    return full;
+  }
+
+  /** A dodge's footwork (placed by hand, fitted to the rules' dash time): a side step, a half-crouched
+   *  step forward, or a jump back. The upper body keeps the guard. Returns how much it took over. */
+  footwork(man, A) {
+    if (!A || A.kind !== 1) return 0;
+    const { age, span } = A;
+    // which way: the dash's own velocity, once it shows (the first moments may still be the walk's)
+    if (!A.dodge || (age < 0.06 && man.speed > 4)) A.dodge = dodgeKind(man.rawF, man.rawR);
+    const dash = Math.max(0.05, (man.world.timing || TIMING).dash.time);
+    const ph = age < dash ? age / dash : 1 + (age - dash) / Math.max(0.05, span - dash);
+    const R = this.rest;
+    const F = this.frame;
+    const P = this.buf.full;
+    const kind = A.dodge;
+    this.clips.get('guard').sample(this.clock, P, true);   // fists up
+    P.q.hips.copy(R.pose.q.hips);                           // square to the aim (the guard stands side-on)
+    const D = kind === 'forward' ? DASH_FORWARD : kind === 'back' ? DASH_BACK : DASH_SIDE;
+    const toRight = kind === 'right' ? 1 : kind === 'left' ? -1 : 0;
+    const off = at(D.hips, ph, this.target);
+    // across: towards the dash's side for a side step (the body's -X is its right), the body's X otherwise;
+    // up and down from the guard's own height (its knees bent: the rest pose stands straight-legged)
+    P.p.set(R.pose.p.x + (toRight ? -toRight * off.x : off.x), P.p.y + off.y, R.pose.p.z + off.z);
+    F.of(P, R);
+    turnBone(P, F, 'chest', AXIS_X, at(D.bend, ph), 'head');
+    F.of(P, R);
+    for (const side of ['L', 'R']) {
+      let keys;
+      if (toRight) keys = (side === 'R') === (toRight > 0) ? D.lead : D.trail;
+      else keys = D[side];
+      const k = at(keys, ph, this.target);
+      this.target.set(toRight ? -toRight * k.x : k.x, R.ankle + k.y, k.z);
+      this.pole.set(side === 'L' ? 0.15 : -0.15, 0, 1);    // knees forward, a little out
+      reach(P, F, R, `leg${side}`, this.target, this.pole);
+      flatFoot(P, F, R, side);
+    }
+    const w = fades(age, span, 0.03, 0.08);
+    mix(this.out, P, w);
+    return w;
+  }
+
+  /** The throwing (right) arm: wound up with the charge, released on the throw, in this throw's
+   *  style: overhead (the clip), side-arm or underarm (placed by hand). */
+  throwArm(dt, s, man, moving, A) {
+    const releasing = man.throwT < RELEASE;
+    if (s.charging) this.style = this.forceStyle || THROW_STYLES[hash(this.id * 977 + man.throws) % THROW_STYLES.length];   // forceStyle: tests
+    const want = s.charging || releasing ? 1 : 0;
+    const parrying = A && A.kind > 1;                          // a defence mid-charge: the arm stays up a moment longer
+    this.w.throw = approach(this.w.throw, want, dt / (want ? 0.08 : parrying ? 0.4 : 0.18));
+    if (this.w.throw <= 0) return;
+    const B = this.buf;
+    const u = s.charging ? clamp(s.charge, 0, 1) : releasing ? man.throwT / RELEASE : null;
+    if (this.style === 'over') {
+      const thr = this.clips.get('throw');
+      if (u !== null) thr.sample(s.charging ? u * thr.cock : lerp(thr.cock, Math.min(thr.duration, thr.release + FOLLOW), u), B.arms);
+      mix(this.out, B.arms, this.w.throw, this.upperMask(1 - moving));
+      return;
+    }
+    const T = THROWS[this.style];
+    const R = this.rest;
+    const F = this.frame;
+    const P = copyPose(B.reach, this.out);
+    if (u !== null) {
+      this.u = u;
+      this.charging = s.charging;
+    }
+    const k = this.u ?? 0;
+    const wound = this.charging;
+    F.of(P, R);
+    if (this.style === 'side') turnBone(P, F, 'chest', AXIS_Y, at(wound ? T.turnWind : T.turnRelease, k), 'head');
+    else turnBone(P, F, 'chest', AXIS_X, at(wound ? T.bendWind : T.bendRelease, k), 'head');
+    F.of(P, R);
+    at(wound ? T.wind : T.release, k, this.target);
+    reach(P, F, R, 'R', this.target, this.pole.set(...T.pole));
+    aimHand(P, F, R, 'R', this.fingers.set(...T.fingers), this.palmDir.set(...T.palm));
+    mix(this.out, P, this.w.throw, RIGHT_TURN);
+  }
+
+  /** The left arm: across the face while charging, a backhand parry for a deflect, a palm catch,
+   *  and a caught ball pulled in to the right hand. */
+  leftArm(dt, s, man, A) {
+    const parry = A && A.kind === 3 ? A : null;
+    const catching = A && A.kind === 2 && !A.done ? A : null;
+    const caught = man.caughtT < CAUGHT;
+    this.w.guard = approach(this.w.guard, s.charging && !parry && !catching && !caught ? 1 : 0, dt / 0.1);
+    const R = this.rest;
+    const F = this.frame;
+    const B = this.buf;
+    if (this.w.guard > 0) {
+      const P = copyPose(B.reach, this.out);
+      F.of(P, R);
+      this.target.set(...GUARD_L.hand).add(F.pos.head).sub(R.head);
+      reach(P, F, R, 'L', this.target, this.pole.set(...GUARD_L.pole));
+      aimHand(P, F, R, 'L', this.fingers.set(...GUARD_L.fingers), this.palmDir.set(...GUARD_L.palm));
+      mix(this.out, P, this.w.guard, LEFT_ARM);
+    }
+    if (parry) {
+      const u = parry.age / parry.span;
+      const P = copyPose(B.reach, this.out);
+      F.of(P, R);
+      turnBone(P, F, 'chest', AXIS_Y, at(PARRY_L.chest, u), 'head');
+      F.of(P, R);
+      reach(P, F, R, 'L', at(PARRY_L.hand, u, this.target), this.pole.set(...PARRY_L.pole));
+      aimHand(P, F, R, 'L', at(PARRY_L.fingers, u, this.fingers), at(PARRY_L.palm, u, this.palmDir));
+      mix(this.out, P, fades(parry.age, parry.span, 0.03, 0.15), LEFT_TURN);
+    }
+    if (catching || caught) {
+      // the palm out in front; once the ball is in it, pulled in (k: 0..1 over the moment it shows there)
+      const k = caught ? smooth(0, 1, man.caughtT / CAUGHT) : 0;
+      const P = copyPose(B.reach, this.out);
+      F.of(P, R);
+      turnBone(P, F, 'chest', AXIS_Y, CATCH_L.chest * (1 - 0.7 * k), 'head');
+      F.of(P, R);
+      this.target.set(...CATCH_L.hand).lerp(tv7.set(...PULL_L.hand), k);
+      reach(P, F, R, 'L', this.target, this.pole.set(...CATCH_L.pole));
+      this.fingers.set(...CATCH_L.fingers).lerp(tv7.set(...PULL_L.fingers), k);
+      this.palmDir.set(...CATCH_L.palm).lerp(tv7.set(...PULL_L.palm), k);
+      aimHand(P, F, R, 'L', this.fingers, this.palmDir);
+      const w = caught ? fades(man.caughtT, CAUGHT, 0, 0.1) : fades(catching.age, catching.span, 0.05, catching.fall);
+      mix(this.out, P, w, LEFT_TURN);
+    }
+  }
+
+  /** Carrying the ball: the right hand holds it in front of the right hip, whatever the rest does
+   *  (and comes to meet a caught ball). */
+  carry(dt, s, man) {
+    const carrying = s.hasBall && !s.charging && man.throwT >= RELEASE;
+    this.w.carry = approach(this.w.carry, carrying ? 1 : 0, dt / 0.15);
+    this.w.meet = approach(this.w.meet, man.caughtT < CAUGHT ? smooth(0.2, 0.9, man.caughtT / CAUGHT) : 0, dt / 0.2);
+    const w = this.w.carry * (1 - this.w.throw);
+    if (w <= 0) return;
+    const R = this.rest;
+    const F = this.frame;
+    const P = copyPose(this.buf.reach, this.out);
+    F.of(P, R);
+    this.target.set(...CARRY_R.hand).lerp(tv7.set(...CARRY_R.meet), this.w.meet);
+    reach(P, F, R, 'R', this.target, this.pole.set(...CARRY_R.pole));
+    aimHand(P, F, R, 'R', this.fingers.set(...CARRY_R.fingers), this.palmDir.set(...CARRY_R.palm));
+    mix(this.out, P, w, RIGHT_ARM);
+  }
+
+  /** The upper body, and the legs as far as standing still (0..1). */
+  upperMask(standing) {
+    const m = (this.mask ||= { ...UPPER });
+    for (const b of LEGS) m[b] = standing;
+    return m;
+  }
+
+  /** Puts a pose on the bones; then no foot through the floor (when grounded). */
+  apply(P, grounded) {
+    const R = this.rest;
+    const b = this.bones;
+    for (const name of BONES) b[name].quaternion.copy(P.q[name]);
+    const hips = b.hips.position.copy(P.p);
+    if (!grounded) return;
+    const T = this.turn;                                     // the legs' turns in the body's frame
+    T.hips.multiplyQuaternions(R.armQ, b.hips.quaternion);
     const A = this.at;
     let lowest = Infinity;
     for (const x of ['L', 'R']) {
+      T[`thigh_${x}`].multiplyQuaternions(T.hips, b[`thigh_${x}`].quaternion);
+      T[`shin_${x}`].multiplyQuaternions(T[`thigh_${x}`], b[`shin_${x}`].quaternion);
       A.thigh.copy(R.local[`thigh_${x}`]).applyQuaternion(T.hips).add(hips);
       A.shin.copy(R.local[`shin_${x}`]).applyQuaternion(T[`thigh_${x}`]).add(A.thigh);
       A.foot.copy(R.local[`foot_${x}`]).applyQuaternion(T[`shin_${x}`]).add(A.shin);
@@ -271,10 +932,46 @@ export class Athlete {
     if (lowest < R.ankle) hips.y += R.ankle - lowest;
   }
 
+  /** A perfect dodge's acrobatics at u (0..1) into out: a corkscrew (the backflip, lower, with a
+   *  full twist), a backflip (going backwards), an aerial side flip (spread, turning over sideways
+   *  towards the dodge), or a butterfly twist (spread, leaning flat and spinning round). */
+  acrobatics(u, out) {
+    const C = this.clips;
+    const R = this.rest;
+    const kind = this.acro.kind;
+    const turn = Math.PI * 2 * u * u * (3 - 2 * u) * this.acro.dir;
+    if (kind === 'corkscrew' || kind === 'backflip') {
+      const flip = C.get('flip');
+      flip.sample(lerp(Math.max(0, flip.takeoff - 0.1), flip.touchdown, u), out);
+      out.p.y = R.pose.p.y + (out.p.y - R.pose.p.y) * CORK_HEIGHT;
+      if (kind === 'corkscrew') out.q.hips.multiply(tq.setFromAxisAngle(R.twist, turn));
+      return;
+    }
+    C.get('air').sample(0.9, out);
+    out.p.y = R.pose.p.y + Math.sin(Math.PI * u) * 0.55;
+    if (kind === 'sideflip') tq.setFromAxisAngle(AXIS_Z, turn);
+    else tq.setFromAxisAngle(AXIS_Y, turn).multiply(tq2.setFromAxisAngle(AXIS_X, Math.sin(Math.PI * Math.min(1, u * 1.15)) * 1.25));
+    out.q.hips.premultiply(R.armQ).premultiply(tq).premultiply(R.armInv);
+  }
+
+  /** A perfect dodge begins: which acrobatics (seed: the same on every screen; going backwards, a
+   *  backflip) and which way. */
+  startAcrobatics(seed, side, back = false) {
+    this.acro = { kind: back ? 'backflip' : ACROBATICS[seed % ACROBATICS.length], dir: side >= 0 ? 1 : -1 };
+  }
+
   /** Puts a held ball of this radius in the right hand, touching the palm. */
   hold(ball, radius) {
     if (ball.parent !== this.hand) this.hand.add(ball);
     ball.position.copy(this.reach).multiplyScalar(radius).add(this.palm);
+  }
+
+  /** Puts a ball of this radius in the left palm (a ball just caught). */
+  holdLeft(ball, radius) {
+    const hand = this.bones.hand_L;
+    if (ball.parent !== hand) hand.add(ball);
+    const ax = this.rest.hands.L;
+    ball.position.copy(ax.fingers).multiplyScalar(0.075).addScaledVector(ax.palm, radius + 0.015);
   }
 
   /** The hit flash and the perfect dodge's glow: the team's colour over the whole body. */
@@ -289,3 +986,14 @@ export class Athlete {
     });
   }
 }
+
+/** Which dodge, from the dash's velocity along the aim and to the right. */
+function dodgeKind(f, r) {
+  const a = Math.atan2(r, f);
+  if (Math.abs(a) < 0.9) return 'forward';
+  if (Math.abs(a) > 2.3) return 'back';
+  return a > 0 ? 'right' : 'left';
+}
+
+export const ACROBATICS_TIME = ACRO_TIME;
+export const CAUGHT_TIME = CAUGHT;

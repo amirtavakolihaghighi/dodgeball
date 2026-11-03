@@ -56,10 +56,10 @@ The game should look and feel professionally made: juice and good art, both. We 
 | 5 | **The arena:** floor, walls, stands and a crowd; lighting baked in Blender | Done (decision 136): the round 2 hall with its light baked, the court painted on its floor, stands and a crowd, the sun's shafts. The user: good; walls and stands behind the camera now turn see-through (decision 137) |
 | 6 | **The ball and effects art** | Done (decision 138): effect shapes (starburst, shockwave, sparkles, flare, dust, swipe), a rubber ball with a bright edge, long sun shadows where the sun shines. The user: good for now |
 | 7 | **The characters:** the model in both versions, with the helmet and without it, one picked at random for each player who joins (decision 128); team colours; a lighter version for low settings | Done (decision 139): round 2's athlete at about 6,600 + 1,700 triangles (Low a third), the body and kit one surface, coloured per player from maps of colour slots (team kit, six looks), its skeleton following the stick figure's poses until step 8. The user: fine |
-| 8 | **Animation:** running from CC0 motion capture; throws, catches, deflects and dodges in code, fitted to the host's timings; knockouts by physics (ragdolls). The user's dodges (decision 134): a perfect dodge is a butterfly twist, a corkscrew or an aerial side flip, picked at random each time, with afterimages; a normal dodge is a ghost dash or an MMA fighter's dash footwork | To do |
+| 8 | **Animation:** running from CC0 motion capture; throws, catches, deflects and dodges in code, fitted to the host's timings; knockouts by physics (ragdolls). The user's dodges (decision 134): a perfect dodge is a butterfly twist, a corkscrew or an aerial side flip, picked at random each time, with afterimages; a normal dodge is a ghost dash or an MMA fighter's dash footwork | Being finished one move at a time (decision 142): every move and change of move, what it should look like, the tester's notes and its status are in `docs/ANIMATIONS.md`. Redone once after the user played it (decisions 140 and 141): 17 CC0 clips (Mesh2Motion, with Quaternius's library) for running, the overhead throw, jumps, hits, knockouts, getting up and a round's end; the rest placed by hand and reached with IK, as the user described: three throws at random, the left forearm guarding the face, a backhand parry, a one-handed palm catch, side steps, a lunge forward, a jump back, and a backflip going backwards. All fitted to the host's timings. Knockouts are clips (ragdolls left for later). The user's second test: some fixed, some broken again, some still faulty. The three fixes since were approved on 2026-11-03 and are Locked (the moves test checks them). **On hold, not finished** (decision 143): other work first; when it resumes, the animation tool comes first (a viewer, then an editor), then the rest of `docs/ANIMATIONS.md` |
 | 9 | **The HUD and menus** | To do |
 | 10 | **An office session:** the logs measure frame rates, freezes and the first download on real laptops | To do |
-| 11 | **The merge into `main`**, when the user says so. In the merge's conflicts, keep this branch's phase 15 and decision rows. Rewrite CLAUDE.md's opening section (about this branch) as plain notes for `main` | Not yet |
+| 11 | **The merge into `main`**, when the user says so. In the merge's conflicts, keep this branch's phase 15 and decision rows. Rewrite CLAUDE.md's opening section (about this branch) as plain notes for `main`. Update the README's text and screenshots: it still shows stick figures | Not yet |
 
 Step 2 comes before anything heavy, and steps 3 and 4 can follow right after step 1.
 
@@ -84,6 +84,10 @@ Step 2 comes before anything heavy, and steps 3 and 4 can follow right after ste
   - The user listens on the "Hear every sound" page (`/static/sounds.html`, linked under the volume sliders).
 - **The arena** (decision 136): `art/arena.py` builds the hall, bakes its light with Cycles on the graphics card and writes `static/arena/` (about 3½ minutes; `--quick` in 10 seconds, small and noisy, to check the look).
 - **The athlete** (decision 139): `art/athlete.py` builds it from round 2's shapes and writes `static/characters/` (about a minute; `--quick` meshes coarser). Check pictures go to `art/out/athlete/`, with a copy in the red team's colours (`athlete_preview.glb`) to import into the user's Blender.
+- **The moves** (decision 140): `art/moves.py`, run by `art/athlete.py`:
+  - downloads Mesh2Motion's CC0 human animations into `art/out/anim-sources/mesh2motion/`;
+  - retargets the clips the game uses onto the athlete and measures them (strides, takeoffs, the throw's cocked arm); the moves placed by hand are in `athlete.js`;
+  - with `--sheets`, renders each clip at 8 moments into `art/out/athlete/moves/`, to check the retargeting.
 - **The user's open Blender** (through the MCP, decision 121) is for looking: results are loaded there so the user can turn them around.
   - Scripts sent through the MCP run in safe mode: `bpy`, `bmesh`, `mathutils`, `math`, `random`, and no files, programs or network.
 - **Conventions:**
@@ -103,7 +107,7 @@ Step 2 comes before anything heavy, and steps 3 and 4 can follow right after ste
 These are starting targets, to be checked on an office laptop and adjusted:
 
 - 60 fps on the default setting on recent built-in graphics (Intel Iris Xe class), and the lowest setting for older laptops;
-- under about 30 MB for the whole first download (about 1 MB before the sounds; about 6.8 MB now: 1 MB of sounds, 2.2 MB of music, 1.8 MB for the hall, 0.8 MB for the athlete);
+- under about 30 MB for the whole first download (about 1 MB before the sounds; about 7.2 MB now: 1 MB of sounds, 2.2 MB of music, 1.8 MB for the hall, 1.2 MB for the athlete and its moves);
 - a character: about 5,000–10,000 triangles, one or two materials, textures no bigger than 1024 px (the athlete: 8,300–8,400 triangles with its head, two draw calls, textures of 512 and 256 px painted per look);
 - the arena: lighting baked into textures, with real-time shadows only for players and balls.
 
@@ -324,3 +328,31 @@ These are starting targets, to be checked on an office laptop and adjusted:
     - About 0.8 MB to download, two draw calls a player; in software rendering a match at Low runs about as fast as with the stick figures (24–26 against 26–27 frames a second).
     - Waiting for the user's look: Claude can't see the athletes move.
     - The user: "they are fine", and step 8 (animation) matters most to them. Committed as step 7.
+  - Step 8, the moves (decision 140; 2026-10-31):
+    - The source: Mesh2Motion's human library, 178 CC0 clips, Quaternius's Universal Animation Library among them. 22 clips are retargeted onto the athlete in Blender and blended in layers in the game.
+    - **Running:** the runs follow the speed, the legs turning where the player goes while the aim is kept (backwards, a backpedal).
+    - **The arms:** the throw winds up with the charge and follows through; the deflect swings.
+    - **Dodges:** MMA footwork to the sides and back; forwards, a low ghost dash with a faint trail.
+    - **Perfect dodges:** the user's three acrobatics (a corkscrew, an aerial side flip, a butterfly twist), at random but the same on every screen.
+    - **Hits:** knockouts fall away from the ball, harder the faster it came.
+    - **The rest:** revived players get up; at a round's end the winners celebrate and the losers kneel.
+    - **Not as planned:** knockout clips instead of ragdolls (reliable, and they look good); the catch keeps the stick figure's pose (no catch in the library).
+    - **No new shader**, and about the same speed in software rendering. Waiting for the user to play: Claude can't see motion.
+  - Step 8 redone after the user played it ("it needs serious edits"; decision 141, the same day):
+    - **Fixed:** strafing, the legs ran the wrong way (the turn's sign); during the forward dash the right hand flicked: it copied the stick figure's arm, with its old swat and catch poses, and now holds the ball in its own pose.
+    - **Made here, as the user described:** five clips gave way to moves placed by hand and reached with IK (17 clips remain):
+      - three throws at random: overhead (the clip), side-arm at the stomach's height, underarm like bowling;
+      - while charging, the left forearm across in front of the face;
+      - the deflect, a backhand parry with the left hand like Dark Souls' (the hook clip, with the right hand, looked like a punch);
+      - the catch, a one-handed palm blast, then the caught ball pulled in to the right hand;
+      - the dashes: a side step pushed off the far foot, landing on the near one; a half-crouched big step forward; a jump back;
+      - going backwards, a perfect dodge is a backflip.
+    - Every move plays to its end on the figure's own clock: the game ends a catch or deflect the moment it meets the ball.
+    - **The shorts:** spread legs stretched them into a skirt; an inseam now parts them.
+    - The backpedal looked natural to the user: unchanged. Still no new shader, and the same speed. Waiting for the user to play again.
+  - The user's second test (2026-11-01): some things fixed, some broken again, some still faulty. The perfect dodges show nothing until their last moment; the legs are still wrong holding only left or right; getting up after a knockout, the player can move while the body lies flat; and other things.
+  - Fixed the same day, waiting for the user's test: the perfect dodges (the dash's footwork had covered them), strafing (a pure sideways move kept the backpedal after backing up), and getting up (moving now cuts the get-up short instead of sliding the body along the floor).
+  - Decision 142: one animation at a time from here, in a new session. `docs/ANIMATIONS.md` lists every move and change of move, what it should look like, the tester's notes, its status, and Claude's likely causes for the three problems. A move the user approves is locked. If prompting doesn't work, the user may make moves themselves (Blender, a free tool, or a small web tool Claude makes: Claude's recommendation, starting with a viewer).
+- **2026-11-03:**
+  - The user's third test: the three fixes are good. Strafing, the perfect dodges and getting up are Locked, and the moves test now fails (`FAIL locked move ...`, exit 1) if a later change alters them. Committed as a checkpoint of step 8.
+  - Step 8 is on hold, not finished (decision 143): the office logs and a batch of lobby features come first. When it resumes, the animation tool comes first: the web tool (option c in `docs/ANIMATIONS.md`), a viewer, then an editor.

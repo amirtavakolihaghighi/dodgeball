@@ -48,6 +48,7 @@ from mathutils import Matrix, Vector
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import arena  # noqa: E402  (the graphics card for Cycles)
+import moves  # noqa: E402  (the clips, retargeted onto the athlete: step 8)
 import style_samples_2 as r2  # noqa: E402  (round 2's athlete: shapes, skeleton, kit)
 from style_samples import lin  # noqa: E402
 
@@ -120,8 +121,15 @@ def body_shape(J, parts):
     sf, sc_, sw = r2.shorts_parts(J, parts)
     scol, swhite = closure(sc_, "region"), closure(sw, "region")
 
+    mid = float(J["pc"][1])                             # round 2 faces +X: across the body is Y
+    crotch_z = float(J["pc"][2]) - 0.16                 # round 2's cloth between the legs ends 0.18 down
+
     def shorts(p):                                      # nothing above the shirt's hem: the shirt hangs over them
-        return r2.smax(sf(p), p[:, 2] - F(hem_z + 0.03), 0.004)
+        d = r2.smax(sf(p), p[:, 2] - F(hem_z + 0.03), 0.004)
+        # an inseam: round 2's legs touch, which made the shorts one piece below the crotch, and a side
+        # step's spread legs stretched that into a skirt; apart, each leg goes with its thigh
+        gap = r2.smax(np.abs(p[:, 1] - F(mid)) - F(0.008), p[:, 2] - F(crotch_z), 0.01)
+        return r2.smax(d, -gap, 0.004)
     socks = {s: r2.sock_parts(J, parts, s) for s in ("L", "R")}
     bands = {s: r2.wristband_sdf(J, parts, s) for s in ("L", "R")}
     pieces = [parts["body"], shirt, shorts, socks["L"][0], socks["R"][0], bands["L"], bands["R"]]
@@ -373,6 +381,10 @@ def body_weights(o, J, parts):
     D = np.stack([parts["torso"](v),
                   parts["upper_arm"](v, "L"), parts["forearm"](v, "L"), parts["upper_arm"](v, "R"), parts["forearm"](v, "R"),
                   parts["thigh"](v, "L"), parts["shin"](v, "L"), parts["thigh"](v, "R"), parts["shin"](v, "R")], 1)
+    # below the hip joints the shorts go with the legs (each leg of them with its own thigh, now that
+    # they're apart): following the hips, they'd hang between spread legs like a skirt
+    hip_z = min(J["L"]["hip"][2], J["R"]["hip"][2])
+    D[:, 0] += F(0.2) * r2.smoothstep(hip_z + 0.01, hip_z - 0.06, v[:, 2])
     W = np.exp(-(D - D.min(1, keepdims=True)) / F(TAU))
     up = r2.smoothstep(J["waist"][2] - 0.05, J["waist"][2] + 0.1, v[:, 2])
     W = np.concatenate([W[:, :1] * (1 - up)[:, None], W[:, :1] * up[:, None], W[:, 1:]], 1)
@@ -695,6 +707,34 @@ def check_pictures(sc, rig, meshes):
     return shots
 
 
+def move_frames(sc, rig, meshes, frames=8):
+    """Each clip at a few moments, small and quick (Workbench), from the front-left: to check the
+    retargeting. art/out/athlete/moves/<clip>_<i>.png, for a contact sheet."""
+    out = os.path.join(WORK, "moves")
+    os.makedirs(out, exist_ok=True)
+    for o in meshes:
+        o.hide_render = o.name not in ("body_hi", "helmet_hi")
+    sc.render.engine = "BLENDER_WORKBENCH"
+    sc.display.shading.light = "STUDIO"
+    sc.display.shading.color_type = "TEXTURE"
+    sc.render.resolution_x, sc.render.resolution_y = 220, 300
+    cam = sc.camera
+    cam.data.type = "ORTHO"
+    cam.data.ortho_scale = 2.8
+    cam.location = (-3.0, -5.0, 1.25)
+    cam.rotation_euler = (Vector((0, 0, 0.95)) - cam.location).to_track_quat("-Z", "Y").to_euler()
+    for name, meta in moves.CLIPS.items():
+        a = bpy.data.actions[name]
+        f1 = a.frame_range[1]
+        for i in range(frames):
+            moves.play(rig, name, round(f1 * i / (frames - 1)))
+            sc.render.filepath = os.path.join(out, f"{name}_{i}.png")
+            bpy.ops.render.render(write_still=True)
+    moves.rest(rig)
+    for o in meshes:
+        o.hide_render = False
+
+
 # ---------------------------------------------------------------- build
 
 def main():
@@ -754,7 +794,10 @@ def main():
         print(f"  {o.name}: {counts[o.name]} triangles, {len(o.data.vertices)} vertices")
 
     shots = check_pictures(sc, rig, made)
-    # The file carries shapes, bones and texture coordinates only: the game paints from the maps.
+    clips = moves.bake_all(rig)
+    if "--sheets" in ARGS:
+        move_frames(sc, rig, made)
+    # The file carries shapes, bones, texture coordinates and the clips: the game paints from the maps.
     plain = bpy.data.materials.new("athlete")
     previews = {o.name: o.data.materials[0] for o in made}
     for o in made:
@@ -764,20 +807,20 @@ def main():
         o.select_set(True)
     bpy.context.view_layer.objects.active = rig
     path = os.path.join(OUT, "athlete.glb")
-    bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_apply=False,
-                              export_yup=True, export_texcoords=True, export_normals=True, export_materials="EXPORT",
-                              export_skins=True, export_animations=False, export_morph=False)
+    export = dict(export_format="GLB", use_selection=True, export_apply=False, export_yup=True, export_texcoords=True,
+                  export_normals=True, export_skins=True, export_morph=False, export_animations=True,
+                  export_animation_mode="ACTIONS", export_force_sampling=True, export_frame_step=1,
+                  export_optimize_animation_size=True, export_reset_pose_bones=True)
+    bpy.ops.export_scene.gltf(filepath=path, export_materials="EXPORT", **export)
     print("  wrote athlete.glb", os.path.getsize(path) // 1024, "KB")
     for o in made:
         o.data.materials[0] = previews[o.name]
     # a copy painted in the red team's colours, for looking at in Blender (the MCP's safe mode imports
     # glTF, not other .blend files)
-    bpy.ops.export_scene.gltf(filepath=os.path.join(WORK, "athlete_preview.glb"), export_format="GLB", use_selection=True,
-                              export_apply=False, export_yup=True, export_texcoords=True, export_normals=True,
-                              export_materials="EXPORT", export_skins=True, export_animations=False, export_morph=False)
+    bpy.ops.export_scene.gltf(filepath=os.path.join(WORK, "athlete_preview.glb"), export_materials="EXPORT", **export)
     info = dict(slots=[s[0] for s in SLOTS], color=[s[1] for s in SLOTS], rough=[s[2] for s in SLOTS],
                 metal=[s[3] for s in SLOTS], maps=maps, supersample=2, triangles=counts, heads=["helmet", "face"],
-                held=dict(palm="palm_R", centre="ball_R", radius=BALL_R))
+                held=dict(palm="palm_R", centre="ball_R", radius=BALL_R), fps=moves.FPS, moves=clips)
     with open(os.path.join(OUT, "athlete.json"), "w", newline="\n") as fh:
         json.dump(info, fh, indent=1)
         fh.write("\n")
