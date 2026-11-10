@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-10-29 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it; then the look-and-feel cycle (graphics, juice and sound, with the art made in Blender), on the branch `look-and-feel`; on that branch also the office logs of 31 Oct to 2 Nov and a batch of lobby requests: longer names, players known by who they are rather than their name, renaming, a search across every tab, and bots with flags; all of it merged into `main` on 2026-11-03 and released as v2.3.0, with the athletes' animations and the HUD left on `main`'s task list).
+Last updated: 2026-11-04 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it; then the look-and-feel cycle (graphics, juice and sound, with the art made in Blender), on the branch `look-and-feel`; on that branch also the office logs of 31 Oct to 2 Nov and a batch of lobby requests: longer names, players known by who they are rather than their name, renaming, a search across every tab, and bots with flags; all of it merged into `main` on 2026-11-03 and released as v2.3.0, with the athletes' animations and the HUD left on `main`'s task list; then, on `main`, the animation tool: the "See every move" page, and its editor for the moves placed by hand).
 
 ## Contents
 
@@ -83,13 +83,14 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── PROJECT.md             this document
 │   ├── LAG_ANALYSIS.md        cycle 2: measured causes of lag, options, what the office logs showed
 │   ├── LOOK_AND_FEEL.md       the look-and-feel cycle: its plan, the budgets, the style samples, its log
-│   ├── ANIMATIONS.md          every animation and change of move, what it should look like, the tester's notes, its status (on hold: section 15)
+│   ├── ANIMATIONS.md          every animation and change of move, what it should look like, the tester's notes, its status (the work: section 15)
 │   └── images\                the README's screenshots
 ├── run.bat                    start the server (creates/repairs .venv; opens the browser)
 ├── build_exe.bat              build the standalone Windows app -> dist\Dodgeball-windows.zip
 ├── build_exe.py               the build logic (PyInstaller + zip with retries; ships the firewall helper too)
 ├── Allow friends to connect.bat   lets other PCs join through Windows Firewall: one rule, local network only
 ├── server.py                  FastAPI web server + WebSocket + game loop + host detection + rules broadcast/saving
+├── moves_file.py              the moves placed by hand (static\characters\made_moves.json): checks and writes a save from the moves page
 ├── sim.py                     all game rules (server-authoritative), lobby/match states, host actions
 ├── diag.py                    the session log: per-second server/host/connection numbers, stalls, late presses
 ├── rules.py                   every host-editable rule: name, description, range, preview; the Rules object
@@ -121,19 +122,25 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── js\juice.js            camera shake, jolts and the charge zoom (applied after the aim)
 │   ├── js\fxtex.js            the effects' shapes, the ball's bumps and the shadows' shapes, drawn at start
 │   ├── js\athlete.js          the athletes: loads them, paints each player's colours, moves them (clips, and moves placed by hand)
-│   ├── characters\            the athlete (athlete.glb), its colour-slot maps and athlete.json, built by art\athlete.py
+│   ├── characters\            the athlete (athlete.glb), its colour-slot maps and athlete.json, built by art\athlete.py;
+│   │                          made_moves.json: the moves placed by hand (edited on the moves page)
 │   ├── js\sfx.js              the sound: recordings mixed with Web Audio, the hall's echo, music, synthesized fallbacks
 │   ├── js\sound_check.js      the "Hear every sound" page (sounds.html)
 │   ├── sounds.html            that page
+│   ├── js\move_view.js        the "See every move" page (moves.html): the animation tool's viewer
+│   ├── js\move_scenes.js      its scenes: every move of docs\ANIMATIONS.md as a script of what the player does
+│   ├── js\move_edit.js        its editor: the moves placed by hand, changed with handles on the athlete, and saved
+│   ├── moves.html             that page
 │   ├── sounds\                sfx.oga + sfx.json (every short sound) and the two music tracks, built by art\sounds.py
 │   ├── arena\                 the sports hall: hall.glb, its lightmaps, the sky, arena.json; built by art\arena.py
-│   └── vendor\                three.js 0.185.1: three.module.min.js + three.core.min.js; addons\: its glTF loader and two helpers
+│   └── vendor\                three.js 0.185.1: three.module.min.js + three.core.min.js; addons\: its glTF loader, two helpers, the orbit camera, the handles
 ├── tests\
 │   ├── test_sim.py            74 rule tests: python tests\test_sim.py (or pytest)
-│   ├── test_server.py         9 server tests (lobby protocol, players' own settings and files, who a player is, the host's screen, saved rules, session logs, the log report, a dropped connection)
+│   ├── test_server.py         11 server tests (lobby protocol, players' own settings and files, who a player is, the host's screen, saved rules, session logs, the log report, a dropped connection, the moves page's list, saving the moves placed by hand)
 │   └── browser\               headless-Chrome end-to-end tests (cdp.js driver + step files, freeze_server.py)
 ├── logs\                      (made at runtime) one folder of session logs per server run; the 30 newest are kept
 ├── saved_rules.json           (made at runtime) the host's rules and players' own settings, reloaded at the next start
+├── move_saves\                (made at runtime, git-ignored) every moves file a Save on the moves page replaced
 ├── testlog\                   the user's collected session logs from office tests (git-ignored: names and IPs)
 ├── .venv\                     local Python environment (made by run.bat; never share it)
 └── dist\                      build output: Dodgeball\ (app) + Dodgeball-windows.zip
@@ -1191,6 +1198,101 @@ On the branch `look-and-feel`, just before its merge into `main`. The animations
 - **The worktree folder goes** at the user's word once `main` is pushed; its git-ignored contents worth keeping move to the main folder first (git-ignored there too): the office logs into `testlog/`, the Blender output into `art/out/`.
 - **The release checksum:** the `.sha256` file is now written with a Unix line ending, so `sha256sum -c` accepts it (v2.2.0's CRLF made it fail; reported then).
 
+### Phase 17: the animation tool: the viewer, then the editor (2026-11-04)
+
+On `main` (decision 153). The athletes' animations resume (decision 143's order: the tool first). The user hasn't tested v2.3.0's lobby batch yet and said to start on the tool without waiting.
+
+**The plan, discussed before building** (decision 154; the user: "begin"):
+
+- **Stage 1, the viewer:** a page in the game, "See every move", like "Hear every sound". Every row of `docs/ANIMATIONS.md` plays on a loop, slowed down, a frame at a time, from any side, with the time of each moment and the move's moments marked on a timeline. A link to a moment (the move, the time, the camera) that Claude opens exactly as it was, and a button that saves the picture.
+- **Stage 2, the editor**, for the moves placed by hand (B1–B2, C4–C7, D1–D7, E2–E5): first their numbers move out of `athlete.js` into a file the page can edit, proven identical (every move's pose recorded before and after); then key moments on the timeline (drag to retime, add, delete), handles on the hands and feet (move, turn the hand, where the elbow or knee points), the chest's turn or lean, the blend times, "stop here" or "pass through" per key, undo, and Save (the host's browser only, from the source folder only, every earlier save kept).
+- **Later, if needed:** the clips (another CC0 clip, which part plays, how fast), which needs Blender to rebuild the athlete.
+- **The branch:** the user: "since it's a tool, I think main is good unless you think it's better for it to have a separate branch and folder." Claude agreed: the page is separate, so the game doesn't change while it's built, with one exception (stage 2's file), proven identical. If a v2.3.1 is needed meanwhile, it's made from the v2.3.0 tag, so it holds only the fixes.
+
+**Built:**
+
+- **The page** (`static/moves.html`, `static/js/move_view.js`), linked under "Hear every sound" in Your settings:
+  - **the list:** every row of `docs/ANIMATIONS.md` by its number, with its status (Locked marked), what it should look like, and its other columns, read from the file itself (the server serves that one file: `GET /docs/ANIMATIONS.md`), so the list stays in one place. A copy without the docs (the app) shows the names only. A search box filters it;
+  - **playing:** play and pause (Space), a frame on or back (← →; a frame is 1/60 s), back to the start (Home), 1×, ½×, ¼× or ⅒×, loop, and a timeline to drag;
+  - **the timeline:** the time ("0.542 s of 1.233 s · frame 32 of 74"), spans (a defence's window and recovery, the dash and its landing, charging, the release, the freeze, the acrobatic, the get-up, a caught ball in the palm), the events by name, and gold diamonds for the key moments of the moves made here, the ones stage 2 will let you drag;
+  - **the camera:** drag to turn round, wheel to zoom, right-drag to move; front, back, either side, above, the game's own over-the-shoulder camera, and an opponent's view; it follows the player, or stays;
+  - **switches:** the hall or the plain court, helmet or face, red or blue, High or Low, the balls on or off;
+  - **the timings** the moves stretch to: the game's (yours: the game keeps them in the browser for the page), the defaults, or any typed in;
+  - **a link to the moment** (copied to the clipboard, or shown in a box where there's no clipboard), and **Save the picture**;
+  - the address keeps the move (and the moment, when paused), so a reload comes back to it; `?clean` shows only the picture (for Claude's pictures).
+- **The scenes** (`static/js/move_scenes.js`): 79 of them, one per row that is a move (A1–J14; K's rows aren't moves). Each is a short script: keys held, the aim turning, presses, a charge and its release, a ball arriving (deflected, caught, a hit, a knockout, or missing a dodge), a perfect dodge, a revive, a round's end. A stand-in for the game turns it into the player's state step by step, as the game does for your own player (`main.js` moveLocal, tryAction, playerStates): the run speeds, the dash, the slower walk while charging or defending, your press showing for 0.4 s. The page feeds that to the game's own World, Stickman and Athlete, and fires the game's events at them (`playThrow`, `impact`, `caught`, `deflected`, `perfectDodge`), so the figure is the game's, moving as in a match.
+  - Scenes are written from the timings, so they stretch with them; run loops are whole run cycles, so they loop seamlessly; each scene is centred in its half of the court.
+  - Balls: the incoming ones come from the other half, 20° to the side (straight in, a deflected ball flew back through the front camera and covered the picture); a thrown one leaves from where the game lets it go (`sim.py HAND_*`).
+- **Every moment exact:** the page steps in 1/120 s, the same steps whether it plays on or goes back to a moment (it plays the scene again from the start, quietly: 30 ms at most), with its own chance (the impact freeze's shudder), so a moment looks the same every time, and a link opens exactly the frame it was copied at.
+- **In the game:** `athlete.js` exports the moves made here and their times (for the timeline's marks), `world.js` gained `clearFx()` (the page starts a scene over), `main.js` keeps its timings in the browser for the page (`dp.timing`), and `index.html` links the page. Nothing in play changed.
+- **Cost:** none in the game. The page downloads the vendored orbit camera (three.js r185's `OrbitControls.js`, 40 KB, from the same version's source, whose glTF loader matches ours byte for byte).
+
+**What the viewer showed straight away** (for the user to judge, move by move; nothing changed):
+
+- **The parry and the catch fall short in a match.** The moves placed by hand put the hand at points in the body's frame, measured in the lobby, where the athlete stands relaxed. In a match the athlete stands in the boxer's guard, its hips turned 44° to the left, and the left arm can't reach as far: at the parry's widest (0.24 s in) the hand is 0.50 m out and 0.23 m forward instead of 0.52 m and 0.26 m, earlier in the swing 0.27 m forward instead of 0.40; the catch's hand is 0.46 m in front instead of 0.6. In the lobby both land exactly on their keys. Noted under D2 and D5 in `docs/ANIMATIONS.md`.
+
+**Tests:**
+
+- New: `tests/browser/move_view.json` (+ `move_view.js`): the list plays all 79 scenes (and has the docs' 11 sections, the locked moves marked); every scene plays to its end and back without an error; a moment is the same played on or gone back to; a frame is two steps; the locked moves come out with the numbers `moves.json` locked them at (strafing, sideways after backing up, the four acrobatics, a corkscrew in a dash, getting up, walking off during a get-up); D2's timeline (the press, the window, the recovery, the parry's five key moments); a longer deflect window stretches the scene and goes into the link, and the defaults bring it back; Low, Face and Blue; a link copied, the page reloaded with it: the same move, step, camera and pose.
+- New server test: the page and its list are served, and no other file of the docs.
+- Re-run and passing: `moves.json` (every lock holds), `athletes.json`, `graphics.json` (37 shaders before and after the match, none built mid-match), the smoke test, the 74 rule tests and the 10 server tests. The game hands its timings to the page (checked by opening the page from the game).
+
+**Stage 2, the editor.** The user tried the viewer: "checked it and the tool itself looks okay up to here. i even found some mistakes in the animation that i didnt notice in the game play. continue with the developement". (The mistakes they found are for the move-by-move work that follows.)
+
+- **First, the numbers into a file, proven identical** (decision 156):
+  - `static/characters/made_moves.json` holds every number of the moves placed by hand: the guard, holding the ball, the catch and the caught ball, the parry, the side-arm and underarm throws, and the three dashes' footwork. Each move says in plain words what it is, and the file's top says how to read it (the athlete's frame, metres, radians, keys).
+  - Two kinds of number written in the code joined them: each move's blend in and out, and where the dashes' knees point. `athlete.js` loads the file with the athlete into `MADE` (filled in place, so the editor's changes show at once); a missing file leaves the stick figures, like a missing athlete.
+  - The file's numbers came out of the running code, not retyped.
+  - **The proof:** a fingerprint of the athlete's pose at every 1/120 s step of all 79 scenes (every bone's turn, the hips, where the figure stands and faces, its shudder and fall, the balls in its hands, to the last bit), before the change and after it: all 79 identical. The same fingerprint is sharp: the guard's hand moved by 1 mm changed the 23 scenes that charge a throw and no other. `tests/browser/move_print.json` prints them, for any later change that must not alter a move.
+- **The editor** (`static/js/move_edit.js`, decision 157): "Edit this move" on the 17 rows placed by hand (B1, B2, C4–C7, D1–D7, E2–E5) opens a panel beside the picture.
+  - **The move's parts:** a hand (where it goes and how it's turned), the chest's turn or lean, an elbow or the knees (where they point), a dash's hips and feet. Pick one in the panel, by its ball on the athlete, or by a key moment on the timeline.
+  - **Handles on the athlete** (three.js's TransformControls, vendored from the same version):
+    - arrows to move: red to its left, green up, blue forward, and the centre in the picture's plane;
+    - rings to turn the hand;
+    - a ball for where the elbow or knee points;
+    - the camera stays put while a handle is dragged; the numbers can be typed too, and the chest's turn and lean in degrees.
+  - **The timeline gets a row per part, with its key moments:**
+    - click one to go there; drag it sideways to retime it (the first and last stay);
+    - double-click a row, or "Add a key moment here", to add one where the scene is: the part stays where it is, to be moved from there;
+    - Delete deletes one; a hand's place and turn share their key moments.
+  - **Each key moment** "Slows to a stop" (as all did: slowing into it and out of it) or "Keeps moving": a smooth swing through it, a cubic through the keys (`athlete.js at()`). Keys that stop on both sides give exactly the old curve. (First called "Stop here" and "Pass through"; the user didn't understand them, so they became a sentence, "At this key moment it: Slows to a stop / Keeps moving", with a line on when to use which, and Claude showed the difference in a picture: the parry's hand, one dot every 1/120 s, bunching up mid-swing at a key moment that slows to a stop.)
+  - **Each move's blend in and out:** the three throws share theirs, and the catch goes over its recovery, a rule.
+  - **Reach:** a red line and a note when a hand or foot doesn't reach its ball (it can't, or the move is still blending in or out).
+  - **Every change shows at once:** the scene is played again from its start with the new numbers. The dashes left and right are one move, mirrored: changing either changes both.
+  - **Undo and keeping your work:**
+    - Undo and Redo (also Ctrl+Z, Ctrl+Y); "Back to saved", which Undo brings back; Save (Ctrl+S).
+    - Unsaved changes are kept in the browser, and the next time the page offers them back ("Bring them back" or "Drop them"). Leaving the page with unsaved changes asks first.
+    - A Locked move asks first ("Change it anyway"); none of the moves placed by hand is locked yet.
+- **Saving** (`server.py`, `moves_file.py`):
+  - **Who can save:** the page sends the whole file, and the server saves it only from the computer the game runs on, and only from the source folder (not the app). A server started with `--fresh` (tests) saves nothing, unless `--moves-file` names another file.
+  - **What it accepts:** it checks the file against the one it replaces:
+    - the same moves and parts, each value the same shape;
+    - key times in order and within the move;
+    - blends from 0 s (in) or 0.01 s (out) up to 2 s, and no number over 10.
+  - **How it writes:** in the file's own layout, a key a line (an unchanged file comes out byte for byte the same), keeping the file it replaces in `move_saves\` (git-ignored). The game plays the new moves from its next start (a reload).
+- **Finding the button:** the user couldn't find "Edit this move". It showed only on the 17 moves placed by hand, as a small dark button, and the page opens on A1 (Idle). Now it shows on every move: gold where it can change the move, greyed elsewhere (its tip names the 17). The list marks the 17 "✎ edit", and typing "edit" in the find box lists them.
+- **What the editor showed:** the parry falls short earlier than the viewer found. At its second key moment, across the chest, the hand is 9 cm from where it was placed; at the third, 14 cm (the guard's turned hips). For D2.
+- **Tests:**
+  - **New, `tests/browser/move_edit.json`** (37 checks):
+    - the button on every move (greyed on a clip, gold on a move placed by hand), the 17 marked in the list and found by "edit";
+    - moving a key's place moves the athlete's hand by as much, Undo gives back the very same pose, and Redo the change;
+    - retiming moves the place and the turn together, and the timeline's mark;
+    - an added key changes nothing there, deleting it gives back the very same pose, and the first and last can't be deleted;
+    - "Keeps moving" keeps the pose at the key and changes it between keys;
+    - the blend out, the chest's turn in degrees, an elbow's ball, and the hand turned 30° about its fingers;
+    - the dash right's leading foot moves the dash left's, mirrored;
+    - the reach note;
+    - Save is off on a test server, and Save works with the server's answer stood in for;
+    - a real mouse drag of a handle (the hand moves, the camera doesn't) and of a key moment along the timeline;
+    - unsaved changes offered back after a reload.
+  - **New server test:** saving takes only well-formed files, in the file's layout, keeping the old file; `--fresh` saves nothing.
+  - **New, `move_print.json`:** prints the fingerprints.
+  - **Re-run and passing:** `moves.json` (every lock), `athletes.json`, `graphics.json`, the smoke test, `move_view.json`, the 74 rule tests and the 11 server tests.
+  - **A real save, by hand:** on a normal server, the page saved, the file was written and the old one kept byte for byte; then the original was put back.
+- **The test runner** (`tests/browser/cdp.js`):
+  - a mouse step can take its place from the page (`"at"`), and a drag says `"buttons": 1`;
+  - a question the page asks (an alert, "Leave site?") is answered and noted, instead of hanging the run.
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -1342,6 +1444,11 @@ On the branch `look-and-feel`, just before its merge into `main`. The animations
 | 150 | From the office logs: the harmless "connection reset" traceback is only noted in the session log, and every server error is noted there; Auto takes one more step down before giving up, judges over 5 s, doesn't retry a level it had to leave and steps up only between rounds; the browser log records the loading time and download | C | Decision 129's Auto stuck an old laptop at 28 fps for 22 minutes after a noisy 3-second judgement, and retried High mid-round on borderline laptops. The error had alarmed the user twice; the download was step 10's unanswered question |
 | 151 | The look-and-feel cycle and the lobby batch are version 2.3.0 (minor) | C | New features; settings saved by v2.2.0 still load (own settings by name go to the first person with that name; bot counts pick the same built-in bots), and hosts and players use the game as before. A judgement call between minor and major: the game looks completely different, but nothing anyone relied on stopped working |
 | 152 | The branch `look-and-feel` is merged into `main` (2026-11-03), released as v2.3.0, and its worktree folder removed; the athletes' animations (with the animation tool first) and the HUD move to `main`'s task list | U | "Merge this with the master branch, and I think then we can delete this folder… We move the animation tasks to the main branch tasks list." The user will test the lobby batch later |
+| 153 | The animation tool is built on `main`, in the main folder, with no branch of its own; the leftover local branch `look-and-feel` (the same commit as `main`) is deleted | U | "Since it's a tool, I think main is good unless you think it's better for it to have a separate branch and folder." An exception to decision 117, the user's call; Claude agreed (the page is separate; stage 2's one change inside the game is proven identical; a v2.3.1 would be made from the v2.3.0 tag). "If the other local branch serves no purpose, delete it" |
+| 154 | The animation tool's plan: stage 1 a viewer (every move of `docs/ANIMATIONS.md` on a loop, slowed down, frame by frame, from any side, with the time of each moment; a link to a moment and a picture), stage 2 an editor for the moves placed by hand (their numbers in a file, key moments retimed, hands and feet moved and turned, saved from the host's browser in the source folder), and the clips later, if needed | U | Claude's plan, discussed before building; the user: "begin" |
+| 155 | The viewer plays each move as a script run on the game's own World, Stickman and Athlete, in steps of 1/120 s and with its own chance, so a moment is exact and repeatable; its list is `docs/ANIMATIONS.md` itself (the server serves that one file); the game keeps its timings in the browser for it; incoming balls come from 20° to the side | C | The same code as a match is the only way the page shows what a match shows. Exact moments make a link a shared picture: Claude can't see motion. One list, so the statuses and notes never drift apart. Straight in, a deflected ball flew back through the front camera |
+| 156 | The moves placed by hand live in `static/characters/made_moves.json`, each move described in it, loaded with the athlete; the blend times and the dashes' knees joined them; the move was proven identical by a fingerprint of every scene's every step, before and after | C | The editor needs a file that it can change and the game reads. The proof makes the move safe, as decision 154 required |
+| 157 | The editor: handles on the athlete (three.js's TransformControls, vendored), the parts and key moments that scene shows, a hand's place and turn sharing their keys, the first and last keys fixed, "slows to a stop" or "keeps moving" per key (a cubic; all stops give the old curve), Undo, Redo and Back to saved, unsaved changes kept in the browser and offered back; Save only from this computer and the source folder (not with `--fresh`), checked against the file it replaces, written in its layout, the old file kept in `move_saves/` | C | Decision 154's plan, kept simple: the user isn't a developer, so nothing to learn but dragging; a save that can't break the game; nothing lost |
 
 ## 6. Current features
 
@@ -1798,6 +1905,9 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 - **`logack {run, seq}`:** that log chunk (and everything before it) is stored.
 - **`hostview {m, g?, q?, f?, d?}`:** the host's screen (the cleaned copy of the host's own message), sent to everyone but the host when it changes and to each newcomer after `welcome`. `{m: null}`: no host is connected any more.
 - **HTTP `GET /logs/download`:** the host's zip of the last 24 h of sessions. It answers 403 to anyone else (allowed: this computer, or `?key=` with the host key) and 404 when the server isn't logging. The filename comes in `X-Filename`, not `Content-Disposition` (see section 14).
+- **HTTP `GET /docs/ANIMATIONS.md`:** the moves page's list, as Markdown, for anyone (the file is public in the repository anyway). Only that file of `docs/`; 404 where the docs aren't there (the app).
+- **HTTP `GET /moves/saving`:** whether the moves page's editor can save here: `{can, why}`. It can only from this computer, from the source folder, and not with `--fresh` (unless `--moves-file` names a file).
+- **HTTP `POST /moves/save`:** the editor saves the moves placed by hand: the whole file, as JSON. It's checked against the file it replaces (`moves_file.check`), written in its layout and the old file kept in `move_saves/`. The answer is `{ok, kept, made}` (`kept`: the old file's name, or null if nothing changed; `made`: what was written), or 403 (not here: why), 400 ("Not saved: ..."), 413.
 - **`s` (snapshot, 30 Hz):** `{st, r, p, b, e}`:
   - `r` (round): `{s: lobby|wait|count|play|over, n, left, score:[red,blue], w, bots:[red, blue], skill, rc:[red, blue], court:[halfLength, halfWidth], win, res, pend, rv, th}`.
     - `rc`: what R costs each team now: a revive, or with team health the next health pack (0: all your cash).
@@ -1847,6 +1957,7 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 
 - **`Client`:** wraps a WebSocket. Its send queue has maxsize 8 and drops the oldest message if full. A `pump` task writes to the socket. It counts dropped messages, its longest queue and its slowest send, for the log.
 - **Logging:** `start_logging()` (the `meta` record, the host watcher), `say()` (console prints that note when Windows held them up), `version_info()` (git describe, or the packaged `build_info.json`), `may_download_logs()` and the `/logs/download` route. The flags are `--no-log` and `--log-dir`; `--fresh` turns logs off unless `--log-dir` is given.
+- **The moves page:** `/docs/ANIMATIONS.md` (its list), and the editor's `/moves/saving` and `/moves/save` (`why_no_saving()`: frozen, `--fresh`, not this computer). `--moves-file` names the file to save into, its old files going into `move_saves/` next to it (tests).
 - **`game_loop()`:**
   - ticks the game at `TICK_RATE` and sends one snapshot string per `1/SNAPSHOT_RATE` to every client (both are rules);
   - when `game.rules_version` changes, sends `rules_message()` to everyone and calls `save_current_rules()`;
@@ -1923,6 +2034,8 @@ Key methods:
 - **Pure helpers:** `launch_velocity(frm, to, speed, gravity, reach_max)` and `rotate_toward`. The throw and damage formulas live on `Rules`.
 
 **`bots.py`:** see section 12.
+
+**`moves_file.py`:** the moves placed by hand (`static/characters/made_moves.json`). `check(new, old)` says why a save can't replace the file (the same moves and parts; each value a number, a place of three, or keys of either; key times in order and within the move; the blends and the sizes), `merge()` keeps the file's own "about" texts, `text()` is the file's layout (moves and parts a line each, a key a line, numbers to 4 decimals), and `save(data, path, saves)` checks, writes (through a temporary file) and keeps the replaced file.
 
 ## 11. Client code tour
 
@@ -2044,7 +2157,8 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 **`input.js`:** bindings, pointer lock (`?nolock` bypasses it for tests), and everything released on blur, visibility change or loss of the lock. Releasing on blur cancels a wind-up instead of throwing. `onPress(action, at)` and `onRelease(action, at)` pass when the key or button really went down (`eventTime`: the event's `timeStamp`, or now if it's missing, in the future or over 1 s old).
 
 **`athlete.js`:**
-- **Loading:** `loadAthlete()` loads `static/characters/`: the meshes and skeleton, the slot maps (read through a canvas), the clips (`Clip`: per bone, three.js's own interpolants), and the rest data (`restOf`).
+- **Loading:** `loadAthlete()` loads `static/characters/`: the meshes and skeleton, the slot maps (read through a canvas), the clips (`Clip`: per bone, three.js's own interpolants), the rest data (`restOf`), and the moves placed by hand (`made_moves.json` into `MADE`, through `setMade()`, which the editor also uses).
+- **Keys:** `at(keys, u, out)` eases from one key to the next, stopping at each, or through a key marked `'pass'` at the speed it has between its neighbours (a cubic: Hermite, the slope from the key before to the key after). Exported for the editor.
 - **`Athlete`:** one player's.
   - **Setup:** a skinned copy (`SkeletonUtils.clone`), their head and look (`hash(id)`, or `?head=helmet`/`?head=face` for everyone), their textures (`paint`, cached per mesh, team and look).
   - **Every frame:** `animate(dt, s, man)` builds the pose in layers: running and standing, the arms, the whole body.
@@ -2082,6 +2196,20 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - `main.js` saves the volumes in `dp.settings` (`volume`, `levels`), calls the moments from `onEvent` (`roundSound` for the rounds) and sets the music from the round's state.
 
 **`sound_check.js`** (with `sounds.html`): the "Hear every sound" page: every moment and every recording on buttons, with the game's saved volumes.
+
+**`move_view.js`** (with `moves.html` and `move_scenes.js`): the "See every move" page, the animation tool's viewer (phase 17).
+
+- **`move_scenes.js`:** `SCENES`, one per move of `docs/ANIMATIONS.md` (A1–J14): `make(T, C, X)` gives a scene at timings `T`, with what the clips measure (`clipInfo`: loop lengths, strides, the throw's moments) for player `X` (`{team, id}`), as a length, a pre-roll and items: `hold` (keys), `aim`, `press`, `charge`, `ballIn`, `perfect`, `down`, `revive`, `roundAt`, `ball`, `protect`.
+  - `ScenePlayer` plays one: `next()` steps 1/120 s and moves the player as `main.js` moveLocal does (the run speeds, the dash, slower while charging or defending) and returns its state as `playerStates` gives your own; `eventsIn()` the game's events in that step; `roundAt()`; `ballsAt()` the balls in the air; `marks` the timeline's events, spans and key moments (from `athlete.js MADE`).
+  - It first records the whole path, to centre the scene in its half and aim the balls. `DEFAULT_TIMING` is `config.py`'s, for a page opened before the game kept its own (`dp.timing`, written by `main.js shareTiming`).
+- **`move_view.js`:** a `World` on the page's canvas (its own `resize`: the canvas beside the list and above the bar), `warmUp()`, and the scene played by feeding `ScenePlayer`'s states to `world.syncPlayers` and its events to the figure (`fire`), as `main.js drawFrame` does. Going back to a moment plays the scene again from the start, quietly (the crowd placed once at the end); `Math.random` is the page's own (mulberry32), started over with each scene.
+  - The camera: three.js's `OrbitControls`, its target following the player (or not), the presets in the player's frame, and "Your camera" as `main.js shoulderCamera` at a level aim.
+  - The address: `#D2@0.540&cam=front&...` (the move, the moment when paused, the camera as a name or an offset, the switches, the timings when not the defaults); a link is this address in full.
+  - `window.moveView`: `select`, `seek`, `frames`, `play`, `pause`, `cam`, `state`, `marks`, `where` (hands, feet, hips and head in the player's frame, and what the athlete is doing), `link`: for tests and Claude's pictures; `edit`: the editor's own steps.
+- **`move_edit.js`:** the editor (`createEditor(api)`, made by `move_view.js` once the athlete has loaded, not with `?clean`).
+  - `sceneMove(id, P)`: the move a scene edits and its parts as that scene shows them: `point` (a place: in the body's frame, following the head for the guard, an ankle or the hips' offset for a dash, mirrored for the dash left), `angle` (the chest's turn or lean) and `pole` (an elbow or the knees). `CLOCKS` turn a move's time (the parry's 0..1 over the deflect's window and recovery, a wind-up's over the charge, a release's over 0.42 s, a dash's 0..1..2) into the scene's seconds and back, as `athlete.js` times them.
+  - One `TransformControls` on a stand-in object (`proxy`): placed on the picked part each frame, read back while dragged (a move: the change in the athlete's frame added to the key's value; a turn: the fingers and palm from its axes; a pole: the way from the limb's middle).
+  - Changes: `begin()`/`end()` around each one (a step of undo), `change()`; `replaced()` for undo, redo, back to saved and saving. The scene is played again from its start (`api.resim`), or made again when key times moved (`api.rebuild`). The draft is `dp.movesDraft` (`{base, now}`).
 
 ## 12. Bots
 
@@ -2210,6 +2338,10 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
   - each one's hips, hands and feet are printed, with the legs' turn and the hips' turn measured from the bones: strafing right and left, the hips turn +1.29 and −1.31 rad (towards the movement); lying, the hips about 0.24 m up; kneeling, 0.49;
   - then a match: running players from the side.
   - Re-run it after touching `athlete.js`'s moves, `art/moves.py` or the stick figure's timers.
+- **The moves page test** (`move_view.json` + `move_view.js`, opened at `/static/moves.html`): the list plays all 79 scenes; each plays to its end and back without an error; a moment is the same played on or gone back to; frame steps; the locked moves with the numbers the moves test locked them at; D2's timeline; the timings (stretching, the link, the defaults); Low, Face, Blue; a link reloaded: the same move, step, camera and pose. Pictures `move_view_*.png`.
+  - Re-run it after touching the moves page (`move_view.js`, `move_scenes.js`, `moves.html`), `athlete.js`, the Stickman's timers or events in `world.js`, how `main.js` moves your player or shows your press, or the tables' layout in `docs/ANIMATIONS.md`.
+- **The editor test** (`move_edit.json`, with `move_view.js`, at `/static/moves.html`): see phase 17. Saving is tested with the server's answer stood in for (the test server runs with `--fresh`, which saves nothing). Re-run it after touching `move_edit.js`, `moves.html`, `athlete.js` (`MADE`, `at`), `made_moves.json`'s layout, or how `move_view.js` plays a scene again.
+- **The moves' fingerprints** (`move_print.json`): every scene's every step, printed. Run it before and after a change that must not alter any move, and compare (phase 17's proof).
 - **The juice test** (`juice.json` + `juice.js`, with `graphics.js`):
   - with full shake and a strong jolt, the aim from the shaken frame equals the aim from a freshly placed camera, while the drawn camera moved (21 cm, 0.75°, 5° wider);
   - the slider at 0 moves nothing, and is saved;
@@ -2351,6 +2483,8 @@ print(lengths, g.score, dict(counts))
 - **Browser-test steps share one global scope:** a `const` declared in one `eval` step makes the next step that declares it fail ("already been declared"). Wrap steps in `(() => { ... })()`.
 - **Headless Chrome can be slow to start on GitHub's Linux machines:** twice (29 Oct, and v2.3.0's CI on 3 Nov) it took over 10 s to open its debug port, and `cdp.js` failed before the page loaded ("Cannot read properties of undefined (reading 'find')"); re-running passed. It now waits up to 30 s, and says so plainly if Chrome never answers.
 - **Browser tests and localStorage:** each debug port keeps its Chrome profile in the temp folder, so personal settings (like "Follow the host") survive between runs. Tests set what they rely on.
+- **A mouse drag through the DevTools protocol:** each move must name the held button (`button: 'left'`, `buttons: 1`), or a page's pointer capture never takes hold (the moves go to whatever is under the mouse). `cdp.js` does it for `"buttons": 1`.
+- **A question in headless Chrome hangs the run:** "Leave site?" (a page with unsaved changes reloading), an alert or a confirm stops the page, and every later step waits forever. `cdp.js` answers them and notes them; the editor's test also turns its question off before reloading.
 - **CSS class names are global:** the lobby's `.tag` labels and the join screen's `.tag` tagline styled each other (fixed by scoping to `.teamCol .tag`).
 - **Windows Firewall:** block rules win over allow rules. Answering its "allow access" prompt for private networks only makes *block* rules for public ones, so on an office Wi-Fi marked Public the game stays blocked until those go (`Allow friends to connect.bat` removes them).
 - **A computer's clock can run fast for a while:** an OS time correction (seen on a Linux laptop) made the browser's `performance.now()` run about 1% fast for 25 s. Anything that estimates the server clock from arrival times must be able to move back quickly, not just drift (`net.js` re-anchors).
@@ -2386,7 +2520,10 @@ print(lengths, g.score, dict(counts))
 
 **Open tasks, in order** (moved here from the look-and-feel plan when it was merged; decision 152):
 
-1. **The athletes' animations: on hold, not finished** (decisions 142 and 143). First the animation tool: a page in the game showing any move or change of move on a loop, slowed down and frame by frame, then an editor for the moves placed by hand. Then `docs/ANIMATIONS.md`, one move at a time: the user tries a move, Claude fixes only that one, and an approved move is locked (and checked by the moves test).
+1. **The athletes' animations, not finished** (decisions 142, 143 and 154). The animation tool first, on `main` (decision 153):
+   - **Stage 1, the viewer** ("See every move", `/static/moves.html`): built 2026-11-04 (phase 17); the user tried it ("looks okay") and found mistakes in some moves they hadn't noticed in play.
+   - **Stage 2, the editor** for the moves placed by hand ("Edit this move" on that page): built 2026-11-04 (phase 17), waiting for the user to try it. Their numbers are in `static/characters/made_moves.json` now, proven identical.
+   - Then `docs/ANIMATIONS.md`, one move at a time: the user tries a move, Claude fixes only that one (or the user fixes it in the editor), and an approved move is locked (and checked by the moves test). Start with the mistakes the user found with the viewer. Already found: in a match the parry and the catch fall short of their keys (phase 17).
 2. **The HUD and menus** in the new look (the look-and-feel plan's step 9): not started.
 3. **The lobby batch of v2.3.0, tested by the user** (names, renaming, same names, the search, bots with flags): built and tested by Claude, not yet by the user.
 4. **Internet mode:** on its own branch, waiting for the user's friend to test it on a cloud server (phase 14).

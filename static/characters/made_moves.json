@@ -1,0 +1,237 @@
+{
+  "about": [
+    "The moves placed by hand: the rows of docs/ANIMATIONS.md marked \"made here\", which no animation library has.",
+    "The game reads this file (static/js/athlete.js). The \"See every move\" page edits it (Edit this move) and saves it",
+    "from the host's computer, keeping the file it replaces in move_saves/.",
+    "Places are metres in the athlete's own frame: x to its left, y up from the floor, z forward. The arms and legs",
+    "bend to reach them. hand: where the wrist goes; pole: the way the elbow (or knee) points; fingers and palm: the way",
+    "the fingers point and the palm faces. Turns are radians: the chest's turn + to the left, a lean + forward.",
+    "Keys are [time, value]: in between, the value eases from one key to the next, stopping at each one. A key",
+    "[time, value, \"pass\"] is passed through without stopping. blend: the seconds a move takes to come in and to go."
+  ],
+  "GUARD_L": {
+    "about": "D1, the guard while charging: the left forearm across in front of the face, the palm towards it. The hand's place is where the face is when the body stands straight: it follows the head when the body bends.",
+    "hand": [-0.08, 1.55, 0.3],
+    "pole": [1, -0.4, 0.3],
+    "fingers": [-1, 0.05, 0.1],
+    "palm": [0, 0, -1],
+    "blend": {"in": 0.1, "out": 0.1}
+  },
+  "CARRY_R": {
+    "about": "B1 and B2, holding the ball: the right hand in front of the right hip, palm up, steady as the player runs. meet: where it comes to take a caught ball from the left hand (D7).",
+    "hand": [-0.24, 1, 0.24],
+    "pole": [-0.3, -0.5, -1],
+    "fingers": [0, -0.2, 1],
+    "palm": [0.4, 0.9, 0],
+    "meet": [-0.28, 1.06, 0.3],
+    "blend": {"in": 0.15, "out": 0.15}
+  },
+  "CATCH_L": {
+    "about": "D5 and D6, the catch: the left arm straight out in front at the shoulder's height, the palm turned forward and the fingers up (a palm blast). chest: the chest turned to the right, so the left shoulder comes forward. It comes in over blend.in and goes over the catch's recovery (a rule).",
+    "hand": [0.16, 1.33, 0.6],
+    "pole": [0.5, -1, 0],
+    "fingers": [0, 1, 0.15],
+    "palm": [0, 0.05, 1],
+    "chest": -0.55,
+    "blend": {"in": 0.05}
+  },
+  "PULL_L": {
+    "about": "D7, a caught ball: the left hand pulls it in to the stomach, the palm turned towards the right hand, which takes it. The elbow points as in the catch.",
+    "hand": [0.02, 1.12, 0.3],
+    "fingers": [0, 0.2, 1],
+    "palm": [-1, 0.3, 0]
+  },
+  "PARRY_L": {
+    "about": "D2 to D4, the deflect: a backhand parry with the left hand. The forearm across the chest, the back of the hand to the ball; then it swings out to the left like a door on its hinge, the back of the hand leading, the chest unwinding with it. Time 0 to 1: the deflect's window and recovery.",
+    "hand": [
+      [0, [-0.16, 1.3, 0.32]],
+      [0.12, [-0.14, 1.32, 0.36]],
+      [0.32, [0.42, 1.36, 0.4]],
+      [0.5, [0.52, 1.3, 0.26]],
+      [0.75, [0.34, 1.1, 0.15]],
+      [1, [0.24, 1, 0.1]]
+    ],
+    "fingers": [
+      [0, [-1, -0.1, 0.15]],
+      [0.12, [-1, 0, 0.25]],
+      [0.32, [0.1, 0.15, 1]],
+      [0.5, [0.6, 0.05, 0.8]],
+      [0.75, [0.3, -0.6, 0.6]],
+      [1, [0.1, -1, 0.1]]
+    ],
+    "palm": [
+      [0, [0, 0, -1]],
+      [0.12, [0, 0, -1]],
+      [0.32, [-1, 0, 0.05]],
+      [0.5, [-0.8, 0, 0.6]],
+      [0.75, [-1, 0, 0.2]],
+      [1, [-1, 0, 0]]
+    ],
+    "chest": [
+      [0, -0.25],
+      [0.12, -0.25],
+      [0.32, 0.3],
+      [0.6, 0.25],
+      [1, 0]
+    ],
+    "pole": [0.6, -0.8, 0],
+    "blend": {"in": 0.03, "out": 0.15}
+  },
+  "THROWS": {
+    "about": "C4 to C7, the side-arm and underarm throws (the overhead one is a clip): the right hand wound up with the charge (wind: time 0 to 1 over the charge), then released (release: time 0 to 1 over 0.42 s). Not the hips: moving them would put the feet through the floor. blend: all three throws, the overhead one too.",
+    "blend": {"in": 0.08, "out": 0.18},
+    "side": {
+      "about": "Side-arm: the hand out to the right at the stomach's height, further as it charges, then swept across the front. turnWind, turnRelease: the chest's turn.",
+      "wind": [
+        [0, [-0.3, 1.02, 0.26]],
+        [1, [-0.62, 1.08, -0.06]]
+      ],
+      "release": [
+        [0, [-0.62, 1.08, -0.06]],
+        [0.25, [-0.38, 1.1, 0.5]],
+        [0.5, [0.18, 1.14, 0.46]],
+        [1, [-0.3, 1.02, 0.26]]
+      ],
+      "fingers": [-1, 0, 0.35],
+      "palm": [0, 0.25, 1],
+      "pole": [0, -1, -0.4],
+      "turnWind": [
+        [0, 0],
+        [1, -0.4]
+      ],
+      "turnRelease": [
+        [0, -0.4],
+        [0.3, 0.2],
+        [0.55, 0.45],
+        [1, 0]
+      ]
+    },
+    "under": {
+      "about": "Underarm, like bowling: the hand down and back, below the waist, then swung through low. bendWind, bendRelease: the upper body bent forward.",
+      "wind": [
+        [0, [-0.3, 1.02, 0.26]],
+        [0.45, [-0.27, 0.86, 0.02]],
+        [1, [-0.26, 0.88, -0.3]]
+      ],
+      "release": [
+        [0, [-0.26, 0.88, -0.3]],
+        [0.3, [-0.24, 0.76, 0.34]],
+        [0.6, [-0.2, 1.08, 0.62]],
+        [1, [-0.3, 1.02, 0.26]]
+      ],
+      "fingers": [0, -1, 0.15],
+      "palm": [0, 0, 1],
+      "pole": [0, 0, 1],
+      "bendWind": [
+        [0, 0],
+        [1, 0.3]
+      ],
+      "bendRelease": [
+        [0, 0.3],
+        [0.4, 0.35],
+        [1, 0]
+      ]
+    }
+  },
+  "DASH_SIDE": {
+    "about": "E2, the dash to the right (E3, to the left, mirrors it). Time 0 to 1: the dash itself (the rules' dash time); 1 to 2: the landing and settling. hips: moved [towards the dash's side, up, forward] from where they stand; lead (the foot on the dash's side) and trail: the ankles [towards the dash's side, lifted, forward]; bend: the upper body bent forward; knees: the way the left knee points (the right's mirrors it). The lead foot lifts a little, the trail foot pushes the body across, the upper body tilts forward and down; the lead foot comes down and takes the weight.",
+    "hips": [
+      [0, [0, 0, 0]],
+      [0.2, [-0.05, -0.06, 0]],
+      [0.7, [0.05, -0.03, 0.02]],
+      [1, [0.08, -0.09, 0.02]],
+      [1.4, [0.03, -0.04, 0]],
+      [2, [0, 0, 0]]
+    ],
+    "lead": [
+      [0, [0.11, 0, 0]],
+      [0.2, [0.2, 0.1, 0.03]],
+      [0.75, [0.33, 0.08, 0.04]],
+      [1, [0.28, 0, 0.03]],
+      [1.5, [0.2, 0, 0.01]],
+      [2, [0.11, 0, 0]]
+    ],
+    "trail": [
+      [0, [-0.11, 0, 0]],
+      [0.2, [-0.27, 0, -0.03]],
+      [0.7, [-0.4, 0.07, -0.05]],
+      [1, [-0.24, 0.05, -0.03]],
+      [1.4, [-0.14, 0, 0]],
+      [2, [-0.11, 0, 0]]
+    ],
+    "bend": [
+      [0, 0],
+      [0.2, 0.25],
+      [1, 0.28],
+      [2, 0]
+    ],
+    "knees": [0.15, 0, 1],
+    "blend": {"in": 0.03, "out": 0.08}
+  },
+  "DASH_FORWARD": {
+    "about": "E4, the dash forward: half-crouched, one big step forward with the left foot, the right pushing behind. As the side dash, with hips moved [left, up, forward] and L and R the left and right ankles [left, lifted, forward].",
+    "hips": [
+      [0, [0, 0, 0]],
+      [0.3, [0, -0.1, 0.04]],
+      [1, [0, -0.13, 0.1]],
+      [1.45, [0, -0.07, 0.05]],
+      [2, [0, 0, 0]]
+    ],
+    "L": [
+      [0, [0.11, 0, 0]],
+      [0.3, [0.12, 0.15, 0.24]],
+      [0.8, [0.12, 0.07, 0.58]],
+      [1, [0.12, 0, 0.55]],
+      [1.45, [0.12, 0, 0.28]],
+      [2, [0.11, 0, 0]]
+    ],
+    "R": [
+      [0, [-0.11, 0, 0]],
+      [0.3, [-0.11, 0, -0.26]],
+      [1, [-0.12, 0.05, -0.46]],
+      [1.45, [-0.11, 0, -0.2]],
+      [2, [-0.11, 0, 0]]
+    ],
+    "bend": [
+      [0, 0],
+      [0.3, 0.25],
+      [1, 0.32],
+      [2, 0]
+    ],
+    "knees": [0.15, 0, 1],
+    "blend": {"in": 0.03, "out": 0.08}
+  },
+  "DASH_BACK": {
+    "about": "E5, the dash back: a jump back, still facing forward: down, up and back, landing soft. As the dash forward.",
+    "hips": [
+      [0, [0, 0, 0]],
+      [0.15, [0, -0.09, 0]],
+      [0.55, [0, 0.12, -0.03]],
+      [1, [0, -0.1, 0]],
+      [1.45, [0, -0.04, 0]],
+      [2, [0, 0, 0]]
+    ],
+    "L": [
+      [0, [0.11, 0, 0]],
+      [0.15, [0.12, 0, 0]],
+      [0.55, [0.13, 0.24, 0.12]],
+      [1, [0.12, 0, 0.05]],
+      [2, [0.11, 0, 0]]
+    ],
+    "R": [
+      [0, [-0.11, 0, 0]],
+      [0.15, [-0.12, 0, 0]],
+      [0.55, [-0.13, 0.24, 0.12]],
+      [1, [-0.12, 0, 0.05]],
+      [2, [-0.11, 0, 0]]
+    ],
+    "bend": [
+      [0, 0],
+      [0.4, 0.2],
+      [1, 0.15],
+      [2, 0]
+    ],
+    "knees": [0.15, 0, 1],
+    "blend": {"in": 0.03, "out": 0.08}
+  }
+}

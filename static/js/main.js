@@ -204,6 +204,7 @@ function join() {
 function applyRules(m) {
   cfg = m.cfg;
   world.setTiming(cfg);
+  shareTiming();
   rules.active = m.rules;
   rules.next = m.next;
   rules.rv = m.rv;
@@ -219,6 +220,29 @@ function applyRules(m) {
   editor.setServer(m.rules, m.next, rules.players, rules.nextPlayers, rules.bots, rules.nextBots);
   botsPage.setServer(rules.bots, rules.nextBots);
   lobby.dirty();
+}
+
+/** The moves page (moves.html, opened from Your settings) plays the moves at this game's timings,
+ *  yours (the dash, each defence's window and recovery, the charge, the speeds), and can go back to
+ *  the defaults: both kept in this browser for it. */
+function shareTiming() {
+  const d = rules.defaults;
+  const action = (k) => ({ window: d[`${k}_WINDOW`], recovery: d[`${k}_RECOVERY`] });
+  const timing = {
+    now: {
+      dash: cfg.dash, chargeTime: cfg.chargeTime, actions: cfg.actions, walk: cfg.walk, chargeWalk: cfg.chargeWalk,
+      defendWalk: cfg.defendWalk, cooldown: cfg.cooldown, throwSpeed: cfg.throwSpeed,
+    },
+    defaults: d && {
+      dash: { time: d.DODGE_DASH_TIME, speed: d.DODGE_DASH_SPEED }, chargeTime: d.CHARGE_TIME,
+      actions: { dodge: action('DODGE'), catch: action('CATCH'), deflect: action('DEFLECT') },
+      walk: d.WALK_SPEED, chargeWalk: d.CHARGE_WALK_SPEED, defendWalk: d.DEFEND_WALK_SPEED, cooldown: d.THROW_COOLDOWN,
+      throwSpeed: [d.THROW_SPEED_MIN, d.THROW_SPEED_MAX],
+    },
+  };
+  try {
+    localStorage.setItem('dp.timing', JSON.stringify(timing));
+  } catch { /* storage off: the page uses its own defaults */ }
 }
 
 /** A rule's value for one player (`who`: their key): their own setting, or everyone's. */

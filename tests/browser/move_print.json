@@ -1,0 +1,6 @@
+[
+  {"waitFor": "window.moveView && window.moveView.ready", "timeout": 30000},
+  {"evalFile": "move_view.js"},
+  {"eval": "__mvFingerprint()"},
+  {"eval": "__mvErrors()"}
+]

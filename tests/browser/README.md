@@ -1,6 +1,6 @@
 # Browser tests
 
-End-to-end checks of the real client in headless Chrome (needs Chrome and Node 22+).
+End-to-end checks of the real client in headless Chrome (needs Chrome and Node 22+). `cdp.js` runs a list of steps; its header lists them. A mouse step can take its place from the page (`"at"`); a drag holds the button with `"buttons": 1`. A question the page asks (an alert, "Leave site?") is answered and noted, so it can't hang the run.
 
 ## Start the server first
 
@@ -201,6 +201,54 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\moves.js
 - **Positions:** each move prints where the hands, feet, hips and head are, the legs' turn (`legYaw`) and the hips' turn measured from the bones (`hipsTurn`, + to the right). Healthy: strafing right and left, `hipsTurn` about +1.3 and −1.3, and +1.3 with `back` false right after the backpedal; the corkscrew in a dash, the hips about 1.5 m up like the corkscrew alone; walking during a get-up, the hips about 0.9 m up (standing still, 0.29); the side-arm wind-up's right hand 0.6 m out; the parry's left hand 0.4 m out at its peak; the catch's 0.6 m forward; the forward dash's hips about 0.8 m up; lying, the hips about 0.24 m up and the head 0.23; kneeling, the hips 0.49; the acrobatics, the hips about 1.5 m up.
 - **Locked moves:** the moves the user approved (Locked in `docs/ANIMATIONS.md`) are checked after they're held: `__lock(name)` compares their key numbers (`LOCKS` in `moves.js`) with what the user approved, within a tolerance, and prints `locked ok: ...` or `FAIL locked move ... changed: ...`. Any `FAIL` makes the run exit with 1 (`cdp.js` does that for every test). Locked since 2026-11-03: strafing right and left (and right after a backpedal), the four acrobatics and a corkscrew in a dash, getting up, and walking during a get-up.
 - **Running:** then a match, with pictures of a running player from each team.
+
+Note: the moves test holds your player in the lobby, where the athlete stands relaxed. In a match it stands in the boxer's guard, and the parry and the catch reach less far (see the moves page's test below).
+
+## The moves page ("See every move")
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/static/moves.html" tests\browser\move_view.json
+```
+
+`move_view.json` (+ `move_view.js`) opens the animation tool's viewer (`static/moves.html`, `move_view.js`, `move_scenes.js`) and checks:
+
+- **The list:** every one of the 79 scenes is a row, the list came from `docs/ANIMATIONS.md` (its 11 sections), and the Locked moves are marked.
+- **Every scene** plays to its end and back without an error (the slowest about 30 ms).
+- **Exact moments:** a moment reached by playing on and by going back to it (the scene played again from the start) gives the same pose, in four scenes; a frame on is two steps, two frames back four.
+- **The locked moves** come out with the numbers `moves.json` locked them at, in the same tolerances: strafing right and left, sideways right after backing up, the four acrobatics, a corkscrew in a dash, getting up, walking off during a get-up. The moves made here are printed (the side-arm wind-up's hand, the parry, the catch, the dashes' feet, lying, kneeling).
+- **The timeline:** D2's press at 0.30 s, its window to 0.48 s and recovery to 0.78 s, the parry's five key moments, all drawn.
+- **The timings:** a 0.3 s deflect window makes D2 0.12 s longer and goes into the link; the defaults bring it back.
+- **The switches:** Low shows the light meshes, Face the face, Blue the blue team facing the red half; and back.
+- **A link:** E2 at 0.417 s from the left side, copied; the page reloaded with it opens E2 at the same step, paused, from the left, in the same pose.
+- **No page errors.** Pictures: `move_view_page.png`, `move_view_parry.png`, `move_view_corkscrew.png`, `move_view_yours.png` (the game's own camera), `move_view_link.png`.
+
+Add `?clean` to the page's address for the picture alone, with no panels (as Claude's pictures of a moment use).
+
+### Its editor ("Edit this move")
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/static/moves.html" tests\browser\move_edit.json
+```
+
+`move_edit.json` (with `move_view.js`) works the editor for the moves placed by hand (`move_edit.js`, `static/characters/made_moves.json`), 37 checks:
+
+- **Finding it:** the button shows on every move, greyed on A1 (a clip) and gold on D2; the list marks the 17 moves placed by hand "✎ edit", and typing "edit" in the find box lists them.
+- **Moving:** the parry's hand at its second key moment, dragged 5 cm up: the key's numbers change by exactly that and the athlete's hand follows; Undo gives back the very same numbers and pose; Redo the change.
+- **Key moments:** retiming one moves the hand's place and turn together, and the timeline's mark; one added at 0.45 of the move changes nothing there (0.00 cm), deleted gives back the very same pose; the first and last can't be deleted.
+- **Keeps moving:** the hand still meets the key (under 1 cm off at the nearest step) and moves differently between keys.
+- **The rest:** the blend out; the chest's turn typed in degrees; an elbow's ball (the guard's bent arm: the elbow moves); the catch's hand turned 30° about its fingers with the rings; the dash right's leading foot moved out moves the dash left's too, mirrored; the note when a hand can't reach its ball (the parry: yes, the guard: no).
+- **Saving:** off on a test server (`--fresh`), and the panel says why; with the server's answer stood in for, Save sends the change and clears it. Tests never write the real file (the server test covers the real save).
+- **The real mouse:** a handle dragged 40 px up (the hand rises, the camera doesn't move), and a key moment dragged along the timeline (0.32 → about 0.42 of the move, its turn with it).
+- **Unsaved changes:** kept in the browser; after a reload the page offers them back, "Bring them back" restores them, "Back to saved" drops them.
+- Pictures: `move_edit_parry.png`, `move_edit_dash.png`.
+
+### Every move's fingerprint
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/static/moves.html" tests\browser\move_print.json > before.txt
+```
+
+`move_print.json` prints a fingerprint of every scene: the athlete's pose at each of its 1/120 s steps, to the last bit. Run it before and after a change that must not alter any move (it proved the moves' numbers moved into `made_moves.json` unchanged), and compare the two outputs. Moving the guard's hand by 1 mm changes the 23 scenes that charge a throw.
 
 ## Juice: the camera never moves the aim
 

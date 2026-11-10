@@ -16,6 +16,7 @@
 //   {"shot": "part.png", "clip": {"x": 0, "y": 0, "width": 400, "height": 300, "scale": 2}}   part of the page, zoomed
 //   {"key": "KeyW"} / {"key": "KeyW", "down": false}        key down / up (KeyboardEvent.code)
 //   {"mouse": "down"|"up"|"move", "button": "left"|"right", "x": 640, "y": 360}
+//   {"mouse": "move", "at": "js giving {x, y}", "buttons": 1}   at a place the page works out; buttons 1: dragging
 // Page console output and exceptions are printed at the end. A step whose result starts with
 // "FAIL" (a check that didn't hold, like a locked move that changed) makes the run exit with 1.
 const { spawn } = require('child_process');
@@ -66,6 +67,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     if (m.method === 'Runtime.consoleAPICalled') logs.push(`[console.${m.params.type}] ` + m.params.args.map((a) => a.value ?? a.description ?? '').join(' '));
     if (m.method === 'Runtime.exceptionThrown') logs.push('[EXCEPTION] ' + (m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text));
     if (m.method === 'Log.entryAdded' && !m.params.entry.url?.endsWith('favicon.ico')) logs.push(`[log.${m.params.entry.level}] ${m.params.entry.text}`);
+    if (m.method === 'Page.javascriptDialogOpening') {     // a question nobody can answer here (an alert, "Leave site?"): yes, and noted
+      logs.push(`[dialog ${m.params.type}] ${m.params.message}`);
+      ws.send(JSON.stringify({ id: ++id, method: 'Page.handleJavaScriptDialog', params: { accept: true } }));
+    }
   };
   const send = (method, params = {}) => new Promise((r) => {
     const i = ++id;
@@ -114,7 +119,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     if (s.key) await send('Input.dispatchKeyEvent', { type: s.down === false ? 'keyUp' : 'keyDown', code: s.key, key: s.key });
     if (s.mouse) {
       const type = { down: 'mousePressed', up: 'mouseReleased', move: 'mouseMoved' }[s.mouse];
-      await send('Input.dispatchMouseEvent', { type, x: s.x ?? 640, y: s.y ?? 360, button: s.button || 'left', clickCount: 1 });
+      let { x = 640, y = 360 } = s;
+      if (s.at) ({ x, y } = await evaluate(s.at));      // a place the page works out, e.g. a handle on the athlete
+      // "buttons": 1 while the left one is held (a drag). Chrome needs the move to name the button
+      // too, or a page's pointer capture (an element holding on to the drag) never takes hold
+      const buttons = s.buttons ?? (s.mouse === 'down' ? 1 : 0);
+      const button = s.button || (s.mouse === 'move' && !(buttons & 1) ? 'none' : 'left');
+      await send('Input.dispatchMouseEvent', { type, x, y, button, buttons, clickCount: 1 });
     }
   }
   console.log(logs.length ? logs.join('\n') : '(no console output or errors)');

@@ -4,9 +4,11 @@
 
 **Open tasks** (the full list is in section 15 of `docs/PROJECT.md`):
 
-- **The athletes' animations: on hold, not finished** (decisions 142–143). Remind the user that they're still open. When they come back to them:
-  - **First build the animation tool** (decision 143): a page in the game, like the "Hear every sound" page. First a viewer for every move and change of move (loop it, slow it down, step frame by frame, turn the camera round), then an editor for the moves placed by hand (drag the hands and feet at each key moment, change the timing, save). The options weighed are at the end of `docs/ANIMATIONS.md`.
-  - Then go through `docs/ANIMATIONS.md` one move at a time (decision 142): the user tries a move and says what differs; fix only that move, and write their notes and the outcome into the list.
+- **The athletes' animations: not finished** (decisions 142–143, 153–157; phase 17 in `docs/PROJECT.md`). Remind the user that they're still open. Built on `main`, no branch (decision 153).
+  - **The animation tool, stage 1, the viewer**, is built (2026-11-04) and the user tried it ("looks okay"; they found mistakes in some moves they hadn't noticed in play): the "See every move" page (`/static/moves.html`, `move_view.js`, `move_scenes.js`). It plays every move of `docs/ANIMATIONS.md` on the game's own athlete and code (79 scripted scenes), exact to the step, with a timeline and moment links (`#D2@0.540&cam=front`). To see a moment the user sends: open their link on the test server with `?clean` and screenshot it (`window.moveView` has `select`, `seek`, `where` for numbers).
+  - **Stage 2, the editor**, is built (2026-11-04), waiting for the user to try it: "Edit this move" on the 17 rows placed by hand (`move_edit.js`; handles on the athlete, key moments on the timeline that slow to a stop or keep moving, blends, undo, Save). Their numbers moved from `athlete.js` into `static/characters/made_moves.json` (`MADE`, loaded with the athlete), proven identical by `move_print.json`'s fingerprints of every scene's every step. Save (`server.py /moves/save`, `moves_file.py`) works only from the computer the game runs on, from the source folder, not with `--fresh`; it checks the file against the one it replaces and keeps that one in `move_saves/` (git-ignored).
+  - Then go through `docs/ANIMATIONS.md` one move at a time (decision 142), starting with the mistakes the user found with the viewer: the user tries a move and says what differs; fix only that move (or the user fixes it in the editor), and write their notes and the outcome into the list. To raise when D2 and D5 come up: in a match the parry and the catch fall short of their keys (the guard turns the hips 44°; the editor shows the parry's hand 9 cm off already at its second key moment).
+  - A change to a move placed by hand is a change to `made_moves.json`: edit it in the page or by hand, never back in `athlete.js`. The user's own saves land there too, so look at `git diff static/characters/made_moves.json` before changing it.
   - Never change a **Locked** move without the user's say. When a move is locked, add its key numbers to `LOCKS` in `tests/browser/moves.js` and a `__lock` step to `moves.json`, so a later change that alters it prints `FAIL` and the run exits with 1; re-run `moves.json` after every change to the moves.
   - Claude can't see motion: show pictures of the moment that matters, and ask for a picture of the pose the user wants.
 - **The HUD and menus** in the new look (the look-and-feel plan's step 9): not started.
@@ -60,7 +62,7 @@ Quick facts:
   - Always pass `--no-browser` in tests, or windows open on the user's desktop.
   - Always pass `--fresh`, or tests load or overwrite the user's `saved_rules.json`.
   - Restart the server after Python changes, and between browser test suites (it keeps changed rules in memory).
-- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 74 must pass) and `tests\test_server.py` (all 9 must pass).
+- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 74 must pass) and `tests\test_server.py` (all 11 must pass).
 - **Session logs:**
   - Every server run writes `logs\<date_time>\` next to the app (`diag.py`). Every browser sends in its own log (`static/js/diag.js`; L marks a laggy moment).
   - The host downloads them all as one zip, and `tools\log_report.py <zip or folder>` turns them into a diagnosis. The user sends these zips to be analysed. Logs from before the rename are named `dodgeparry-...`; the report reads them the same way.
@@ -72,6 +74,8 @@ Quick facts:
   - Re-run the lobby tests after touching the lobby, rules or host code, `logs.json` after touching the logging, and `why_hit.json` after touching the hit marks or the hit popup.
   - Re-run `graphics.json` after touching `graphics.js`, the effects (`fxtex.js` too), the sun shadows, the ball, the hall (`loadArena`, the court's walls, the stands, the crowd) or `warmUp()` in `world.js`, or press timing (`input.js eventTime`), and `juice.json` after touching `juice.js`, where the camera is placed or the aim worked out, the effects in `onEvent`, or the see-through walls (`seeThrough`).
   - Re-run `athletes.json` after touching `athlete.js`, the stick figure's dressing or poses in `world.js`, or `static/characters/`, and `moves.json` after touching the moves (`athlete.js animate`, `art/moves.py`, the stick figure's timers).
+  - Re-run `move_view.json` (at `/static/moves.html`, not `/?nolock`) after touching the moves page (`move_view.js`, `move_scenes.js`, `moves.html`), `athlete.js`, the Stickman's timers or events, how `main.js` moves your player or shows your press, or the tables' layout in `docs/ANIMATIONS.md` (the page reads them), and `move_edit.json` (same address) after touching the editor (`move_edit.js`), `athlete.js` (`MADE`, `at`), `made_moves.json`'s layout or the save routes.
+  - A change that must not alter any move (moving numbers, tidying `athlete.js`): run `move_print.json` (same address) before and after, and compare the printed fingerprints.
   - Re-run `sound.json` after touching `sfx.js`, the sound calls in `main.js`, or `static/sounds/`.
   - Re-run `team_health.json` after touching team health, `regen.json` after touching health regeneration or the lobby's round-time buttons, `still.json` after touching standing still (what counts as walking, the dodge's dash, the hint), and `own_settings.json` after touching players' own settings, the ball colours or the settings files (export/import).
   - Re-run `people_bots.json` after touching who players are (keys, `server.identity`), renaming, the rules search, or the bots page, flags and lineups.
@@ -88,7 +92,9 @@ Quick facts:
 - **Environment:** Windows 10, Python 3.14, Node 24, Chrome. Text files are LF and `.bat` files CRLF (`.gitattributes` enforces both).
 - **Keep in sync:**
   - `sim.launch_velocity` ↔ `static/js/physics.js launchVelocity`;
-  - the `HAND_*` constants in `sim.py` and `main.js`;
+  - the `HAND_*` constants in `sim.py` and `main.js` (and `move_scenes.js HAND`, where the moves page's thrown ball leaves);
+  - how your own player moves and shows a press: `main.js moveLocal`, `dodgeDirection`, `playerStates` ↔ `move_scenes.js ScenePlayer` (`next`, `state`), and `main.js shoulderCamera` ↔ `move_view.js` "Your camera"; `config.py`'s timings ↔ `move_scenes.js DEFAULT_TIMING` (used only before the game has shared its own);
+  - how `athlete.js` times the moves placed by hand (the parry over the deflect's window and recovery, a wind-up over the charge, a release over `RELEASE`, a dash 0..1..2) ↔ `move_edit.js CLOCKS` and `move_scenes.js makeMarks`; what each part of `made_moves.json` means to `athlete.js` (the guard's hand following the head, a dash's hips and ankles, the mirrored side dash) ↔ `move_edit.js sceneMove` and `pointBody`;
   - `rules.Rules._fix` ↔ `rules_ui.js keepConsistent` (also how a player's own settings combine with everyone's);
   - the rally colours: `world.js RALLY_COLORS` ↔ `previews.js RALLY_COLORS`;
   - where regeneration stops and how fast: `rules.Rules.regen_limit` ↔ `hud.js regenLimit`, `rules.Rules.regen_speed` ↔ `previews.js regenSpeed`;

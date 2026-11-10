@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dodgeball: every move</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23ffc940'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+<script type="importmap">{ "imports": { "three": "/static/vendor/three.module.min.js" } }</script>
+<style>
+  :root { --side: 300px; --bar: 170px; --edit: 0px; --cams: 156px; }
+  body.editing { --edit: 340px; --cams: 200px; }
+  body { font-size: 13px; color: var(--text); }
+  canvas#view { left: var(--side); width: calc(100vw - var(--side) - var(--edit)); height: calc(100vh - var(--bar)); }
+  button { padding: 4px 10px; font-size: 12.5px; border-radius: 7px; }
+  button.on { background: rgba(255, 201, 64, 0.22); border-color: rgba(255, 201, 64, 0.6); color: #fff3cf; }
+  .chip { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--line); color: var(--dim); white-space: nowrap; }
+  .chip.Locked { color: #b6ffd3; border-color: rgba(93, 255, 155, 0.5); background: rgba(93, 255, 155, 0.1); }
+  .chip.Faulty { color: #ffc2c2; border-color: rgba(255, 90, 90, 0.55); background: rgba(255, 90, 90, 0.12); }
+  .chip.Waiting { color: #ffe2a0; border-color: rgba(255, 201, 64, 0.5); background: rgba(255, 201, 64, 0.1); }
+  code { font: 12px ui-monospace, Consolas, monospace; background: rgba(255, 255, 255, 0.07); padding: 0 3px; border-radius: 4px; }
+
+  #side { position: fixed; left: 0; top: 0; bottom: 0; width: var(--side); display: flex; flex-direction: column;
+    background: #111726; border-right: 1px solid var(--line); }
+  #side header { padding: 10px 12px 8px; border-bottom: 1px solid var(--line); }
+  #side h1 { font-size: 18px; margin: 8px 0 6px; }
+  #filter { width: 100%; font: inherit; color: var(--text); background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line);
+    border-radius: 7px; padding: 6px 8px; outline: none; user-select: text; }
+  #list { overflow-y: auto; flex: 1; padding: 4px 0 30px; }
+  #list h2 { font-size: 11px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; margin: 14px 12px 4px; }
+  #list button { display: flex; gap: 6px; align-items: baseline; width: 100%; text-align: left; border: 0; border-radius: 0;
+    background: none; padding: 4px 12px; }
+  #list button:hover { background: rgba(255, 255, 255, 0.07); }
+  #list button.sel { background: rgba(255, 201, 64, 0.16); }
+  #list button b { min-width: 30px; color: var(--dim); font-weight: 600; }
+  #list button span.name { flex: 1; }
+  #list button:disabled { opacity: 0.4; }
+
+  .over { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; backdrop-filter: blur(8px); }
+  #info { left: calc(var(--side) + 10px); top: 10px; width: min(640px, calc(100vw - var(--side) - var(--edit) - var(--cams) - 30px)); padding: 9px 12px;
+    max-height: 34vh; overflow-y: auto; user-select: text; }
+  #info .head { display: flex; gap: 8px; align-items: baseline; font-size: 15px; }
+  #info .head b { color: var(--gold); }
+  #info .head .grow, #edit .grow { flex: 1; }
+  #editBtn { font-size: 12.5px; padding: 3px 12px; white-space: nowrap; }
+  #editBtn:not(:disabled) { background: var(--gold); border-color: var(--gold); color: #1a1406; font-weight: 700; }
+  #editBtn:disabled { opacity: 0.45; cursor: default; }
+  .chip.edit { color: #ffe2a0; border-color: rgba(255, 201, 64, 0.55); }
+  #info p { margin: 6px 0 0; line-height: 1.45; }
+  #info details { margin-top: 6px; color: var(--dim); }
+  #info summary { cursor: pointer; }
+  #info dl { margin: 4px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 3px 10px; }
+  #info dt { color: var(--dim); }
+  #info dd { margin: 0; color: var(--text); }
+  #cams { right: calc(var(--edit) + 10px); top: 10px; padding: 8px; display: grid; gap: 4px; width: var(--cams); box-sizing: border-box; }
+  #cams button { width: 100%; }
+  #cams label { color: var(--dim); display: flex; gap: 5px; align-items: center; margin-top: 3px; }
+  #bar { left: var(--side); right: var(--edit); bottom: 0; padding: 8px 12px 9px; border-radius: 0; border-width: 1px 0 0;
+    background: #111726; backdrop-filter: none; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .row + .row { margin-top: 7px; }
+  .group { display: inline-flex; gap: 2px; }
+  .group button { border-radius: 0; }
+  .group button:first-child { border-radius: 7px 0 0 7px; }
+  .group button:last-child { border-radius: 0 7px 7px 0; }
+  #time { font: 13px ui-monospace, Consolas, monospace; margin-left: 6px; min-width: 300px; }
+  #note { color: var(--dim); margin-left: auto; }
+  .sep { width: 10px; }
+  #timeline { position: relative; margin: 8px 0 2px; cursor: pointer; user-select: none; }
+  #timeline .bands { position: relative; }
+  #timeline .band { position: absolute; height: 13px; border-radius: 3px; font-size: 10px; line-height: 13px; padding: 0 4px;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #0d1220; font-weight: 600; }
+  .band.window { background: #6ff3ff; } .band.after { background: #8a97b3; } .band.dash { background: #ffc940; }
+  .band.charge { background: #ff8a2a; } .band.release { background: #ffb37a; } .band.freeze { background: #ff5a5a; }
+  .band.caught { background: #5dff9b; } .band.acro { background: #e9a8ff; } .band.getup { background: #9fd0ff; }
+  .band.shield { background: #d6dcea; } .band.aim { background: #b7c7ff; }
+  #timeline .track { position: relative; height: 22px; background: rgba(255, 255, 255, 0.06); border-radius: 5px; }
+  #timeline .tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(255, 255, 255, 0.55); }
+  #timeline .key { position: absolute; top: 12px; width: 8px; height: 8px; margin-left: -4px; transform: rotate(45deg);
+    background: var(--gold); border: 1px solid #5a4510; }
+  #timeline .cursor { position: absolute; left: var(--at, 0%); top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #fff;
+    box-shadow: 0 0 6px #fff; pointer-events: none; }
+  #timeline .editRows { position: relative; }
+  #timeline .editRows .cursor { top: 0; bottom: 0; box-shadow: none; opacity: 0.7; }
+  #timeline .erow { position: relative; height: 16px; margin-top: 3px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+  #timeline .elabel { position: absolute; right: 5px; top: 1px; font-size: 10px; color: var(--dim); pointer-events: none; }
+  #timeline .ekey { position: absolute; top: 3px; width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg); z-index: 1;
+    background: var(--gold); border: 1px solid #5a4510; cursor: ew-resize; }
+  #timeline .ekey.pass { border-radius: 50%; transform: none; }
+  #timeline .ekey.sel { background: #fff; box-shadow: 0 0 6px #fff; }
+  #timeline .labels { position: relative; font-size: 10.5px; color: var(--dim); }
+  #timeline .label { position: absolute; white-space: nowrap; transform: translateX(-2px); }
+  #timeline .scale { position: relative; height: 12px; font-size: 10px; color: var(--dim); }
+  #timeline .scale span { position: absolute; transform: translateX(-50%); }
+  #timings { right: calc(var(--edit) + 10px); bottom: calc(var(--bar) + 10px); padding: 10px 12px; width: 300px; }
+  #timings h3 { margin: 0 0 6px; font-size: 13px; }
+  #timings label { display: grid; grid-template-columns: 1fr 70px 34px; gap: 6px; align-items: center; margin: 3px 0; color: var(--dim); }
+  #timings input { font: inherit; color: var(--text); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 6px;
+    padding: 2px 5px; user-select: text; }
+  #toast { position: fixed; left: 50%; top: 40%; transform: translateX(-50%); padding: 8px 14px; z-index: 20; }
+  #linkBox { width: 100%; margin-top: 6px; font: 11px ui-monospace, Consolas, monospace; color: var(--text);
+    background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; user-select: text; }
+
+  #edit { position: fixed; right: 0; top: 0; bottom: 0; width: var(--edit); display: flex; flex-direction: column;
+    background: #111726; border-left: 1px solid var(--line); }
+  #edit header { padding: 10px 12px 8px; border-bottom: 1px solid var(--line); }
+  #edit header .row { flex-wrap: nowrap; }
+  #edit h2 { font-size: 15px; margin: 0; color: var(--gold); }
+  #editBody { flex: 1; overflow-y: auto; padding: 4px 12px 12px; }
+  #editBody p { margin: 6px 0; line-height: 1.4; }
+  #editBody .about { color: var(--text); opacity: 0.85; }
+  #editBody .parts { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+  #editBody section.part { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 6px 0; display: grid; gap: 7px; }
+  #editBody section.part .row + .row { margin-top: 0; }
+  #editBody .keyInfo { flex: 1; text-align: center; font-size: 12px; }
+  #editBody .xyz { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 5px; align-items: end; }
+  #editBody .xyz label { display: grid; gap: 2px; font-size: 11px; color: var(--dim); }
+  #editBody input[type=number] { width: 100%; box-sizing: border-box; font: inherit; color: var(--text); background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--line); border-radius: 6px; padding: 2px 5px; user-select: text; }
+  #editBody .angle { display: grid; grid-template-columns: auto 1fr 60px auto; gap: 6px; align-items: center; }
+  #editBody .angle p { grid-column: 1 / -1; margin: 0; }
+  #editBody .blend { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+  #editBody .blend input { width: 62px; }
+  #editBody .unit { color: var(--dim); font-size: 11px; }
+  #editBody .warn { color: #ffc2c2; }
+  #edit footer { padding: 8px 12px 10px; border-top: 1px solid var(--line); }
+  #edit footer .note { margin: 6px 0 0; }
+  #saveBtn:not(:disabled) { background: rgba(93, 255, 155, 0.18); border-color: rgba(93, 255, 155, 0.6); color: #d8ffe6; }
+
+  /* editing: the move's notes fold away (the editor shows the file's own), the views take less room */
+  body.editing #info > :not(.head):not(#draftNote) { display: none; }
+  body.editing #cams { grid-template-columns: 1fr 1fr; padding: 6px; gap: 3px; }
+  body.editing #cams button { font-size: 11px; padding: 2px 6px; }
+  body.editing #cams label { grid-column: 1 / -1; font-size: 11px; }
+
+  body.clean #side, body.clean .over, body.clean #edit { display: none !important; }
+  body.clean canvas#view { left: 0; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<aside id="side">
+  <header>
+    <button id="backBtn" class="small">← Back to the game</button>
+    <h1>Every move</h1>
+    <input id="filter" placeholder="Find a move: parry, D2, dash, edit…" autocomplete="off" spellcheck="false">
+  </header>
+  <div id="list"></div>
+</aside>
+
+<section id="info" class="over">
+  <div class="head"><b id="moveId">…</b><span id="moveName">Loading the hall and the athlete…</span><span id="moveStatus" class="chip" hidden></span>
+    <span class="grow"></span><span id="unsaved" class="chip Waiting" hidden title="Changes to the moves placed by hand, not saved yet">Unsaved</span>
+    <button id="editBtn" hidden title="Change this move: its hands, feet, turns and key moments">Edit this move</button></div>
+  <p id="draftNote" hidden><span id="draftText"></span> <button id="draftBackBtn">Bring them back</button> <button id="draftDropBtn">Drop them</button></p>
+  <p id="moveSee"></p>
+  <p id="moveDoes" class="note"></p>
+  <details id="moveMore" hidden><summary>When it plays, what it's made from, the tester's notes</summary><dl id="moveDl"></dl></details>
+</section>
+
+<div id="cams" class="over">
+  <button data-cam="front">Front</button>
+  <button data-cam="back">Back</button>
+  <button data-cam="left">Left side</button>
+  <button data-cam="right">Right side</button>
+  <button data-cam="above">Above</button>
+  <button data-cam="yours" title="The game's own camera, over your right shoulder">Your camera</button>
+  <button data-cam="opponent" title="From the other half, as the other team sees you">An opponent's view</button>
+  <label title="The camera moves with the player; off, it stays where it is and the player moves away"><input id="followBox" type="checkbox" checked> Follows the player</label>
+</div>
+
+<div id="bar" class="over">
+  <div class="row">
+    <button id="startBtn" title="Back to the start (Home)">⏮</button>
+    <button id="backFrameBtn" title="One frame back (←)">◀ frame</button>
+    <button id="playPauseBtn" title="Play or pause (Space)">Pause</button>
+    <button id="nextFrameBtn" title="One frame on (→)">frame ▶</button>
+    <span class="sep"></span>
+    <span class="group" id="speeds"></span>
+    <button id="loopBtn" class="on" title="Play it again and again">Loop</button>
+    <span id="time"></span>
+    <span id="note">Space: play / pause · ← →: a frame · drag: turn round · wheel: zoom · right-drag: move</span>
+  </div>
+  <div id="timeline"><div class="bands"></div><div class="track"></div><div class="editRows"></div><div class="labels"></div><div class="scale"></div></div>
+  <div class="row">
+    <span class="group"><button id="hallBtn" class="on">The hall</button><button id="plainBtn">Plain court</button></span>
+    <span class="group"><button data-head="helmet" class="on">Helmet</button><button data-head="face">Face</button></span>
+    <span class="group"><button data-team="0" class="on">Red</button><button data-team="1">Blue</button></span>
+    <span class="group"><button data-low="0" class="on">High</button><button data-low="1">Low</button></span>
+    <button id="ballBtn" class="on" title="The ball coming at you, and the ball you throw">Balls</button>
+    <button id="timingsBtn" title="The rules' timings the moves stretch to">Timings…</button>
+    <span class="sep"></span>
+    <button id="linkBtn" title="Copy a link to this moment (the move, the time, the camera), to paste in the chat">Copy a link to this moment</button>
+    <button id="shotBtn" title="Save this picture as a file">Save the picture</button>
+  </div>
+  <input id="linkBox" readonly hidden>
+</div>
+
+<div id="timings" class="over" hidden>
+  <h3>Timings</h3>
+  <p class="note" id="timingFrom"></p>
+  <div id="timingFields"></div>
+  <div class="row"><button id="gameTimingBtn">The game's</button><button id="defaultTimingBtn">The defaults</button><button id="closeTimingBtn">Close</button></div>
+</div>
+<aside id="edit" hidden>
+  <header>
+    <div class="row"><h2>Edit <span id="editTitle"></span></h2><span class="grow"></span>
+      <button id="editCloseBtn" title="Close the editor (your changes stay until you save them or drop them)">Close</button></div>
+  </header>
+  <div id="editBody"></div>
+  <footer>
+    <div class="row">
+      <button id="undoBtn" title="Undo (Ctrl+Z)">Undo</button><button id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
+      <button id="revertBtn" title="Drop every change since the last save">Back to saved</button><span class="grow"></span>
+      <button id="saveBtn">Save</button>
+    </div>
+    <p id="editStatus" class="note"></p>
+  </footer>
+</aside>
+<div id="toast" class="over" hidden></div>
+
+<script type="module" src="/static/js/move_view.js"></script>
+</body>
+</html>

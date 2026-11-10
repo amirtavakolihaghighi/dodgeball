@@ -970,10 +970,7 @@ export class World {
       const k = f.t / f.dur;
       const mat = f.mat || f.obj.material;
       if (k >= 1) {
-        this.scene.remove(f.obj);
-        mat.dispose();
-        if (f.ownGeometry) f.obj.geometry.dispose();
-        if (f.skinned) f.obj.traverse((o) => { if (o.isSkinnedMesh) o.skeleton.dispose(); });
+        this.dropFx(f);
         return false;
       }
       if (f.fade) mat.opacity = f.fade * (1 - k);
@@ -988,6 +985,22 @@ export class World {
       trail.dispose(this.scene);
       return false;
     });
+  }
+
+  /** An effect is over: it goes, with what it alone owns. */
+  dropFx(f) {
+    this.scene.remove(f.obj);
+    (f.mat || f.obj.material).dispose();
+    if (f.ownGeometry) f.obj.geometry.dispose();
+    if (f.skinned) f.obj.traverse((o) => { if (o.isSkinnedMesh) o.skeleton.dispose(); });
+  }
+
+  /** Every effect still showing goes at once, and the faded trails (the moves page starts a scene over). */
+  clearFx() {
+    for (const f of this.fx) this.dropFx(f);
+    this.fx = [];
+    for (const trail of this.oldTrails) trail.dispose(this.scene);
+    this.oldTrails = [];
   }
 
   /** points: [[x, y, z], ...] or null; bounce: {pos: [x, y, z], floor: bool} or null */

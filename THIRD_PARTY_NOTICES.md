@@ -8,7 +8,7 @@ to everyone behind it.
 | Software | Where | Licence |
 | --- | --- | --- |
 | [three.js](https://threejs.org) r185 | `static/vendor/` | MIT. Copyright 2010-2026 Three.js Authors. The licence header is kept at the top of both files. |
-| three.js r185 addons: `GLTFLoader.js`, `BufferGeometryUtils.js`, `SkeletonUtils.js` (from `examples/jsm/`, unchanged) | `static/vendor/addons/` | MIT, the same licence and authors as three.js (these files carry no header of their own). |
+| three.js r185 addons: `GLTFLoader.js`, `BufferGeometryUtils.js`, `SkeletonUtils.js`, `OrbitControls.js`, `TransformControls.js` (from `examples/jsm/`, unchanged) | `static/vendor/addons/` | MIT, the same licence and authors as three.js (these files carry no header of their own). |
 
 ## Sounds and music
 

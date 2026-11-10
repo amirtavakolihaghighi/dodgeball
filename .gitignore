@@ -12,9 +12,11 @@ dist/
 tests/browser/*.png
 tests/browser/out/
 
-# Made at runtime, per machine: the host's saved rules and the session logs
+# Made at runtime, per machine: the host's saved rules, the session logs, and the moves file's
+# earlier versions (each save from the moves page keeps the file it replaces)
 saved_rules.json
 logs/
+move_saves/
 
 # Written by build_exe.py during a build
 build_info.json

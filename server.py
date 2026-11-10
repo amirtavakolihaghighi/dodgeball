@@ -37,15 +37,19 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import diag
+import moves_file
 import rules as rules_mod
 from sim import TEAM_NAMES, Game
 
 FROZEN = getattr(sys, "frozen", False)     # running as the packaged .exe
 # Bundled files sit next to this script, or inside the packaged app.
 STATIC = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "static"
+DOCS = Path(__file__).resolve().parent / "docs"     # in a copy of the source only (the moves page's list)
 # Files the app writes go next to the .exe (or this script), where the user can find them.
 APP_DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent
 RULES_FILE = APP_DIR / "saved_rules.json"
+MOVES_FILE = STATIC / "characters" / "made_moves.json"   # the moves placed by hand: the moves page's editor saves here,
+MOVE_SAVES = APP_DIR / "move_saves"                       # keeping each file it replaces here
 HOST_KEY = secrets.token_urlsafe(6)         # the console's host link carries it, for hosting from another device
 SCHEMA = rules_mod.schema()
 
@@ -53,6 +57,7 @@ game = Game()
 clients: dict[int, "Client"] = {}
 port = 8000
 save_rules = True
+save_moves = True                           # off with --fresh (tests), unless --moves-file names a file to save into
 own_ips: list[str] = []                     # this computer's addresses (likely LAN first): browsers from them are the host
 session_log: diag.SessionLog | None = None  # None: not logging (--no-log / --fresh)
 stats: diag.Stats | None = None
@@ -361,6 +366,57 @@ async def index():
     return FileResponse(STATIC / "index.html")
 
 
+@app.get("/docs/ANIMATIONS.md")
+async def animations_list():
+    """The moves page's list (static/moves.html): every move, what it should look like, the tester's
+    notes and its status. Only a copy of the source has it: the app doesn't carry the docs."""
+    path = DOCS / "ANIMATIONS.md"
+    if not path.is_file():
+        return PlainTextResponse("This copy of the game doesn't include docs/ANIMATIONS.md.", 404)
+    return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="text/markdown; charset=utf-8")
+
+
+def why_no_saving(ip: str | None) -> str | None:
+    """Why the moves page can't save the moves placed by hand here (None: it can)."""
+    if FROZEN:
+        return "Saving works when the game runs from its source folder (run.bat), not in the app."
+    if not save_moves:
+        return "This server was started with --fresh (for tests), so it doesn't change any file."
+    if not is_this_computer(ip):
+        return "Only the computer the game runs on can save: open this page there."
+    if not MOVES_FILE.is_file():
+        return f"There's no {MOVES_FILE.name} to save over."
+    return None
+
+
+@app.get("/moves/saving")
+async def moves_saving(request: Request):
+    """Whether the moves page's editor can save here, and if not, why."""
+    why = why_no_saving(request.client.host if request.client else None)
+    return {"can": why is None, "why": why}
+
+
+@app.post("/moves/save")
+async def save_made_moves(request: Request):
+    """The moves page's editor saves the moves placed by hand: checked against the file it replaces
+    (moves_file.py), written in the file's layout, the old file kept in move_saves/."""
+    why = why_no_saving(request.client.host if request.client else None)
+    if why:
+        return PlainTextResponse(why, 403)
+    body = await request.body()
+    if len(body) > moves_file.MAX_BYTES:
+        return PlainTextResponse("Not saved: that's far bigger than the moves file.", 413)
+    try:
+        saved, kept = await asyncio.to_thread(moves_file.save, json.loads(body), MOVES_FILE, MOVE_SAVES)
+    except ValueError as e:
+        return PlainTextResponse(f"Not saved: {e}", 400)
+    except OSError as e:
+        return PlainTextResponse(f"Not saved: {e}", 500)
+    if kept:
+        say(f"  The moves page saved the moves placed by hand (the file it replaced: {MOVE_SAVES.name}/{kept.name})")
+    return {"ok": True, "kept": f"{MOVE_SAVES.name}/{kept.name}" if kept else None, "made": saved}
+
+
 @app.get("/logs/download")
 async def download_logs(request: Request, key: str = ""):
     """The host's "Download all logs": this session's folder, and any others from the last day, zipped."""
@@ -532,8 +588,14 @@ def start_logging(folder, args):
     atexit.register(session_log.flush, 2.0)
 
 
+def set_moves_file(path: Path):
+    global MOVES_FILE, MOVE_SAVES
+    MOVES_FILE = path
+    MOVE_SAVES = path.parent / "move_saves"
+
+
 def main():
-    global port, save_rules, own_ips, VERSION
+    global port, save_rules, save_moves, own_ips, VERSION
     parser = argparse.ArgumentParser(description="Dodgeball LAN server")
     parser.add_argument("--port", type=int, help="default: 8000, or the next free port")
     parser.add_argument("--host", default="0.0.0.0", help="0.0.0.0 = reachable from the LAN")
@@ -542,9 +604,15 @@ def main():
                         help="start with the default rules, don't save rule changes and don't log (for tests)")
     parser.add_argument("--no-log", action="store_true", help="don't write a session log")
     parser.add_argument("--log-dir", help="where session logs go (default: logs next to the app); logs even with --fresh")
+    parser.add_argument("--moves-file", help="the file the moves page saves the moves placed by hand into (default: "
+                        "static/characters/made_moves.json; the files it replaces go into move_saves/ next to it); "
+                        "saves even with --fresh (for tests)")
     args = parser.parse_args()
     port = args.port or first_free_port(args.host, 8000)
     save_rules = not args.fresh
+    if args.moves_file:
+        set_moves_file(Path(args.moves_file).resolve())
+    save_moves = bool(args.moves_file) or not args.fresh
     VERSION = version_info()
     if sys.platform == "win32":
         with contextlib.suppress(Exception):

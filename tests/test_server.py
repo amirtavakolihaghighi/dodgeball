@@ -438,6 +438,108 @@ def test_a_dropped_connection_is_only_noted():
     assert len(printed) == 1 and isinstance(printed[0]["exception"], ValueError)
 
 
+def test_the_moves_page_and_its_list_are_served():
+    """The moves page (static/moves.html) and the list it reads: docs/ANIMATIONS.md, every move by
+    its number, its notes and its status. That one file only: the rest of the docs stay unserved."""
+    with running_server() as (port, _key):
+        base = f"http://127.0.0.1:{port}"
+        page = urllib.request.urlopen(f"{base}/static/moves.html", timeout=10).read().decode()
+        with urllib.request.urlopen(f"{base}/docs/ANIMATIONS.md", timeout=10) as res:
+            kind, text = res.headers.get_content_type(), res.read().decode()
+        try:
+            urllib.request.urlopen(f"{base}/docs/PROJECT.md", timeout=10)
+            other = 200
+        except urllib.error.HTTPError as e:
+            other = e.code
+    assert "move_view.js" in page
+    assert kind == "text/markdown"
+    assert "| A1 | Idle |" in text and "| J14 |" in text and "Locked" in text
+    assert other == 404
+
+
+def _post_json(url, data):
+    """POST JSON (or raw bytes); returns (status, parsed JSON or the error's text)."""
+    body = data if isinstance(data, bytes) else json.dumps(data).encode()
+    req = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as res:
+            return res.status, json.load(res)
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode()
+
+
+def test_the_moves_page_saves_the_moves_made_here():
+    """The moves page's editor saves the moves placed by hand (static/characters/made_moves.json):
+    only what fits the file (the same moves and parts, each value the same shape, key times in
+    order, sane numbers), in the file's own layout, keeping the file it replaces. --fresh saves
+    nothing; --moves-file saves into another file (this test's copy)."""
+    import moves_file
+    real = ROOT / "static" / "characters" / "made_moves.json"
+    original = real.read_text(encoding="utf-8")
+    # the file is in its own layout: saving it unchanged writes it byte for byte
+    assert moves_file.text(json.loads(original)) == original
+
+    with running_server() as (port, _key):          # --fresh: tests never change the real file
+        base = f"http://127.0.0.1:{port}"
+        fresh = json.load(urllib.request.urlopen(f"{base}/moves/saving", timeout=10))
+        refused = _post_json(f"{base}/moves/save", json.loads(original))
+    assert fresh["can"] is False and "--fresh" in fresh["why"]
+    assert refused[0] == 403 and real.read_text(encoding="utf-8") == original
+
+    with tempfile.TemporaryDirectory() as tmp:
+        target = Path(tmp) / "made_moves.json"
+        target.write_text(original, encoding="utf-8", newline="\n")
+        saves = Path(tmp) / "move_saves"
+        with running_server("--moves-file", str(target)) as (port, _key):
+            base = f"http://127.0.0.1:{port}"
+            status = json.load(urllib.request.urlopen(f"{base}/moves/saving", timeout=10))
+            unchanged = _post_json(f"{base}/moves/save", json.loads(original))
+            data = json.loads(original)
+            data["PARRY_L"]["hand"][2] = [0.3, [0.45, 1.36, 0.42], "pass"]     # moved, retimed, passed through
+            data["PARRY_L"]["blend"]["out"] = 0.2
+            data["GUARD_L"]["hand"][0] = -0.0812345                            # kept to 4 decimals
+            data["about"] = "the page can't change the descriptions"
+            saved = _post_json(f"{base}/moves/save", data)
+            after_save = target.read_text(encoding="utf-8")
+
+            def broken(change):
+                d = json.loads(after_save)
+                change(d)
+                return d
+            bad = {
+                "keys out of order": broken(lambda d: d["PARRY_L"]["chest"].insert(1, [0.9, 0.1])),
+                "a move missing": broken(lambda d: d.pop("CATCH_L")),
+                "an unknown part": broken(lambda d: d["GUARD_L"].update(elbow=[1, 0, 0])),
+                "not a place": broken(lambda d: d["GUARD_L"].update(hand=[0, 1])),
+                "a key not a stop or a pass": broken(lambda d: d["DASH_SIDE"]["bend"][1].append("fast")),
+                "a key past the move's end": broken(lambda d: d["DASH_BACK"]["hips"].append([2.5, [0, 0, 0]])),
+                "a blend out of 0": broken(lambda d: d["DASH_SIDE"]["blend"].update(out=0)),
+                "a huge number": broken(lambda d: d["CATCH_L"].update(chest=1e9)),
+                "text for a number": broken(lambda d: d["CATCH_L"].update(chest="-0.55")),
+            }
+            refusals = {name: _post_json(f"{base}/moves/save", d) for name, d in bad.items()}
+            refusals["not a number at all"] = _post_json(f"{base}/moves/save", original.replace("-0.55", "NaN").encode())
+            refusals["not JSON"] = _post_json(f"{base}/moves/save", b"{nope")
+            final = target.read_text(encoding="utf-8")
+        kept = [k.read_text(encoding="utf-8") for k in sorted(saves.glob("made_moves_*.json"))]
+
+    assert status == {"can": True, "why": None}
+    assert unchanged == (200, {"ok": True, "kept": None, "made": json.loads(original)})     # nothing changed: nothing kept
+    assert saved[0] == 200 and saved[1]["kept"].startswith("move_saves/made_moves_"), saved
+    written = json.loads(after_save)
+    assert written == saved[1]["made"]
+    assert written["PARRY_L"]["hand"][2] == [0.3, [0.45, 1.36, 0.42], "pass"] and written["PARRY_L"]["blend"]["out"] == 0.2
+    assert written["GUARD_L"]["hand"][0] == -0.0812
+    assert written["about"] == json.loads(original)["about"]                      # the descriptions stay the file's own
+    assert after_save == moves_file.text(written)                                 # the file's layout
+    assert '      [0.3, [0.45, 1.36, 0.42], "pass"],\n' in after_save             # a key a line
+    assert kept == [original]                                                      # the file it replaced, kept
+    for name, (code, why) in refusals.items():
+        assert code == 400 and why.startswith("Not saved:"), (name, code, why)
+    assert final == after_save                                                     # none of them changed the file
+    assert real.read_text(encoding="utf-8") == original
+
+
 def run_all():
     tests = [(name, fn) for name, fn in globals().items() if name.startswith("test_") and callable(fn)]
     failed = 0

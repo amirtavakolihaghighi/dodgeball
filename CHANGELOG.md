@@ -8,6 +8,19 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 
 ## [Unreleased]
 
+### Added
+
+- **A "See every move" page** (Esc › Your settings, under "Hear every sound"): every move of the players, as the game plays it, in the hall. Loop a move, slow it down to a tenth, step a frame at a time, turn the camera round it or look through the game's own camera, and read the time of every moment on its timeline (a defence's window, the dash, the release...). Copy a link to a moment to open that exact frame again, or save the picture. The first part of a tool for judging and fixing the animations.
+- **An editor for the moves made by hand**, on that page ("Edit this move"; the list marks them "✎ edit"): the guard, holding the ball, the catch, the parry, the side-arm and underarm throws, and the dashes.
+  - Drag a hand, a foot or the hips with arrows on the athlete, turn a hand with rings, and say where an elbow or knee points; the chest's turn and lean in degrees.
+  - Move key moments along the timeline, add and delete them, and let a moment stop or swing through. The move's blend in and out too.
+  - Every change shows at once, and a red line shows a hand or foot that can't reach where it was put.
+  - Undo, Redo, Back to saved, and Save, which works on the computer the game runs on (from its source folder). Each save keeps the file it replaces, and unsaved changes are offered back next time.
+
+### Changed
+
+- The moves made by hand moved out of the code into a file of their own, `static/characters/made_moves.json`, which the editor saves. They play exactly as before: every step of every move was compared before and after.
+
 ## [2.3.0] - 2026-11-03
 
 The game gets a new look and feel: athletes in a sunlit sports hall instead of stick figures,

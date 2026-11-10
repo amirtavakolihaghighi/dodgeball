@@ -2,7 +2,7 @@
 
 Every animation the athletes have, every change from one move into another, and what you should see in each. This is step 8's working list (decision 142): the user tries one move, writes what they saw and what they expected, Claude fixes that move only, and once the user approves it, it's **locked**.
 
-> **On hold since 2026-11-03, and not finished** (decision 143). The user approved the three fixes from 11-01 (perfect dodges, strafing, getting up: now Locked) and is happy with the moves for now. Other work came first: the office logs, then names, players' identities, renaming, the lobby's search and bots with flags. **When the moves are picked up again, the first job is the animation tool** (option c at the end of this list: a viewer, then an editor), then the rest of this list, one move at a time. Since the merge into `main` (v2.3.0, 2026-11-03), this is the first item on `main`'s task list (section 15 of `docs/PROJECT.md`).
+> **Not finished.** On hold from 2026-11-03 to 11-04 (decision 143): the user approved the three fixes from 11-01 (perfect dodges, strafing, getting up: now Locked) and other work came first. Picked up again on 2026-11-04 with **the animation tool** (option c at the end of this list; decisions 153–157): the "See every move" page (below), and on it, the editor for the moves placed by hand ("Edit this move"). Next: the rest of this list, one move at a time, starting with the mistakes the tester found with the viewer. This is the first item on `main`'s task list (section 15 of `docs/PROJECT.md`).
 
 Times are with the default rules: the host can change the dash's time, each action's window and recovery, and the charge time, and the moves stretch to fit.
 
@@ -17,6 +17,19 @@ Times are with the default rules: the host can change the dash's time, each acti
 
 ## Where to see them
 
+- **The "See every move" page** (Esc › Your settings › See every move, or `/static/moves.html`): every row of this list that is a move, played by the game's own athlete in the hall, with the game's own code.
+  - Pick a row on the left: it plays on a loop. Space plays and pauses, ← and → step a frame (1/60 s), the speed buttons slow it down to a tenth, and the timeline below shows the time of every moment (the press, the window, the dash...) with the key moments of the moves made here as gold diamonds. Drag the timeline to any moment.
+  - Drag the picture to turn round it, the wheel zooms, right-drag moves; or pick a view (front, back, a side, above, your own camera, an opponent's view).
+  - Switches: the hall or the plain court, helmet or face, red or blue, High or Low, the balls; Timings… stretches the moves to other rules, as a host's would.
+  - **To tell Claude about a moment:** pause on it and press "Copy a link to this moment", then paste the link in the chat. Claude opens exactly that frame from exactly that camera. "Save the picture" keeps it as a file.
+  - Each scene says what it does (for example, D2: a deflect pressed at 0.30 s, a ball meeting it halfway through the window). The page reads this list from this file, so the statuses and notes it shows are these.
+  - **Changing a move placed by hand:** the list marks them "✎ edit" (B1, B2, C4–C7, D1–D7, E2–E5; typing "edit" in the find box lists them). Pick one and press the gold **Edit this move** at the top right of the move's box (on the other moves it's greyed out). A panel opens beside the picture:
+    - Pick a part (a hand, the chest's turn or lean, an elbow, a dash's hips, feet or knees), in the panel or by its ball on the athlete.
+    - Drag the arrows to move it (red: to the athlete's left, green: up, blue: forward); "Turn the hand" shows rings; an elbow's or knee's ball sets where it points. Numbers can be typed too.
+    - The timeline gets a row of key moments for each part: click one to go there, drag it sideways to make it sooner or later, double-click the row to add one, Delete to remove one. At each key moment the part either "Slows to a stop" (a pause in the motion, for a pose that should land) or "Keeps moving" (it swings on through, for a point in the middle of one smooth motion). On the timeline, ◆ slows to a stop and ● keeps moving. Every key moment slowed to a stop at first.
+    - Every change shows at once. A red line means the hand or foot can't reach where you put it.
+    - Undo (Ctrl+Z), Redo, Back to saved, and **Save**, which works only on the computer the game runs on (with run.bat, not the app). The game plays your change from its next start: reload its tab. Each save keeps the file it replaces in the `move_saves` folder next to the game. Unsaved changes stay in the browser, and the page offers them back next time.
+    - The dash left mirrors the dash right: changing one changes both.
 - **In the game:**
   - **The lobby's warm-up** (Esc › Warm up): run, throw, dodge, catch and deflect alone, at your own pace.
   - **A match with bots:** everything else (perfect dodges need a ball coming at you; knockouts, getting up and a round's end need a match).
@@ -26,7 +39,7 @@ Times are with the default rules: the host can change the dash's time, each acti
   - `static/characters/athlete.glb`: the game's own copy. It looks grey in other programs, because the game paints its colours.
   - `art/out/anim-sources/mesh2motion/*.glb`: the CC0 library the clips come from (178 clips on Mesh2Motion's own figure): other clips we could choose instead.
   - `art/out/` isn't in git: `art/athlete.py` builds it again (about a minute; it downloads the library once).
-- **The moves marked "made here"** exist only as numbers in `static/js/athlete.js` (where the hands and feet go over the move; the arms and legs bend to reach them). No file shows them: only the game does. To edit them in Blender or another tool, Claude would first have to record them into clips.
+- **The moves marked "made here"** are numbers in `static/characters/made_moves.json` (where the hands and feet go over the move; the arms and legs bend to reach them), each move described there. The page's editor changes them (above). To edit them in Blender or another tool, Claude would first have to record them into clips.
 
 ## A. Standing and moving
 
@@ -183,6 +196,14 @@ Changed on 2026-11-01. The tester approved all three on 2026-11-03 ("good"), so 
   - Also: when the server places a player (at a round's start), the figure no longer takes the jump for running.
   - The other way, if this looks wrong: a rule that keeps the player still for about a second after a revive or a round's start (a rule change: the user's call).
 
+Found with the viewer on 2026-11-04 (nothing changed: for the tester to judge when D2 and D5 come up):
+
+- **The parry (D2) and the catch (D5) fall short in a match.** Their hand positions were placed, and measured by the moves test, with the athlete standing relaxed in the lobby. In a match the athlete stands in the boxer's guard, hips turned 44° to the left, and the left arm can't reach as far:
+  - the parry, early in its swing (0.15 s in): 0.27 m in front instead of 0.40; at its widest (0.24 s in): 0.50 m out and 0.23 m in front instead of 0.52 and 0.26;
+  - the catch: the hand 0.46 m in front instead of 0.6.
+  - In the lobby both reach their positions exactly. Possible fixes, one at a time: square the body to the aim during these moves (as the dashes do), or place them further out.
+  - The editor shows it plainly (a red line from the hand to where it should be): the parry's hand is already 9 cm off at its second key moment (across the chest), and 14 cm at the third.
+
 ## If prompting doesn't work: making or fixing moves yourself
 
 The user's options (decision 142), with Claude's view:
@@ -193,7 +214,7 @@ The user's options (decision 142), with Claude's view:
   - Rokoko Video makes motion from a video of you acting the move (30 seconds a month free, exported as FBX). But it's AI-made motion: decision 119 excludes AI generators, so it's the user's call whether motion acted by the user counts. Its licence for your own recordings needs checking.
   - Mesh2Motion's web app (free, open source, CC0, where our clips come from) only applies its library's clips; it can't edit them. It's useful for browsing other clips to choose from.
   - The browser posing toys found are early, unlicensed, and rebuild the skeleton.
-- **The user's choice (2026-11-03, decision 143):** c), built before the moves are worked on again.
+- **The user's choice (2026-11-03, decision 143):** c), built before the moves are worked on again. Its viewer and its editor were built on 2026-11-04 (the "See every move" page and "Edit this move", above).
 - **c) A small web tool made here (Claude's recommendation):** a page in the game, like the "Hear every sound" page.
   - **First, a viewer:** pick any move or change from this list, loop it, slow it down, step frame by frame, turn the camera round, and see the time of each moment.
   - **Then an editor** for the moves made here: drag the hands and feet with handles at each key moment while the body follows, change the timing, save. The game then plays exactly what you made.

@@ -82,68 +82,21 @@ const TIMING = {                      // the game's defaults, until the server's
 // ------------------------------------------------------------------ the moves made here
 // No CC0 library has these, so hands and feet are placed by hand in the body's frame (X: the
 // athlete's left, Y: up, Z: forward; metres from the feet), and the limbs bend to reach them.
-// Keys are [time, value]; values in between ease from one key to the next.
+// Their numbers are in static/characters/made_moves.json (each move says there what it is), which
+// the moves page's editor changes (move_edit.js); MADE holds them once loaded:
+// - GUARD_L: the left forearm across the face while charging; CARRY_R: the right hand holding the
+//   ball; CATCH_L: the palm catch, PULL_L: a caught ball pulled in; PARRY_L: the deflect's backhand
+//   parry; THROWS: the side-arm and underarm throws; DASH_SIDE, DASH_FORWARD, DASH_BACK: the dodges'
+//   footwork;
+// - keys are [time, value] (a key [time, value, 'pass'] is passed through without stopping);
+//   blend: seconds to come in ('in') and to go ('out').
+export const MADE = {};
 
-// The left forearm across in front of the face while charging, its palm towards it (where the
-// face is standing straight: it follows the head when the body bends).
-const GUARD_L = { hand: [-0.08, 1.55, 0.3], pole: [1, -0.4, 0.3], fingers: [-1, 0.05, 0.1], palm: [0, 0, -1] };
-// Carrying the ball: the right hand holds it in front of the right hip, palm up, steady as the player runs;
-// meet: where it comes to take a caught ball from the left hand.
-const CARRY_R = { hand: [-0.24, 1.0, 0.24], pole: [-0.3, -0.5, -1], fingers: [0, -0.2, 1], palm: [0.4, 0.9, 0], meet: [-0.28, 1.06, 0.3] };
-// The catch: the left arm straight out in front at the shoulder's height, the palm turned forward and
-// the fingers up (a palm blast), the left shoulder turned forward.
-const CATCH_L = { hand: [0.16, 1.33, 0.6], pole: [0.5, -1, 0], fingers: [0, 1, 0.15], palm: [0, 0.05, 1], chest: -0.55 };
-// A caught ball: the left hand pulls it in to the stomach, palm turned towards the right hand, which takes it.
-const PULL_L = { hand: [0.02, 1.12, 0.3], fingers: [0, 0.2, 1], palm: [-1, 0.3, 0] };
-// The deflect, a backhand parry with the left hand: the forearm across the chest, the back of the
-// hand to the ball; then it swings out to the left like a door on its hinge, the back of the hand
-// leading, the chest unwinding with it; over the deflect's window and recovery (0..1).
-const PARRY_L = {
-  hand: [[0, [-0.16, 1.3, 0.32]], [0.12, [-0.14, 1.32, 0.36]], [0.32, [0.42, 1.36, 0.4]], [0.5, [0.52, 1.3, 0.26]], [0.75, [0.34, 1.1, 0.15]], [1, [0.24, 1.0, 0.1]]],
-  fingers: [[0, [-1, -0.1, 0.15]], [0.12, [-1, 0, 0.25]], [0.32, [0.1, 0.15, 1]], [0.5, [0.6, 0.05, 0.8]], [0.75, [0.3, -0.6, 0.6]], [1, [0.1, -1, 0.1]]],
-  palm: [[0, [0, 0, -1]], [0.12, [0, 0, -1]], [0.32, [-1, 0, 0.05]], [0.5, [-0.8, 0, 0.6]], [0.75, [-1, 0, 0.2]], [1, [-1, 0, 0]]],
-  chest: [[0, -0.25], [0.12, -0.25], [0.32, 0.3], [0.6, 0.25], [1, 0]],
-  pole: [0.6, -0.8, 0],
-};
-// The side-arm and underarm throws: the right hand wound up with the charge (0..1), then released
-// (0..1 over RELEASE); the chest turns (side-arm) or bends forward (underarm). (Not the hips: moving
-// them would put the feet through the floor, and apply() would lift the whole body back up.)
-const THROWS = {
-  side: {                             // the hand out to the right at the stomach's height, further as it charges
-    wind: [[0, [-0.3, 1.02, 0.26]], [1, [-0.62, 1.08, -0.06]]],
-    release: [[0, [-0.62, 1.08, -0.06]], [0.25, [-0.38, 1.1, 0.5]], [0.5, [0.18, 1.14, 0.46]], [1, [-0.3, 1.02, 0.26]]],
-    fingers: [-1, 0, 0.35], palm: [0, 0.25, 1], pole: [0, -1, -0.4],
-    turnWind: [[0, 0], [1, -0.4]], turnRelease: [[0, -0.4], [0.3, 0.2], [0.55, 0.45], [1, 0]],
-  },
-  under: {                            // like bowling: the hand down and back, below the waist, then swung through low
-    wind: [[0, [-0.3, 1.02, 0.26]], [0.45, [-0.27, 0.86, 0.02]], [1, [-0.26, 0.88, -0.3]]],
-    release: [[0, [-0.26, 0.88, -0.3]], [0.3, [-0.24, 0.76, 0.34]], [0.6, [-0.2, 1.08, 0.62]], [1, [-0.3, 1.02, 0.26]]],
-    fingers: [0, -1, 0.15], palm: [0, 0, 1], pole: [0, 0, 1],
-    bendWind: [[0, 0], [1, 0.3]], bendRelease: [[0, 0.3], [0.4, 0.35], [1, 0]],
-  },
-};
-// The dodges' footwork. Time: 0..1 the dash itself (the rules' dash time), 1..2 the landing and
-// settling. hips: offsets [across, up, forward]; the feet: ankles [across, lift, forward]; bend: the
-// upper body bent forward (rad).
-const DASH_SIDE = {   // to the right (the left mirrors it), across = towards that side: the lead (right) foot lifts a
-  // little, the trail foot pushes the body across, the upper body tilts forward and down; the lead foot comes down and takes the weight
-  hips: [[0, [0, 0, 0]], [0.2, [-0.05, -0.06, 0]], [0.7, [0.05, -0.03, 0.02]], [1, [0.08, -0.09, 0.02]], [1.4, [0.03, -0.04, 0]], [2, [0, 0, 0]]],
-  lead: [[0, [0.11, 0, 0]], [0.2, [0.2, 0.1, 0.03]], [0.75, [0.33, 0.08, 0.04]], [1, [0.28, 0, 0.03]], [1.5, [0.2, 0, 0.01]], [2, [0.11, 0, 0]]],
-  trail: [[0, [-0.11, 0, 0]], [0.2, [-0.27, 0, -0.03]], [0.7, [-0.4, 0.07, -0.05]], [1, [-0.24, 0.05, -0.03]], [1.4, [-0.14, 0, 0]], [2, [-0.11, 0, 0]]],
-  bend: [[0, 0], [0.2, 0.25], [1, 0.28], [2, 0]],
-};
-const DASH_FORWARD = {   // half-crouched, one big step forward with the left foot, the right pushing behind
-  hips: [[0, [0, 0, 0]], [0.3, [0, -0.1, 0.04]], [1, [0, -0.13, 0.1]], [1.45, [0, -0.07, 0.05]], [2, [0, 0, 0]]],
-  L: [[0, [0.11, 0, 0]], [0.3, [0.12, 0.15, 0.24]], [0.8, [0.12, 0.07, 0.58]], [1, [0.12, 0, 0.55]], [1.45, [0.12, 0, 0.28]], [2, [0.11, 0, 0]]],
-  R: [[0, [-0.11, 0, 0]], [0.3, [-0.11, 0, -0.26]], [1, [-0.12, 0.05, -0.46]], [1.45, [-0.11, 0, -0.2]], [2, [-0.11, 0, 0]]],
-  bend: [[0, 0], [0.3, 0.25], [1, 0.32], [2, 0]],
-};
-const DASH_BACK = {   // a jump back, still facing forward: down, up and back, landing soft
-  hips: [[0, [0, 0, 0]], [0.15, [0, -0.09, 0]], [0.55, [0, 0.12, -0.03]], [1, [0, -0.1, 0]], [1.45, [0, -0.04, 0]], [2, [0, 0, 0]]],
-  L: [[0, [0.11, 0, 0]], [0.15, [0.12, 0, 0]], [0.55, [0.13, 0.24, 0.12]], [1, [0.12, 0, 0.05]], [2, [0.11, 0, 0]]],
-  R: [[0, [-0.11, 0, 0]], [0.15, [-0.12, 0, 0]], [0.55, [-0.13, 0.24, 0.12]], [1, [-0.12, 0, 0.05]], [2, [-0.11, 0, 0]]],
-  bend: [[0, 0], [0.4, 0.2], [1, 0.15], [2, 0]],
-};
+/** The moves made here, all of them at once (loading, and the editor's undo). */
+export function setMade(data) {
+  for (const k of Object.keys(MADE)) delete MADE[k];
+  Object.assign(MADE, data);
+}
 
 // A faint cool light on the edges, where the body turns away from you: the athletes stand out
 // from the warm, busy hall, and the dark visor gets a glossy rim.
@@ -162,15 +115,42 @@ const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /** 1 in the middle of a move, rising over its first `rise` seconds and falling over its last `fall`. */
 const fades = (t, span, rise, fall) => Math.min(rise > 0 ? clamp(t / rise, 0, 1) : 1, clamp((span - t) / fall, 0, 1));
 
-/** Through keyframes [[time, value], ...] at u, easing from one to the next; vector values go into out. */
-function at(keys, u, out = null) {
+/** Through keyframes [[time, value], ...] at u, easing from one to the next; vector values go into
+ *  out. Each key is a stop (the value slows into it and out of it), unless it's [time, value,
+ *  'pass']: then it's passed through at the speed it has between its neighbours. */
+export function at(keys, u, out = null) {
   let i = 0;
   while (i < keys.length - 2 && u > keys[i + 1][0]) i++;
+  const j = Math.min(i + 1, keys.length - 1);
   const [u0, a] = keys[i];
-  const [u1, b] = keys[Math.min(i + 1, keys.length - 1)];
+  const [u1, b] = keys[j];
   const k = u1 > u0 ? smooth(0, 1, (u - u0) / (u1 - u0)) : 1;
-  if (typeof a === 'number') return a + (b - a) * k;
-  return out.set(lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k));
+  const pass0 = keys[i][2] === 'pass';
+  const pass1 = keys[j][2] === 'pass';
+  if (!pass0 && !pass1) {
+    if (typeof a === 'number') return a + (b - a) * k;
+    return out.set(lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k));
+  }
+  // a cubic (Hermite) segment: the ease above, plus each passing key's speed
+  const s = u1 > u0 ? clamp((u - u0) / (u1 - u0), 0, 1) : 1;
+  const h = u1 - u0;
+  const c0 = pass0 ? h * (s * s * s - 2 * s * s + s) : 0;
+  const c1 = pass1 ? h * (s * s * s - s * s) : 0;
+  const one = (d) => {
+    let v = lerp(valueOf(keys[i], d), valueOf(keys[j], d), k);
+    if (c0) v += c0 * slope(keys, i, d);
+    if (c1) v += c1 * slope(keys, j, d);
+    return v;
+  };
+  if (typeof a === 'number') return one(0);
+  return out.set(one(0), one(1), one(2));
+}
+const valueOf = (key, d) => (typeof key[1] === 'number' ? key[1] : key[1][d]);
+/** How fast a key's value changes as it passes: from the key before it to the key after it. */
+function slope(keys, n, d) {
+  const p = keys[Math.max(0, n - 1)];
+  const q = keys[Math.min(keys.length - 1, n + 1)];
+  return q[0] > p[0] ? (valueOf(q, d) - valueOf(p, d)) / (q[0] - p[0]) : 0;
 }
 
 const AXIS_X = new THREE.Vector3(1, 0, 0);
@@ -497,12 +477,18 @@ function restOf(scene) {
 
 /** Loads the athlete: its meshes and skeleton, the slot maps, the clips, and what the poses need. */
 export async function loadAthlete() {
+  const made = fetch(`${DIR}made_moves.json`).then((res) => {
+    if (!res.ok) throw new Error(`made_moves.json: ${res.status}`);
+    return res.json();
+  });
   const info = await (await fetch(`${DIR}athlete.json`)).json();
   const names = Object.keys(info.maps);
-  const [gltf, ...maps] = await Promise.all([
+  const [gltf, moves, ...maps] = await Promise.all([
     new GLTFLoader().loadAsync(`${DIR}athlete.glb`),
+    made,
     ...names.map((name) => slotMap(DIR + info.maps[name])),
   ]);
+  setMade(moves);
   const rm = new Uint8Array(64);             // roughness (green) and metalness (blue) per slot
   info.slots.forEach((_, i) => rm.set([0, Math.round(info.rough[i] * 255), Math.round(info.metal[i] * 255), 255], i * 4));
   const t = { info, scene: gltf.scene, maps: {}, rm: {}, painted: new Map(), rest: null, clips: new Map() };
@@ -779,7 +765,7 @@ export class Athlete {
     const kind = A.dodge;
     this.clips.get('guard').sample(this.clock, P, true);   // fists up
     P.q.hips.copy(R.pose.q.hips);                           // square to the aim (the guard stands side-on)
-    const D = kind === 'forward' ? DASH_FORWARD : kind === 'back' ? DASH_BACK : DASH_SIDE;
+    const D = kind === 'forward' ? MADE.DASH_FORWARD : kind === 'back' ? MADE.DASH_BACK : MADE.DASH_SIDE;
     const toRight = kind === 'right' ? 1 : kind === 'left' ? -1 : 0;
     const off = at(D.hips, ph, this.target);
     // across: towards the dash's side for a side step (the body's -X is its right), the body's X otherwise;
@@ -794,11 +780,12 @@ export class Athlete {
       else keys = D[side];
       const k = at(keys, ph, this.target);
       this.target.set(toRight ? -toRight * k.x : k.x, R.ankle + k.y, k.z);
-      this.pole.set(side === 'L' ? 0.15 : -0.15, 0, 1);    // knees forward, a little out
+      const kn = D.knees;                                   // the left knee's way; the right's mirrors it
+      this.pole.set(side === 'L' ? kn[0] : -kn[0], kn[1], kn[2]);
       reach(P, F, R, `leg${side}`, this.target, this.pole);
       flatFoot(P, F, R, side);
     }
-    const w = fades(age, span, 0.03, 0.08);
+    const w = fades(age, span, D.blend.in, D.blend.out);
     mix(this.out, P, w);
     return w;
   }
@@ -807,10 +794,11 @@ export class Athlete {
    *  style: overhead (the clip), side-arm or underarm (placed by hand). */
   throwArm(dt, s, man, moving, A) {
     const releasing = man.throwT < RELEASE;
-    if (s.charging) this.style = this.forceStyle || THROW_STYLES[hash(this.id * 977 + man.throws) % THROW_STYLES.length];   // forceStyle: tests
+    if (s.charging) this.style = this.forceStyle || THROW_STYLES[hash(this.id * 977 + man.throws) % THROW_STYLES.length];   // forceStyle: tests, the moves page
     const want = s.charging || releasing ? 1 : 0;
     const parrying = A && A.kind > 1;                          // a defence mid-charge: the arm stays up a moment longer
-    this.w.throw = approach(this.w.throw, want, dt / (want ? 0.08 : parrying ? 0.4 : 0.18));
+    const blend = MADE.THROWS.blend;
+    this.w.throw = approach(this.w.throw, want, dt / (want ? blend.in : parrying ? 0.4 : blend.out));
     if (this.w.throw <= 0) return;
     const B = this.buf;
     const u = s.charging ? clamp(s.charge, 0, 1) : releasing ? man.throwT / RELEASE : null;
@@ -820,7 +808,7 @@ export class Athlete {
       mix(this.out, B.arms, this.w.throw, this.upperMask(1 - moving));
       return;
     }
-    const T = THROWS[this.style];
+    const T = MADE.THROWS[this.style];
     const R = this.rest;
     const F = this.frame;
     const P = copyPose(B.reach, this.out);
@@ -846,41 +834,46 @@ export class Athlete {
     const parry = A && A.kind === 3 ? A : null;
     const catching = A && A.kind === 2 && !A.done ? A : null;
     const caught = man.caughtT < CAUGHT;
-    this.w.guard = approach(this.w.guard, s.charging && !parry && !catching && !caught ? 1 : 0, dt / 0.1);
+    const G = MADE.GUARD_L;
+    const guarding = s.charging && !parry && !catching && !caught;
+    this.w.guard = approach(this.w.guard, guarding ? 1 : 0, dt / (guarding ? G.blend.in : G.blend.out));
     const R = this.rest;
     const F = this.frame;
     const B = this.buf;
     if (this.w.guard > 0) {
       const P = copyPose(B.reach, this.out);
       F.of(P, R);
-      this.target.set(...GUARD_L.hand).add(F.pos.head).sub(R.head);
-      reach(P, F, R, 'L', this.target, this.pole.set(...GUARD_L.pole));
-      aimHand(P, F, R, 'L', this.fingers.set(...GUARD_L.fingers), this.palmDir.set(...GUARD_L.palm));
+      this.target.set(...G.hand).add(F.pos.head).sub(R.head);
+      reach(P, F, R, 'L', this.target, this.pole.set(...G.pole));
+      aimHand(P, F, R, 'L', this.fingers.set(...G.fingers), this.palmDir.set(...G.palm));
       mix(this.out, P, this.w.guard, LEFT_ARM);
     }
     if (parry) {
+      const D = MADE.PARRY_L;
       const u = parry.age / parry.span;
       const P = copyPose(B.reach, this.out);
       F.of(P, R);
-      turnBone(P, F, 'chest', AXIS_Y, at(PARRY_L.chest, u), 'head');
+      turnBone(P, F, 'chest', AXIS_Y, at(D.chest, u), 'head');
       F.of(P, R);
-      reach(P, F, R, 'L', at(PARRY_L.hand, u, this.target), this.pole.set(...PARRY_L.pole));
-      aimHand(P, F, R, 'L', at(PARRY_L.fingers, u, this.fingers), at(PARRY_L.palm, u, this.palmDir));
-      mix(this.out, P, fades(parry.age, parry.span, 0.03, 0.15), LEFT_TURN);
+      reach(P, F, R, 'L', at(D.hand, u, this.target), this.pole.set(...D.pole));
+      aimHand(P, F, R, 'L', at(D.fingers, u, this.fingers), at(D.palm, u, this.palmDir));
+      mix(this.out, P, fades(parry.age, parry.span, D.blend.in, D.blend.out), LEFT_TURN);
     }
     if (catching || caught) {
       // the palm out in front; once the ball is in it, pulled in (k: 0..1 over the moment it shows there)
+      const C = MADE.CATCH_L;
+      const U = MADE.PULL_L;
       const k = caught ? smooth(0, 1, man.caughtT / CAUGHT) : 0;
       const P = copyPose(B.reach, this.out);
       F.of(P, R);
-      turnBone(P, F, 'chest', AXIS_Y, CATCH_L.chest * (1 - 0.7 * k), 'head');
+      turnBone(P, F, 'chest', AXIS_Y, C.chest * (1 - 0.7 * k), 'head');
       F.of(P, R);
-      this.target.set(...CATCH_L.hand).lerp(tv7.set(...PULL_L.hand), k);
-      reach(P, F, R, 'L', this.target, this.pole.set(...CATCH_L.pole));
-      this.fingers.set(...CATCH_L.fingers).lerp(tv7.set(...PULL_L.fingers), k);
-      this.palmDir.set(...CATCH_L.palm).lerp(tv7.set(...PULL_L.palm), k);
+      this.target.set(...C.hand).lerp(tv7.set(...U.hand), k);
+      reach(P, F, R, 'L', this.target, this.pole.set(...C.pole));
+      this.fingers.set(...C.fingers).lerp(tv7.set(...U.fingers), k);
+      this.palmDir.set(...C.palm).lerp(tv7.set(...U.palm), k);
       aimHand(P, F, R, 'L', this.fingers, this.palmDir);
-      const w = caught ? fades(man.caughtT, CAUGHT, 0, 0.1) : fades(catching.age, catching.span, 0.05, catching.fall);
+      const w = caught ? fades(man.caughtT, CAUGHT, 0, 0.1) : fades(catching.age, catching.span, C.blend.in, catching.fall);
       mix(this.out, P, w, LEFT_TURN);
     }
   }
@@ -888,8 +881,9 @@ export class Athlete {
   /** Carrying the ball: the right hand holds it in front of the right hip, whatever the rest does
    *  (and comes to meet a caught ball). */
   carry(dt, s, man) {
+    const K = MADE.CARRY_R;
     const carrying = s.hasBall && !s.charging && man.throwT >= RELEASE;
-    this.w.carry = approach(this.w.carry, carrying ? 1 : 0, dt / 0.15);
+    this.w.carry = approach(this.w.carry, carrying ? 1 : 0, dt / (carrying ? K.blend.in : K.blend.out));
     this.w.meet = approach(this.w.meet, man.caughtT < CAUGHT ? smooth(0.2, 0.9, man.caughtT / CAUGHT) : 0, dt / 0.2);
     const w = this.w.carry * (1 - this.w.throw);
     if (w <= 0) return;
@@ -897,9 +891,9 @@ export class Athlete {
     const F = this.frame;
     const P = copyPose(this.buf.reach, this.out);
     F.of(P, R);
-    this.target.set(...CARRY_R.hand).lerp(tv7.set(...CARRY_R.meet), this.w.meet);
-    reach(P, F, R, 'R', this.target, this.pole.set(...CARRY_R.pole));
-    aimHand(P, F, R, 'R', this.fingers.set(...CARRY_R.fingers), this.palmDir.set(...CARRY_R.palm));
+    this.target.set(...K.hand).lerp(tv7.set(...K.meet), this.w.meet);
+    reach(P, F, R, 'R', this.target, this.pole.set(...K.pole));
+    aimHand(P, F, R, 'R', this.fingers.set(...K.fingers), this.palmDir.set(...K.palm));
     mix(this.out, P, w, RIGHT_ARM);
   }
 
@@ -997,3 +991,9 @@ function dodgeKind(f, r) {
 
 export const ACROBATICS_TIME = ACRO_TIME;
 export const CAUGHT_TIME = CAUGHT;
+
+// For the moves page (moves.html), which marks the moves' key moments on its timeline (and edits the
+// moves made here, MADE above): the moves' own times, which dodge a dash is, and the round-end
+// celebrations' order.
+export const MOVE_TIMES = { ACRO_TIME, RELEASE, FOLLOW, GETUP, RISE_CUT, CAUGHT };
+export { dodgeKind, WINS, ACROBATICS, MIN_STRIDE };
