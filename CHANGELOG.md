@@ -16,10 +16,29 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
   - Move key moments along the timeline, add and delete them, and let a moment stop or swing through. The move's blend in and out too.
   - Every change shows at once, and a red line shows a hand or foot that can't reach where it was put.
   - Undo, Redo, Back to saved, and Save, which works on the computer the game runs on (from its source folder). Each save keeps the file it replaces, and unsaved changes are offered back next time.
+- **A note while the game loads:** the join screen says the sports hall and the characters are still loading (you can join already, and play on a plain court with stick figures until they're ready), and so does the line under the score bar.
+- **The session log notes every press that reached the host past the lag compensation limit** (it then counts a little later than it was made), and the log report counts them under FAIRNESS.
 
 ### Changed
 
 - The moves made by hand moved out of the code into a file of their own, `static/characters/made_moves.json`, which the editor saves. They play exactly as before: every step of every move was compared before and after.
+- **Auto graphics tries a sharper picture only in the lobby,** never during a match: between rounds a level could look fine and then fail a few seconds into the next round. It also judges nothing until the game has loaded.
+- **The lag compensation limit** (Game rules › Network) says to keep it at least 0.1 s above the view delay, and its preview turns red when it's closer.
+- **The log report:**
+  - a frozen picture caused by the player's own computer stalling is put down to their computer, not their Wi-Fi;
+  - joining and loading are left out of each player's numbers;
+  - logs a browser kept from an earlier session are told apart by page, so a computer whose clock is minutes off no longer loses its first minutes from the report;
+  - the session's times come from the host's clock;
+  - renamed players show under their new name, and pressing L several times in a row is one moment.
+
+### Fixed
+
+- **Health bars over other players' heads ignored their own health** (since 2.3.0). A player the host gave more health, 500 say, or a bot with the Tank flag, showed a full bar until their health fell below everyone's 100. The bars now use each player's own health and stamina, a bot's flags included.
+- **A player's own timings now show on everyone's screen** (since 2.3.0). A player given a longer catch window, say, or a longer dash had their moves drawn to everyone else's timings, so their catch ended early on other screens. The game itself was right; only the drawing was off.
+- **Back from spectating, the host returned to the team with fewer people** (since 2.3.0) instead of the team they had.
+- **Two balls at once:** when two balls reached you a split second apart while your catch or deflect was still on its way over Wi-Fi, it went to the ball thrown first, not the one that reached you first. So the ball you pressed for hit you, with no "SECOND BALL" label. Now the first ball to reach you is the one caught or deflected, and the other's hit says SECOND BALL.
+- **The session logs lost most of what a browser recorded before its player joined,** the loading time with it: the browser sent its newest lines first, and the server took the older ones for copies it already had. Now they go oldest first, and the server takes them in any order.
+- The log's late presses count the press grace, as the game does.
 
 ## [2.3.0] - 2026-11-03
 

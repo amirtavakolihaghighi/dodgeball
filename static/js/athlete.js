@@ -14,7 +14,8 @@
 //   two-bone IK, because no library has them: a side step pushed off the far foot, a half-crouched
 //   step forwards, a jump back; three throws (overhead, side-arm, underarm like bowling), the left
 //   forearm guarding the face while charging, a backhand parry and a one-handed palm catch with it.
-// Every action is stretched to the host's timings (world.timing: the game's rules).
+// Every action is stretched to its player's timings: the game's rules with that player's own
+// settings (man.timing, from main.js), else the game's (world.timing: the moves page's too).
 import * as THREE from 'three';
 import { GLTFLoader } from '/static/vendor/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from '/static/vendor/addons/utils/SkeletonUtils.js';
@@ -78,6 +79,9 @@ const TIMING = {                      // the game's defaults, until the server's
   dash: { time: 0.22 }, chargeTime: 0.9,
   actions: { dodge: { window: 0.32, recovery: 0.15 }, catch: { window: 0.3, recovery: 0.25 }, deflect: { window: 0.18, recovery: 0.3 } },
 };
+/** The timings a figure's moves fit: its player's own (a beginner given a longer catch window
+ *  catches for longer on everyone's screen), else the game's, else the defaults. */
+const timingOf = (man) => man.timing || man.world.timing || TIMING;
 
 // ------------------------------------------------------------------ the moves made here
 // No CC0 library has these, so hands and feet are placed by hand in the body's frame (X: the
@@ -620,7 +624,7 @@ export class Athlete {
       this.pose(man);
       return;
     }
-    const tm = man.world.timing || TIMING;
+    const tm = timingOf(man);
     const round = man.world.round || {};
     this.clock += dt;
     const A = this.action(dt, s, man, tm);
@@ -651,7 +655,7 @@ export class Athlete {
   }
 
   /** An action began age seconds ago (also from the game's events, for one only seen by its result). */
-  startAction(kind, age, man, tm = man.world.timing || TIMING) {
+  startAction(kind, age, man, tm = timingOf(man)) {
     const spec = tm.actions[ACTS[kind]];
     this.act = { kind, age, span: spec.window + spec.recovery, fall: spec.recovery, dodge: null, done: false };
     return this.act;
@@ -757,7 +761,7 @@ export class Athlete {
     const { age, span } = A;
     // which way: the dash's own velocity, once it shows (the first moments may still be the walk's)
     if (!A.dodge || (age < 0.06 && man.speed > 4)) A.dodge = dodgeKind(man.rawF, man.rawR);
-    const dash = Math.max(0.05, (man.world.timing || TIMING).dash.time);
+    const dash = Math.max(0.05, timingOf(man).dash.time);
     const ph = age < dash ? age / dash : 1 + (age - dash) / Math.max(0.05, span - dash);
     const R = this.rest;
     const F = this.frame;

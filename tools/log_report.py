@@ -8,7 +8,8 @@ QuickEdit), the server's own stalls, a table of the players (frame rate, frozen 
 late world updates arrived, ping, presses that came too late or during a recovery, lag marks),
 freezes that hit several players at once, what stands out, and every moment someone pressed L
 with the numbers just before it. Times are the host computer's clock (players' own clocks can be
-off by minutes). Plain Python, no packages needed.
+off by minutes). Joining and loading are left out of each player's numbers. Plain Python, no
+packages needed.
 """
 from __future__ import annotations
 
@@ -23,6 +24,14 @@ VPN_WORDS = ("vpn", "tun", "tap-", "wireguard", "wintun", "singbox", "sing-box",
              "anyconnect", "globalprotect", "fortinet", "forticlient", "tailscale", "zerotier", "hamachi", "proton",
              "mullvad", "expressvpn", "warp", "clash", "v2ray")
 NO_GPU = ("swiftshader", "basic render", "llvmpipe", "software rasterizer")
+# Left out of a player's numbers: the seconds after joining (the menus, the court and the athletes are
+# built) and after the hall and the athletes arrive (dressed and drawn the first time). A page stutters
+# then for 0.3-2 s, which says nothing about the network.
+JOIN_SETTLE_MS = 10_000
+LOAD_SETTLE_MS = 3_000
+STALL_FRAME_MS = 150        # a frame this long: the page itself stalled (diag.js HITCH_MS)
+BUSY_CODE_MS = 100          # a frame of the game's own code this long: busy (an L mark with no freeze before it)
+MARKS_TOGETHER_S = 2.0      # L pressed again within this: the same moment
 
 
 # ---------------------------------------------------------------- loading
@@ -97,6 +106,19 @@ class Clock:
 
 # ---------------------------------------------------------------- per player
 
+def settling_test(records):
+    """Is a browser line from while its page was joining or loading? Before joining it has no clock
+    yet (st is null); then the seconds after each join and after the hall and the athletes arrived.
+    The page's own clock throughout, so a PC clock that's off doesn't matter."""
+    spans = [(r["wall"], r["wall"] + JOIN_SETTLE_MS) for r in records if r.get("ty") == "welcome" and r.get("wall")]
+    spans += [(r["wall"], r["wall"] + LOAD_SETTLE_MS) for r in records if r.get("ty") == "load" and r.get("wall")]
+
+    def settling(r):
+        wall = r.get("wall") or 0
+        return r.get("st") is None or any(a <= wall <= b for a, b in spans)
+    return settling
+
+
 class Player:
     def __init__(self, tab, records, name):
         self.tab = tab
@@ -106,8 +128,14 @@ class Player:
         welcome = next((r for r in reversed(records) if r.get("ty") == "welcome"), {})
         self.ids = {r["id"] for r in records if r.get("ty") == "welcome" and r.get("id") is not None}
         self.host = bool(welcome.get("host"))
-        self.secs = [r for r in records if r.get("ty") == "sec" and not r.get("hidden") and not r.get("resumed")]
-        self.freezes = [r for r in records if r.get("ty") == "freeze" and r.get("st") is not None]
+        self.was = None             # the name they joined with, if they renamed themselves
+        settling = settling_test(records)
+        # Every second (to line up moments), and the ones that count for the numbers: joining and
+        # loading left out (unless that's all there is).
+        self.all_secs = [r for r in records if r.get("ty") == "sec" and not r.get("hidden") and not r.get("resumed")]
+        self.secs = [r for r in self.all_secs if not settling(r)] or self.all_secs
+        self.all_freezes = [r for r in records if r.get("ty") == "freeze" and r.get("st") is not None]
+        self.freezes = [r for r in self.all_freezes if not settling(r)]
         self.hitches = [r for r in records if r.get("ty") == "hitch"]
         self.marks = [r for r in records if r.get("ty") == "mark"]
         self.ignored = [r for r in records if r.get("ty") == "ignored"]    # pressed while still recovering
@@ -145,6 +173,7 @@ class Player:
         # how much came over the network (files from the browser's cache don't count).
         self.loads = [r for r in records if r.get("ty") == "load"]
         self.late_presses = []      # filled from the server log
+        self.capped = []            # presses that reached the server past the lag compensation limit
         self.sidesteps = []         # balls that missed: clear on their own screen (sidestep compensation)
         self.graced = []            # defences that counted only thanks to the press grace
         self.clear_hits = []        # hits while they were clear of the ball on their own screen
@@ -152,10 +181,11 @@ class Player:
         self.second_hits = []       # hits just after they had stopped another ball ("SECOND BALL")
         self.in_gaps = []           # the server's view: longest gap between this player's inputs, per second
         self.shared_ms = 0          # frozen time while the server stalled or most others froze too
-        self.own_ms = 0
+        self.computer_ms = 0        # ...while their own page stalled (their computer)
+        self.own_ms = 0             # ...the rest: their own download (their Wi-Fi)
 
     def window(self, st0, st1):
-        return [r for r in self.secs if r.get("st") is not None and st0 <= r["st"] <= st1]
+        return [r for r in self.all_secs if r.get("st") is not None and st0 <= r["st"] <= st1]
 
     def played_through(self, st0, st1):
         """Playing the whole time from st0 to st1 (server time): in the menu, knocked out or in
@@ -165,18 +195,25 @@ class Player:
                    for s in range(int(st0), int(st1) + 1))
 
 
-def players_of(files, since=None):
-    """One Player per browser tab. `since` (ms): leave out what a browser kept from an earlier
-    session and sent in again (its unsent log is kept until a server takes it)."""
+def players_of(files, since=None, runs=None):
+    """One Player per browser tab. A browser keeps its unsent log until a server takes it, so a
+    session folder can hold page loads from earlier sessions: with `runs` (the page loads that
+    joined this server) only those count; without them (logs from before joins named the page),
+    lines from before `since` (ms, the server's start) are left out. Players' own clocks can be
+    minutes off, so `runs` is the sure way."""
     groups, names = defaultdict(list), {}
     for stem, records in files.items():
         if stem == "server":
             continue
-        if since:
+        head = next((r for r in records if r.get("ty") == "file"), {})
+        if runs:
+            run = head.get("run") or (stem.split("-")[1] if stem.count("-") >= 2 else None)
+            if run not in runs:
+                continue
+        elif since:
             records = [r for r in records if not r.get("wall") or r["wall"] >= since - 60_000]
             if not any(r.get("ty") == "sec" for r in records):
                 continue
-        head = next((r for r in records if r.get("ty") == "file"), {})
         env = next((r for r in records if r.get("ty") == "env"), {})
         tab = head.get("tab") or env.get("tab") or stem
         groups[tab].extend(r for r in records if r.get("ty") != "file")
@@ -198,18 +235,26 @@ def report(session, files):
     server = files.get("server", [])
     meta = next((r for r in server if r.get("ty") == "meta"), {})
     host = next((r for r in server if r.get("ty") == "host"), {})
-    players = players_of(files, meta.get("wall"))
+    joins = [r for r in server if r.get("ty") == "join"]
+    # The page loads that joined this server (joins name them since the session logs began).
+    runs = {j["run"] for j in joins} if joins and all(j.get("run") for j in joins) else None
+    players = players_of(files, meta.get("wall"), runs)
     hosts = [p for p in players if p.host]
     clock = Clock(server or (hosts[0].recs if hosts else []), meta.get("utc_offset_min"))
     by_pid = {}
     for p in players:
         for pid in p.ids:
             by_pid[pid] = p
-    joins = [r for r in server if r.get("ty") == "join"]
     for j in joins:
         if j.get("p") not in by_pid:
             by_pid[j["p"]] = next((p for p in players if p.tab == j.get("tab")), None)
-    walls = [r["wall"] for r in server + [x for p in players for x in p.recs] if r.get("wall")]
+    for r in server:                    # the name they go by now, if they renamed themselves
+        q = by_pid.get(r.get("p")) if r.get("ty") == "rename" else None
+        if q is not None and r.get("name"):
+            q.was = q.was or r.get("was")
+            q.name = r["name"]
+    # The session's length on the host's clock: players' own clocks can be minutes off.
+    walls = [r["wall"] for r in (server or [x for p in players for x in p.recs]) if r.get("wall")]
     start, end = (min(walls), max(walls)) if walls else (None, None)
     version = (meta.get("version") or {}).get("commit", "?")
     say(f"=== SESSION {session} | build {version} | {clock.wall(start)} to {clock.wall(end)}"
@@ -294,6 +339,8 @@ def report(session, files):
                 continue
             if r.get("ty") == "late_press":
                 q.late_presses.append(r)
+            elif r.get("ty") == "capped":
+                q.capped.append(r)
             elif r.get("ty") == "sidestep":
                 q.sidesteps.append(r)
             elif r.get("ty") == "graced":
@@ -326,25 +373,39 @@ def report(session, files):
             f" {len(p.late_presses):>10} {len(p.ignored):>7} {len(p.marks):>5} {len(p.drops):>5}")
     say("  (* = the host. frozen = time the picture of the others stood still. late = how much later than the quickest"
         " update the world updates arrived. input gap = longest wait between this player's inputs reaching the server,"
-        " while playing. ignored = presses during the recovery after their own dodge, catch or deflect.)")
+        " while playing. ignored = presses during the recovery after their own dodge, catch or deflect. The first"
+        f" {JOIN_SETTLE_MS // 1000} s after joining and {LOAD_SETTLE_MS // 1000} s after loading are left out: the page"
+        " builds the game then.)")
+    renamed = [p for p in players if p.was and p.was != p.name]
+    if renamed:
+        say("  Renamed during the session: " + ", ".join(f"{p.name} (joined as {p.was})" for p in renamed))
 
     loading = [(p, r) for p in players for r in p.loads]
     if loading:
         say("")
         say("LOADING: from opening the page to the game ready (the hall and the athletes in place)")
         for p, r in loading:
-            got = f"{r.get('kb', 0) / 1024:.1f} MB downloaded" if r.get("kb") else "everything from the browser's cache"
+            kb = r.get("kb") or 0
+            got = (f"{kb / 1024:.1f} MB downloaded" if kb >= 1024 else f"{kb} KB downloaded" if kb
+                   else "everything from the browser's cache")
             slow = r.get("slowest") or [None, None]
             extra = f"; slowest file {slow[0]} {slow[1] / 1000:.1f} s" if slow[0] and slow[1] else ""
             say(f"  {p.name[:14]:<14} {r.get('ms', 0) / 1000:5.1f} s, {got}{extra}")
 
-    helped = [p for p in players if p.sidesteps or p.graced or p.clear_hits or p.early_hits or p.second_hits]
+    helped = [p for p in players if p.sidesteps or p.graced or p.clear_hits or p.early_hits or p.second_hits or p.capped]
     if helped:
         say("")
-        say("FAIRNESS: what the press grace and sidestep compensation did (Game rules > Network), and hits"
-            " that came right after a press or a defence")
+        say("FAIRNESS: what the press grace, sidestep compensation and the lag compensation limit did (Game rules >"
+            " Network), and hits that came right after a press or a defence")
         for p in helped:
             parts = []
+            if p.capped:
+                cap = p.capped[0].get("cap_ms", 0)
+                worst = max(r.get("screen_ms", 0) for r in p.capped)
+                share = f" ({100 * len(p.capped) / p.presses:.0f}% of their presses)" if p.presses else ""
+                parts.append(f"{len(p.capped)} press(es){share} reached the server more than the lag compensation limit"
+                             f" ({cap / 1000:.2f} s) after the moment their screen showed, so they counted up to"
+                             f" {(worst - cap) / 1000:.2f} s later than pressed")
             if p.sidesteps:
                 parts.append(f"{len(p.sidesteps)} ball(s) missed because they had stepped clear on their screen")
             if p.graced:
@@ -388,18 +449,32 @@ def report(session, files):
     if not notes:
         say("  Nothing: the numbers look healthy for everyone.")
 
-    marks = [(p, m) for p in players for m in p.marks]
-    if marks:
+    def mark_time(m):
+        return m["st"] if m.get("st") is not None else (m.get("wall") or 0) / 1000
+    moments = []        # [player, first mark, presses of L, time of the last]: L pressed again soon after is one moment
+    for p in players:
+        for m in sorted(p.marks, key=mark_time):
+            if moments and moments[-1][0] is p and mark_time(m) - moments[-1][3] <= MARKS_TOGETHER_S:
+                moments[-1][2] += 1
+                moments[-1][3] = mark_time(m)
+            else:
+                moments.append([p, m, 1, mark_time(m)])
+    if moments:
         say("")
         say("LAG MARKS (someone pressed L): the 3 seconds before each")
-        for p, m in sorted(marks, key=lambda pm: pm[1].get("st") or (pm[1].get("wall") or 0) / 1000):
-            say(f"  {clock.st(m.get('st'), m.get('wall'))}  {p.name:<12} {explain_mark(p, m, stalls)}")
+        for p, m, presses, _ in sorted(moments, key=lambda e: mark_time(e[1])):
+            again = f" (L {presses} times)" if presses > 1 else ""
+            say(f"  {clock.st(m.get('st'), m.get('wall'))}  {p.name:<12} {explain_mark(p, m, stalls)}{again}")
     return "\n".join(out)
 
 
 def attribute_freezes(players, stalls):
-    """Splits each player's frozen time: host side (the server stalled, or at least half of the
-    other players froze at the same time) or their own (their connection or computer)."""
+    """Splits each player's frozen time three ways: host side (the server stalled, or at least half
+    of the other players froze at the same time), their computer (their own page stalled right
+    then, drawing no frame for STALL_FRAME_MS, so world updates waited unread) or their own
+    download (their Wi-Fi). On the 10 Nov office log it gave the Linux laptops' Wi-Fi scanning 100%
+    download and an overloaded laptop 58% computer. (A slow frame anywhere in the same second
+    proved too loose: one 127 ms frame took the blame for a 1.2 s freeze.)"""
     stall_spans = [(s["st"] - 0.3, s["st"] + s["ms"] / 1000 + 0.3) for s in stalls]
 
     def overlaps(a, b, spans):
@@ -407,17 +482,24 @@ def attribute_freezes(players, stalls):
 
     for p in players:
         others = [q for q in players if q is not p]
-        for f in p.freezes:
+        stalled = [(h["st"] - h["ms"] / 1000, h["st"]) for h in p.hitches
+                   if h.get("st") is not None and h.get("ms", 0) >= STALL_FRAME_MS]
+        counted = {id(f) for f in p.freezes}       # joining and loading: a cause (for the L marks), not a total
+        for f in p.all_freezes:
             a, b = f["st"] - f["ms"] / 1000, f["st"]
             host_side = overlaps(a, b, stall_spans)
             if not host_side:
                 active = [q for q in others if q.window(a - 2, b + 2)]
-                froze = [q for q in active if overlaps(a, b, [(g["st"] - g["ms"] / 1000, g["st"]) for g in q.freezes])]
+                froze = [q for q in active if overlaps(a, b, [(g["st"] - g["ms"] / 1000, g["st"]) for g in q.all_freezes])]
                 host_side = bool(active) and len(froze) >= len(active) / 2
             if host_side:
-                p.shared_ms += f["ms"]
+                f["cause"], total = "host", "shared_ms"
+            elif overlaps(a - 0.05, b + 0.2, stalled):
+                f["cause"], total = "computer", "computer_ms"
             else:
-                p.own_ms += f["ms"]
+                f["cause"], total = "own", "own_ms"
+            if id(f) in counted:
+                setattr(p, total, getattr(p, total) + f["ms"])
 
 
 def shared_freezes(players, slack=0.1):
@@ -449,7 +531,8 @@ def verdicts(p):
     if p.no_gpu:
         out.append(f"draws without the graphics card ({p.gpu}). Turn on hardware acceleration in Chrome settings.")
     if p.fps_med is not None and (p.fps_med < 45 or (p.slow_share or 0) > 10):
-        cpu = f"; {p.js_med:.0f} ms of game code per frame, so the CPU is part of it" if (p.js_med or 0) > 8 else ""
+        cpu = (f"; {p.js_med:.0f} ms of game code per frame, so the CPU is part of it: battery saver or other programs,"
+               " and browsers don't tell the game about a player's battery") if (p.js_med or 0) > 8 else ""
         fixed = (f" They chose {p.gfx_choice.capitalize()} graphics: Auto or a lower level would help."
                  if p.gfx_choice in ("high", "medium") else "")
         out.append(f"low frame rate (typically {p.fps_med:.0f} fps, under 30 for {p.slow_share:.0f}% of the time{cpu}).{fixed}")
@@ -469,13 +552,17 @@ def verdicts(p):
         out.append(f"the browser held their presses up to {held:.0f} ms (p95) before the game saw them: a busy page."
                    " Presses are timed from the key itself, so it doesn't count against them.")
     if (p.frozen_pct or 0) >= 1 or (p.late_p95 or 0) >= 60:
-        where = ("mostly while the server stalled or others froze too (host side)" if p.shared_ms > p.own_ms
-                 else "mostly on its own (this player's download: likely their Wi-Fi)")
+        where, most = "mostly on its own (this player's download: likely their Wi-Fi)", p.own_ms
+        if p.computer_ms > most:
+            where, most = ("mostly while their own computer stalled (it drew no frame for 0.15 s or more right then):"
+                           " their computer, not the network"), p.computer_ms
+        if p.shared_ms > most:
+            where = "mostly while the server stalled or others froze too (host side)"
         out.append(f"the picture froze {p.frozen_pct:.1f}% of the time: world updates arrived up to {num(p.late_max, ' ms')} late, {where}.")
     gap = max((g for g in p.in_gaps if g is not None), default=0)
     if gap >= 300:
-        out.append(f"their inputs reached the server in bursts (gaps up to {gap:.0f} ms), so others saw them stutter"
-                   " (their upload: Wi-Fi, or their computer stalling).")
+        why = "their computer stalling" if p.computer_ms > p.own_ms else "their upload: Wi-Fi, or their computer stalling"
+        out.append(f"their inputs reached the server in bursts (gaps up to {gap:.0f} ms), so others saw them stutter ({why}).")
     if (p.ping_p95 or 0) >= 100:
         out.append(f"high ping: typically {num(p.ping_med, ' ms')}, {num(p.ping_p95, ' ms')} at worst (p95).")
     if p.late_presses:
@@ -508,11 +595,23 @@ def explain_mark(p, m, stalls):
     fps = min((r.get("fps") for r in before if r.get("fps")), default=None)
     ping = max((r.get("ping") or 0 for r in before), default=0)
     hitch = max((h.get("ms", 0) for h in p.hitches if h.get("st") and st - 3 <= h["st"] <= st + 0.5), default=0)
+    busy = max((r.get("js_max") or 0 for r in before), default=0)       # the longest frame of the game's code
     stall = next((s for s in stalls if st - 3.5 <= s["st"] <= st + 0.5), None)
     late_press = next((r for r in p.late_presses if abs(r["st"] - st) <= 3), None)
     facts = f"frozen {frozen / 1000:.1f} s, updates up to {late:.0f} ms late, {num(fps)} fps min, ping {ping:.0f} ms"
+    # The freezes that had ended by the press (what made them press L), as attribute_freezes split them;
+    # with none, the page's own frames decide.
+    causes = defaultdict(float)
+    for f in p.all_freezes:
+        if st - 3 <= f["st"] <= st + 0.1:
+            causes[f.get("cause")] += f["ms"]
+    computer = (causes["computer"] > causes["own"] if causes
+                else hitch >= STALL_FRAME_MS or busy >= BUSY_CODE_MS)
     if stall:
         why = f"the server itself stalled {stall['ms']:.0f} ms (host computer)"
+    elif (frozen >= 300 or late >= 120) and computer:
+        why = (f"this computer stalled (no frame for {hitch:.0f} ms), so world updates waited unread" if hitch >= STALL_FRAME_MS
+               else f"this computer was busy (a frame of the game's code took {busy:.0f} ms), so world updates waited unread")
     elif frozen >= 300 or late >= 120:
         why = "world updates arrived late (network)"
     elif (fps is not None and fps < 30) or hitch >= 150:

@@ -41,7 +41,7 @@
     // 2b. ...and when Low does help (31 -> 50 fps), it stays at Low.
     w = fake(); g = new Graphics(w, 'auto', false); c = { t: 0 }; g.frame(c.t);
     run(g, 30, 6, c); run(g, 31, 8, c); run(g, 50, 10, c); out.lowHelped = `${g.level}, stuck ${g.stuck}`;
-    // 3. Smooth for 20 s at Medium: tries High, but only between rounds (calm()).
+    // 3. Smooth for 20 s at Medium: tries High, but only in the lobby (calm()).
     w = fake(); g = new Graphics(w, 'medium', false); g.choose('auto'); g.level = 'medium'; c = { t: 0 }; g.frame(c.t);
     let calm = false;
     g.calm = () => calm;
@@ -61,6 +61,11 @@
     for (let i = 0; i < 4; i++) { c.t += 5000; g.frame(c.t); run(g, 60, 0.4, c); }
     out.pausesIgnored = g.level;
     out.ratios = w.calls;
+    // 7. Nothing is judged while the game loads, nor for 3 s after; then slow seconds count again.
+    w = fake(); g = new Graphics(w, 'auto', false); let loaded = false; g.ready = () => loaded; c = { t: 0 }; g.frame(c.t);
+    run(g, 20, 10, c); const whileLoading = g.level;
+    loaded = true; run(g, 30, 3, c); const justLoaded = g.level;
+    run(g, 30, 4, c); out.loading = `${whileLoading} while loading, ${justLoaded} just after, ${g.level} once slow 4 s more`;
     return JSON.stringify(out);
   };
 

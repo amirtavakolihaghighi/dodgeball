@@ -89,11 +89,13 @@ Every session writes a diagnostics log, so lag can be traced to its cause instea
   - its timing, including any moment it stalled;
   - the host computer's CPU, memory, power, Wi-Fi signal, network adapters (VPNs) and whether the console window was clicked into;
   - each player's connection as it arrives (input gaps, how far behind their screen runs);
-  - presses that arrived after the ball had already hit.
+  - presses that arrived after the ball had already hit, and presses that arrived past the lag compensation limit (they count a little later than they were made).
 - **Every browser** keeps its own log and sends it to the host's computer every few seconds. Nobody has to collect anything from the other PCs. It contains:
   - frame rate and hitches, and how late world updates arrive;
   - how long the picture of the others stood frozen, and the ping;
-  - the graphics card, CPU cores and screen.
+  - the graphics card, CPU cores and screen;
+  - how long the game took to load, and how much it downloaded.
+- **Batteries:** only the host's own browser can say whether its laptop runs on battery. Browsers tell that only to secure pages, and the others open the game as a plain `http://` address. So when a laptop is slow, ask its player whether it was on battery saver.
 - **Press L** in the game the moment something feels laggy. The log marks it, so the numbers around that moment can be read later.
 - **After the session** the host opens the menu (Esc) and clicks **Download all logs (zip)**, then sends that zip. If someone's connection dropped, they can click **Save my log** to keep their own copy (it goes to their Downloads folder).
 - **What's in it:** player names, LAN addresses, device details (browser, graphics card, CPU cores, screen) and performance numbers. Nothing else.
@@ -102,10 +104,12 @@ Every session writes a diagnostics log, so lag can be traced to its cause instea
 To read a session: `python tools\log_report.py <the zip or a session folder>`. It prints:
 
 - the host computer's state and the server's stalls;
-- a table of every player: frame rate, frozen time, late updates, ping, input gaps while playing, late presses, presses made while still recovering;
-- what the press grace and sidestep compensation did, and the hits that came just after a press or a defence (too early, second ball);
+- a table of every player: frame rate, frozen time, late updates, ping, input gaps while playing, late presses, presses made while still recovering (the first seconds after joining and loading are left out: the game stutters while it builds the hall and the players);
+- how long each browser took to load;
+- what the press grace, sidestep compensation and the lag compensation limit did, and the hits that came just after a press or a defence (too early, second ball);
+- for each frozen picture, whose it was: the host's (several players froze together), the player's own computer (it stalled meanwhile) or their Wi-Fi;
 - freezes several players shared, which point at the host;
-- the numbers just before every L;
+- the numbers just before every L (pressing it several times in a row counts once);
 - when Auto graphics changed a player's level and why, and players whose browser held their key presses for a while (a busy computer).
 
 ## The players
@@ -121,7 +125,7 @@ To read a session: `python tools\log_report.py <the zip or a session folder>`. I
 - **Perfect dodges:** a corkscrew, an aerial side flip or a butterfly twist, picked at random (everyone sees the same one), with afterimages; going backwards, a backflip.
 - **Hits** make them flinch. **Knockouts** throw them down, away from the ball, harder the faster it came. **Revived**, they get up from the floor. **At a round's end** the winners celebrate and the losers kneel.
 - **Low graphics** draw lighter versions (about a third of the detail).
-- **Until they have loaded** (a moment at start), the stick figures of before stand in.
+- **Until they have loaded** (a moment at start), the stick figures of before stand in. The join screen and the line under the score bar say the game is still loading, so nobody takes it for broken; you can join and play meanwhile.
 
 ## The hall
 
@@ -145,7 +149,8 @@ Each player picks their own in the menu (Esc), under **Your settings › Graphic
 
 - **Auto** steps down a level when the frame rate stays under 45 a second for 3 seconds.
   - A step that doesn't help is followed by one more (Low halves the sharpness). If even that doesn't help, Auto goes back and leaves things alone: the game is held back by something else, like battery saver or a busy computer, and a softer picture wouldn't help.
-  - After 20 smooth seconds it tries a level up again, only between rounds and at most twice a session, and never a level it already had to leave.
+  - After 20 smooth seconds it tries a level up again, only in the lobby (never during a match: a level that copes between rounds can fail in the next round) and at most twice a session, and never a level it already had to leave.
+  - It judges nothing while the game is still loading: the picture stutters then whatever the level.
   - On the host's computer, which also runs the server, Auto stays at Medium or lower. Pick High there to override it.
 - **The top-right corner** shows the level next to the frame rate, for example "1 ms · 60 fps · Medium". Low softens only the 3D picture: names, bars and the crosshair stay sharp.
 - **Nothing that matters for play changes** with the setting: the balls, their trails, the timing ring and the throw preview look the same on every level, so a low setting is never a disadvantage.
@@ -215,7 +220,7 @@ These are the **defaults** (they live in `config.py`). The host can change every
   - Bots use bank shots too.
 - **Defence:** press just before the ball arrives. Each action has a window. Arriving in its first fraction ("the last moment") is **perfect**: it refunds most of the stamina and pays extra cash. Pressing too early wastes the stamina, and there's a short recovery, so mashing is punished. A press during that recovery does nothing, and the game says **"Still recovering"** so you know why.
   - **When a ball gets through anyway, the hit says why.** **TOO EARLY (0.05 s)**: your dodge, catch or deflect had ended that long before the ball reached you. **SECOND BALL**: you had just stopped another ball. A catch or a deflect stops one ball, so a second one right behind it still hits; a dodge covers every ball during its dash, so dodge through volleys.
-  - **Fairness on Wi-Fi** (Game rules › Network, each with its own explanation): your screen shows the world 0.10 s in the past to stay smooth; presses are judged against what your screen showed, plus 0.02 s of **press grace** (your screen is drawn a moment before your finger moves); with **sidestep compensation** on, stepping out of a ball's way also counts by your screen ("SIDESTEPPED"); and **Lockout after a missed press** sets how long you wait before pressing again (0 = press again at once).
+  - **Fairness on Wi-Fi** (Game rules › Network, each with its own explanation): your screen shows the world 0.10 s in the past to stay smooth; presses are judged against what your screen showed, up to the **lag compensation limit** (0.25 s; keep it at least 0.1 s above the view delay, or presses on uneven Wi-Fi count a little late), plus 0.02 s of **press grace** (your screen is drawn a moment before your finger moves); with **sidestep compensation** on, stepping out of a ball's way also counts by your screen ("SIDESTEPPED"); and **Lockout after a missed press** sets how long you wait before pressing again (0 = press again at once).
 
   | Action | Stamina (perfect) | Window | Perfect zone |
   | --- | --- | --- | --- |
@@ -270,8 +275,8 @@ These are the **defaults** (they live in `config.py`). The host can change every
 ## Tests
 
 ```powershell
-.venv\Scripts\python tests\test_sim.py       # 69 rule tests
-.venv\Scripts\python tests\test_server.py    # 7 server tests: real WebSockets, players' own settings, the host's screen, the session logs, the log report
+.venv\Scripts\python tests\test_sim.py       # 76 rule tests
+.venv\Scripts\python tests\test_server.py    # 12 server tests: real WebSockets, players' own settings, the host's screen, the session logs, the log report, the moves page
 ```
 
 End-to-end browser tests (headless Chrome) are in `tests\browser\`; see its README. The full project history and technical reference is [PROJECT.md](PROJECT.md).
@@ -287,6 +292,7 @@ The tests cover:
 - the court growing with players and only shrinking between rounds
 - catch, deflect and dodge windows, including perfect presses, early presses and the deflect window being tighter than catch
 - why a hit got through: a press that ended too early (and by how much), or a second ball right after a defence
+- two balls waiting on one press: the catch meets the one that reached the player first, and the other is the second ball
 - the rally speeding up to its cap
 - late-arriving inputs, which still count if they were in time on screen
 - no stamina, no defence
@@ -295,7 +301,7 @@ The tests cover:
 - knockouts, revives and rounds
 - each team's bots: set by the host, never balanced by people joining or leaving
 - a full bot-only match
-- the host spectating; shared team cash; cash carrying over while revive prices start over
+- the host spectating, and coming back to their own team; shared team cash; cash carrying over while revive prices start over
 - health regeneration: the pause after a hit, the speed, both kinds of limit, never taking health away, a player's own regeneration, and the team bar's own (paused by a hit on anyone on the team)
 - standing still: faster by extra health or a percentage, or needed; walking (even creeping) starting it over; a dodge's dash not counting unless the key is held on after it; each teammate standing still adding to the team bar; hurt bots standing still (and not with the setting off)
 - team health: one bar that the whole team falls with, its size (added up, or fixed; people joining and leaving), buying health with a pack or all your cash, the time limit going to more of the bar left, and bots playing it
@@ -307,9 +313,9 @@ The tests cover:
 - the lobby: only the host starts, ends, moves players or changes rules; lobby changes apply at once and match changes from the next round; a reconnecting player keeps their team; "first to N" ends the match
 - the rules: bad values are rejected or clamped, every listed rule is really used by the game, and 20 matches with random rule values run without errors
 - the host's screen reaching everyone else (and only the host's)
-- the logs: the server and a browser's log end up in the host's zip, without duplicates
-- the logs' detectors: server stalls, presses that arrived after the hit, and console prints held up by a click
-- the log report: it blames a freeze during a server stall on the host, a player's own freezes on their connection, and gives each lag mark the right cause
+- the logs: the server and a browser's log end up in the host's zip, without duplicates, in whatever order a browser's pieces arrive
+- the logs' detectors: server stalls, presses that arrived after the hit (the press grace included) or past the lag compensation limit, and console prints held up by a click
+- the log report: it blames a freeze during a server stall on the host, a player's own freezes on their connection or on their computer stalling, and gives each lag mark the right cause; it keeps a browser whose clock is minutes off, leaves out pages from earlier sessions, joining and loading, shows renamed players under their new name, and counts L pressed several times in a row once
 
 ## Known limits
 

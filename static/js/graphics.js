@@ -4,9 +4,10 @@
 // laptop stays smooth. A step down that doesn't raise the frame rate is followed by one more (Low
 // halves the sharpness, which a slow graphics chip feels most); if even that doesn't help, the
 // game is held back by something else (battery saver, a busy computer), a softer picture wouldn't
-// help, and Auto goes back to where it was. It tries a level up only between rounds, and never
-// tries again a level it had to leave. The host's computer also runs the server, so there Auto
-// stays at Medium or lower.
+// help, and Auto goes back to where it was. It tries a level up only in the lobby, never during a
+// match (a level that copes between rounds can fail in the next round's play), and never tries
+// again a level it had to leave. Nothing is judged while the game loads: the page stutters then.
+// The host's computer also runs the server, so there Auto stays at Medium or lower.
 // Nothing that matters for play changes with the level: balls, trails, the timing ring and the
 // throw preview look the same everywhere, so a low setting is never a disadvantage.
 
@@ -29,6 +30,7 @@ const RISE_FPS = 57;        // this many frames a second or more...
 const RISE_AFTER = 20;      // ...for this many seconds in a row tries a level up
 const RISES = 2;            // at most this many tries a session, so it can't keep see-sawing
 const SETTLE = 2;           // seconds not counted after a change, while the picture is rebuilt
+const LOADED_SETTLE = 3;    // ...and once the game has loaded (the athletes dressed and drawn the first time)
 
 // What browsers report when they draw without a graphics card: Chrome's SwiftShader, Mesa's
 // llvmpipe and softpipe on Linux, Windows' Basic Render Driver.
@@ -60,7 +62,9 @@ export class Graphics {
     this.why = this.choice === 'auto' && software ? 'the page is drawn without the graphics card' : '';
     this.fps = null;            // the latest second's frame rate
     this.onChange = () => {};   // (from, to, why): Auto changed the level by itself
-    this.calm = () => true;     // may Auto try a level up now? (main.js: not while a round is played)
+    this.calm = () => true;     // may Auto try a level up now? (main.js: only in the lobby)
+    this.ready = () => true;    // has the game loaded? Nothing is judged before (main.js: the hall and the athletes)
+    this.loading = false;       // it hadn't, at the last second measured
     this.ups = 0;
     this.stuck = false;         // even the lowest step didn't help: Auto stops changing things
     this.trial = null;          // after a step down: is it helping?
@@ -133,6 +137,14 @@ export class Graphics {
   }
 
   watch(fps) {
+    if (!this.ready()) {        // still loading: the page stutters while it builds the hall and the athletes
+      this.loading = true;
+      return;
+    }
+    if (this.loading) {         // just loaded: a moment more before anything counts
+      this.loading = false;
+      this.settle = Math.max(this.settle, LOADED_SETTLE);
+    }
     if (this.settle > 0) {
       this.settle--;
       return;

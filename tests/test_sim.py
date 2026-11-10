@@ -312,6 +312,38 @@ def test_a_second_ball_right_after_a_defence_is_marked():
     assert len(hits) == 1 and "second" not in hits[0] and "early" not in hits[0]
 
 
+def test_two_balls_waiting_on_one_press_the_first_to_arrive_is_the_one_caught():
+    """Two balls touch someone while their catch is still on its way over Wi-Fi. The catch goes to
+    the ball that reached them first, even though the other was thrown earlier, and the later
+    ball's hit says SECOND BALL (the 9 Nov office log: the older ball took the catch, and the ball
+    the player had pressed for hit them with no mark)."""
+    g = Game(seed=7, rules=Rules({"GRAVITY": 0}))
+    g.bots_each = 0
+    t = 100.0
+    a, d = g.add_player("A", 0, t), g.add_player("D", 1, t)
+    t = play_now(g, t)
+    a.x, a.z, d.x, d.z = -8.0, 0.0, 8.0, 0.0
+    a.prev_x, a.prev_z, d.prev_x, d.prev_z = a.x, a.z, d.x, d.z
+    d.view_lag = 0.1
+    # Thrown in this order (so listed in this order), but the newer ball is a metre closer.
+    older, newer = (Ball(id=g._new_id(), owner=a.id, team=a.team, x=d.x - gap, y=C.CHEST_HEIGHT, z=0.0,
+                         vx=20.0, vy=0.0, vz=0.0, born=t, curve=0.0) for gap in (4.0, 3.0))
+    g.balls[older.id], g.balls[newer.id] = older, newer
+    g.events.clear()
+    pressed = []
+
+    def each_tick(now):
+        if not pressed and older.state == newer.state == "pending":
+            pressed.append(True)            # pressed on their screen before either touched them
+            g.handle(d.id, {"t": "act", "a": "catch", "wt": newer.contact_t - 0.05}, now)
+
+    run(g, t, 1.0, each_tick)
+    hits = [e for e in events(g, "hit") if e["p"] == d.id]
+    assert pressed and newer.contact_t < older.contact_t
+    assert len(events(g, "catch")) == 1 and len(hits) == 1
+    assert hits[0]["b"] == older.id and hits[0].get("second")
+
+
 def test_an_ordinary_hit_has_no_mark():
     g, a, (d,), t = start_duel()
     throw(g, a, d, t)
@@ -970,6 +1002,20 @@ def test_the_host_can_watch_instead_of_playing():
     while not (g.state == "count" and g.round_no > n):
         t = run(g, t, 0.1)
     assert host.team == 0 and host.alive and host.next_team is None
+
+
+def test_the_host_comes_back_from_watching_to_their_own_team():
+    """...even when the other team has fewer people. Since v2.3.0 teams are remembered by who a
+    player is (their key), but coming back looked the team up by name, found nothing, and put the
+    host on the emptier team."""
+    g, host, guests, t = lobby(guests=2)
+    for guest in guests:
+        if guest.team != host.team:
+            say(g, host, t, t="move", p=guest.id)            # in the lobby: at once
+    assert [q.team for q in guests] == [host.team, host.team] == [0, 0]
+    say(g, host, t, t="spectate", on=True)
+    say(g, host, t, t="spectate", on=False)
+    assert host.team == 0                                    # RED again, though BLUE is empty
 
 
 def test_shared_team_cash():

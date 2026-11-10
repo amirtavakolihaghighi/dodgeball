@@ -267,7 +267,8 @@ def test_the_hosts_screen_reaches_everyone_else():
 
 
 async def log_scenario(port):
-    """A browser that plays for a moment and sends in its log (one chunk twice, as after a reload)."""
+    """A browser that plays for a moment and sends in its log (out of order, and one chunk twice, as
+    after a reload)."""
     ws = await websockets.connect(f"ws://127.0.0.1:{port}/ws", max_queue=None)
     await ws.send(json.dumps({"t": "join", "name": "Logan", "tab": "tab123", "run": "run456"}))
     while (welcome := json.loads(await ws.recv()))["t"] != "welcome":
@@ -280,15 +281,16 @@ async def log_scenario(port):
         await asyncio.sleep(1 / 30)
 
     def chunk(seq, n):
-        return {"t": "log", "run": "run456", "tab": "tab123", "seq": seq, "lines": [{"ty": "sec", "i": i} for i in range(n)]}
-    for msg in (chunk(1, 2), chunk(1, 2), chunk(2, 1)):
+        return {"t": "log", "run": "run456", "tab": "tab123", "seq": seq,
+                "lines": [{"ty": "sec", "seq": seq, "i": i} for i in range(n)]}
+    for msg in (chunk(2, 1), chunk(1, 2), chunk(1, 2)):     # out of order, and one chunk twice
         await ws.send(json.dumps(msg))
     acks = []
     while len(acks) < 3:
         m = json.loads(await asyncio.wait_for(ws.recv(), 5))
         if m["t"] == "logack":
             acks.append(m["seq"])
-    assert acks == [1, 1, 2]
+    assert acks == [2, 1, 1]
     await ws.close()
 
 
@@ -307,7 +309,8 @@ def test_the_session_log_keeps_the_server_and_every_browser():
     assert join["tab"] == "tab123" and join["run"] == "run456" and join["host"] and join["ip"] == "127.0.0.1"
     inputs = [n["in"] for r in server_lines if r["ty"] == "sec" for n in r["net"] if n["p"] == join["p"]]
     assert inputs and max(inputs) >= 20                 # ~30 inputs a second, seen from the server
-    assert [r["ty"] for r in client_lines] == ["file", "sec", "sec", "sec"]     # the resent chunk is stored once
+    assert [r["ty"] for r in client_lines] == ["file", "sec", "sec", "sec"]     # each chunk stored once...
+    assert sorted((r["seq"], r["i"]) for r in client_lines[1:]) == [(1, 0), (1, 1), (2, 0)]   # ...whatever the order
 
 
 class Recorder:
@@ -340,6 +343,13 @@ def test_stalls_late_presses_and_held_up_prints_are_logged():
     stats.message(pia.id, {"t": "act", "a": "catch", "wt": 19.95}, 20.30, game)    # in time on screen, late here
     late = log.of("late_press")
     assert len(late) == 1 and late[0]["screen_ms"] == 350 and late[0]["after_hit_ms"] == 180 and late[0]["over_cap"]
+    stats.message(pia.id, {"t": "act", "a": "deflect", "wt": 20.01}, 20.4, game)   # a hair after contact: the grace
+    assert len(log.of("late_press")) == 2
+    stats.message(pia.id, {"t": "act", "a": "dodge", "wt": 29.7}, 30.0, game)      # no ball: 0.30 s behind, over 0.25
+    stats.message(pia.id, {"t": "act", "a": "dodge", "wt": 29.85}, 30.0, game)     # 0.15 s behind: within the limit
+    # Past the limit: the too-early catch (0.65 s behind) and the first dodge; a late press is only counted as late.
+    capped = [(r["a"], r["screen_ms"], r["cap_ms"]) for r in log.of("capped")]
+    assert capped == [("catch", 650, 250), ("dodge", 300, 250)], capped
 
     class SlowConsole(io.StringIO):                      # a console with a QuickEdit selection in it
         def write(self, text):
@@ -355,10 +365,15 @@ def test_stalls_late_presses_and_held_up_prints_are_logged():
     assert len(held) == 1 and held[0]["ms"] >= 140
 
 
-def test_the_report_tells_a_host_freeze_from_a_players_own():
+def load_report():
     spec = importlib.util.spec_from_file_location("log_report", ROOT / "tools" / "log_report.py")
     report = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(report)
+    return report
+
+
+def test_the_report_tells_a_host_freeze_from_a_players_own():
+    report = load_report()
 
     def at(st):
         return int((st + 1000) * 1000)
@@ -385,6 +400,49 @@ def test_the_report_tells_a_host_freeze_from_a_players_own():
     assert "The server stalled 1 times" in text and "2 players (Cable, Wifi)" in text
     marks = [s for s in lines if " -> " in s and "Wifi" in s]
     assert len(marks) == 2 and "(network)" in marks[0] and "the server itself stalled 1500 ms" in marks[1], marks
+
+
+def test_the_report_goes_by_page_loads_and_tells_a_busy_computer_from_wifi():
+    """The 9 and 10 Nov office logs: a PC clock two minutes slow lost a player's first minutes, an
+    overloaded laptop's frozen picture was put down to its Wi-Fi, a renamed player kept their old
+    name, joining counted as lag, and four quick presses of L were four moments."""
+    report = load_report()
+
+    def at(st, skew=0.0):           # a wall clock; `skew`: this PC's clock is that far off
+        return int((st + 1000 + skew) * 1000)
+
+    def sec(st, skew=0.0, **values):
+        return {"ty": "sec", "st": st, "wall": at(st, skew), "span": 1000, "fps": 60, "frozen": 0, "late_max": 10,
+                "ping": 8, **values}
+
+    seconds = [float(t) for t in range(42, 120)]
+    server = [{"ty": "meta", "st": 40.0, "wall": at(40), "version": {"commit": "test"}, "utc_offset_min": 0},
+              {"ty": "join", "st": 41.0, "wall": at(41), "p": 1, "name": "Slow", "tab": "a", "run": "ra"},
+              {"ty": "join", "st": 41.0, "wall": at(41), "p": 2, "name": "Busy", "tab": "b", "run": "rb"},
+              {"ty": "rename", "st": 60.0, "wall": at(60), "p": 2, "was": "Busy", "name": "Hasty"},
+              *[{"ty": "sec", "st": t, "wall": at(t), "gap_max": 17, "net": []} for t in seconds]]
+    slow = [{"ty": "file", "run": "ra", "tab": "a", "name": "Slow"},
+            {"ty": "welcome", "st": None, "wall": at(41, -130), "id": 1, "name": "Slow"},
+            {"ty": "env", "st": None, "wall": at(41, -130), "gpu": "Test GPU"},
+            *[sec(t, -130) for t in seconds],
+            *[{"ty": "mark", "st": 70.0 + i * 0.2, "wall": at(70 + i * 0.2, -130)} for i in range(4)]]
+    busy = [{"ty": "file", "run": "rb", "tab": "b", "name": "Busy"},
+            {"ty": "welcome", "st": None, "wall": at(41), "id": 2, "name": "Busy"},
+            sec(43.0, late_max=2000),                    # the stutter of joining: not lag
+            *[sec(t, frozen=300, late_max=250, js_max=150) for t in seconds if t != 43],
+            *[r for t in (60.0, 70.0, 80.0) for r in ({"ty": "hitch", "st": t, "wall": at(t), "ms": 400},
+                                                      {"ty": "freeze", "st": t, "wall": at(t), "ms": 400})]]
+    leftover = [{"ty": "file", "run": "old", "tab": "c", "name": "Leftover"},
+                {"ty": "welcome", "st": None, "wall": at(41), "id": 9, "name": "Leftover"}, *[sec(t) for t in seconds]]
+    text = report.report("test", {"server": server, "client-ra-Slow": slow, "client-rb-Busy": busy,
+                                  "client-old-Leftover": leftover})
+    lines = text.splitlines()
+    assert "Leftover" not in text and "| 00:17:20 to 00:18:39 (1 min) |" in text, text   # this server's pages, its clock
+    assert any(s.strip().startswith("Slow") and "Test GPU" in s for s in lines), text  # kept despite its clock
+    assert "Hasty (joined as Busy)" in text and "2000 ms" not in text, text
+    assert any("Hasty: the picture froze" in s and "their computer, not the network" in s for s in lines), text
+    marks = [s for s in lines if " -> " in s]
+    assert len(marks) == 1 and "Slow" in marks[0] and "(L 4 times)" in marks[0], marks
 
 
 def test_the_hosts_rules_are_saved_and_come_back():

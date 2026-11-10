@@ -532,7 +532,10 @@ def _define():
          0.03, 0.3, 0.005, "s", who="people")
     _add(g, "network", "MAX_LAG_COMP", "Lag compensation limit",
          "Dodge, catch and deflect presses are judged against what the player's screen showed, up to this far "
-         "back. Higher: fairer for laggy players, but others see balls hang on them a little longer.",
+         "back. Keep it at least 0.1 s above the View delay: every screen already runs that far behind, plus the "
+         "Wi-Fi's own delay (often 0.05–0.15 s more on uneven Wi-Fi), and a press that takes longer than this to "
+         "arrive counts a little later than it was made. Higher: fairer for laggy players, but others see balls "
+         "hang on them a little longer.",
          0, 0.5, 0.01, "s", who="people")
     _add(g, "defence", "PRESS_GRACE", "Press grace",
          "Dodge, catch and deflect presses count as if made this much earlier. Your screen is drawn a moment before "

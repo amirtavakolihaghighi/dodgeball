@@ -830,7 +830,8 @@ export class World {
     }
   }
 
-  /** players: [{id, team, isMe, x, z, yaw, alive, charging, charge, act, actAge, hasBall, invuln, ballColor}] */
+  /** players: [{id, team, isMe, x, z, yaw, alive, charging, charge, act, actAge, hasBall, invuln, ballColor,
+   *  timing}]; timing: that player's own (setTiming's shape), or none for the game's. */
   syncPlayers(players, dt) {
     const seen = new Set();
     for (const s of players) {
@@ -1227,6 +1228,7 @@ class Stickman {
   // rotation.x < 0 swings a limb forward, knee rotation.x > 0 bends it, elbow < 0 bends it,
   // left arm rotation.z > 0 / right arm rotation.z < 0 raise the arm out to the side.
   update(dt, s) {
+    this.timing = s.timing ?? null;           // their own timings, if main.js says (else world.timing)
     const frozen = this.freezeT > 0;
     if (frozen) this.freezeT -= dt;
     const pdt = frozen ? 0 : dt;              // the pose's own clock, stopped by an impact freeze
@@ -1363,7 +1365,7 @@ class Stickman {
         this.root.position.set(s.x, 0, s.z);
         this.world.ghostMan(this);
       }
-    } else if (a && s.alive && s.act === 1 && s.actAge < (this.world.timing?.dash.time ?? 0.22) + 0.04) {
+    } else if (a && s.alive && s.act === 1 && s.actAge < ((this.timing ?? this.world.timing)?.dash.time ?? 0.22) + 0.04) {
       if (s.actAge < this.lastDash) this.lastDash = -1;   // a ghost dash: a faint trail of afterimages
       if (s.actAge - this.lastDash >= 0.045) {
         this.lastDash = s.actAge;

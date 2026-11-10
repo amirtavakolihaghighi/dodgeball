@@ -31,9 +31,16 @@
   {"waitFor": "dp.rules.players['b:blitz'] && dp.rules.players['b:blitz'].MAX_HP === 300", "timeout": 3000},
   {"eval": "JSON.stringify({blitz: dp.rules.players['b:blitz'], heading: document.getElementById('rulesHeading').textContent, groups: [...document.querySelectorAll('#rulesNav button span')].map((s) => s.textContent).join(', ')})"},
   {"eval": "document.getElementById('rulesClose').click(); JSON.stringify({playerFileAsSetup: dp.importSetupText(window.aceFile), junk: dp.importSetupText('not json at all'), wrongShape: dp.importSetupText('[1, 2]'), popups: document.getElementById('popups').textContent})"},
+  {"eval": "document.querySelector('#listBlue button[data-own=\"b:blitz\"]').click(); dp.editor.setDraft('CATCH_WINDOW', 0.6); dp.editor.setDraft('DODGE_DASH_TIME', 0.35); document.getElementById('rulesApply').click(); 'Bot Blitz: its own catch window 0.6 s and dash 0.35 s'"},
+  {"waitFor": "dp.rules.players['b:blitz'] && dp.rules.players['b:blitz'].CATCH_WINDOW === 0.6", "timeout": 4000},
+  {"eval": "document.getElementById('rulesClose').click(); 'closed'"},
+  {"wait": 300},
+  {"eval": "(() => { const out = {}; for (const p of dp.net.latest.players.values()) { const man = dp.world.men.get(p.id); if (!man?.athlete) continue; out[p.name] = {catchDrawnFor: Math.round(man.athlete.startAction(2, 0, man).span * 100) / 100, dash: (man.timing ?? dp.world.timing).dash.time}; } return JSON.stringify({moveTimings: out, expected: 'Bot Blitz 0.85 s and 0.35 s (its own), the others 0.55 s and 0.22 s'}); })()"},
   {"eval": "document.getElementById('startBtn').click(); 'start'"},
   {"waitFor": "dp.net.latest.r.s === 'play'", "timeout": 10000},
   {"eval": "JSON.stringify({hp: Object.fromEntries([...dp.net.latest.players.values()].map((p) => [p.name, p.hp]))})"},
   {"evalFile": "own_settings.js"},
-  {"shot": "ball_colors.png"}
+  {"shot": "ball_colors.png"},
+  {"waitFor": "[...dp.view.players.values()].some((p) => (p.name === 'Bot Ace' || p.name === 'Bot Blitz') && p.alive && p.hp < 300 && [...document.querySelectorAll('#tags .tag3d .n')].some((n) => n.textContent === p.name))", "timeout": 30000},
+  {"eval": "(() => { const own = {'Bot Ace': 300, 'Bot Blitz': 300}; const out = {}; for (const p of dp.view.players.values()) { if (!p.bot || !p.alive) continue; const el = [...document.querySelectorAll('#tags .tag3d')].find((t) => t.firstChild.textContent === p.name); if (!el) continue; const shown = parseFloat(el.children[1].firstChild.style.width); const of = own[p.name] ?? 100; out[p.name] = {hp: p.hp, of, barShown: Math.round(shown), barExpected: Math.round((100 * p.hp) / of), ok: Math.abs(shown - (100 * p.hp) / of) < 1.5}; } return JSON.stringify({healthTags: out}); })()"}
 ]

@@ -98,8 +98,11 @@ addEventListener('resize', () => graphics.apply());     // also catches a move t
 if (gpu.software) {
   for (const id of ['gpuWarn', 'gpuWarnJoin']) $(id).hidden = false;
 }
-// Auto tries a sharper level only between rounds: if it's too much, that shows before the next one.
-graphics.calm = () => !['count', 'play'].includes(net.latest?.r?.s);
+// Auto tries a sharper level only in the lobby, never during a match: between rounds, with fewer
+// balls flying, a level can look fine and then fail a few seconds into the next round (the 9 and
+// 10 Nov office logs). And it judges nothing until the hall and the athletes are in place.
+graphics.calm = () => net.latest?.r?.s === 'lobby';
+graphics.ready = () => world.ready;
 graphics.onChange = (from, to, why) => {
   diag.log('gfx', { from, to, why, fps: graphics.fps === null ? null : round(graphics.fps, 1) });
   $('gfxNote').textContent = graphics.describe();
@@ -144,6 +147,7 @@ if (!params.has('nowarm')) world.warmUp();     // every effect's shader built no
 // For the session log: how long the game took to load (from opening the page to the hall and the
 // athletes in place) and how much came over the network. Files from the browser's cache weigh 0.
 world.loading.then(() => {
+  $('loadingNote').hidden = true;       // the join screen's "Loading the sports hall..." (the HUD's hint follows world.ready)
   const files = performance.getEntriesByType('resource');
   const page = performance.getEntriesByType('navigation')[0];
   const bytes = files.reduce((sum, f) => sum + (f.transferSize || 0), page?.transferSize || 0);
@@ -213,6 +217,7 @@ function applyRules(m) {
   rules.labels = m.labels ?? {};
   rules.bots = m.bots ?? null;
   rules.nextBots = m.nextBots ?? null;
+  movesTimings.clear();               // each player's move timings, worked out again as they're needed
   net.interpDelay = cfg.interpDelay;
   net.gravity = cfg.gravity;
   world.setBallRadius(cfg.ballRadius);
@@ -245,8 +250,25 @@ function shareTiming() {
   } catch { /* storage off: the page uses its own defaults */ }
 }
 
-/** A rule's value for one player (`who`: their key): their own setting, or everyone's. */
-const ownValue = (who, key) => rules.players[who]?.[key] ?? rules.active[key];
+/** A rule's value for one player (`who`: their key, never their name: two players may share one) in
+ *  the round being played: their own setting (a bot's over its flags, like rules.Rules.own_of), or
+ *  everyone's. */
+const ownValue = (who, key) => editor.ownOf(who, rules.players, rules.bots, rules.active)[key] ?? rules.active[key];
+/** The timings a player's moves are drawn to (world.setTiming's shape), by their own settings: a
+ *  beginner with a longer catch window catches for longer on everyone's screen, not for your
+ *  window. Yours are cfg's (world.timing). Kept per player until the rules change. */
+const movesTimings = new Map();
+function movesTiming(p) {
+  let t = movesTimings.get(p.k);
+  if (!t) {
+    const v = (rule) => ownValue(p.k, rule);
+    const action = (k) => ({ window: v(`${k}_WINDOW`), perfect: v(`${k}_PERFECT`), recovery: v(`${k}_RECOVERY`) });
+    t = { dash: { time: v('DODGE_DASH_TIME'), speed: v('DODGE_DASH_SPEED') }, chargeTime: v('CHARGE_TIME'),
+          actions: { dodge: action('DODGE'), catch: action('CATCH'), deflect: action('DEFLECT') } };
+    movesTimings.set(p.k, t);
+  }
+  return t;
+}
 /** The colour of a player's balls (p: a snapshot player). */
 const ballColorOf = (p) => (p && p.team >= 0 ? ownValue(p.k, BALL_COLOR_KEYS[p.team][p.bot ? 1 : 0]) : null);
 
@@ -1226,11 +1248,22 @@ function playerStates(t) {
       out.push({
         id: p.id, team: p.team, isMe: false, x: p.x, z: p.z, yaw: p.yaw, alive: p.alive,
         charging: p.charging, charge: p.charge, act: p.act, actAge: p.actAge, hasBall: p.hasBall, invuln: p.invuln,
-        ballColor: ballColorOf(p),
+        ballColor: ballColorOf(p), timing: movesTiming(p),
       });
     }
   }
   return out;
+}
+
+/** The line under the score bar: the game still loading, spectating, waiting, or the lobby. */
+function hintLine(r, lobbyOn, spectating) {
+  if (!world.ready) return 'Still loading the sports hall and the characters: a plain court and stick figures until then';
+  if (spectating) {
+    return spec.follow !== null ? `Spectating ${nameOf(spec.follow)} · LMB / RMB: next / previous player · W A S D: fly free · Esc: menu`
+      : 'Spectating · Mouse: look · W A S D: fly · Space / Shift: up / down · LMB: follow a player · Esc: menu';
+  }
+  if (!lobbyOn) return r.s === 'wait' ? 'Waiting for players: one team is empty' : '';
+  return isHost ? 'Lobby warm-up · press Esc to set up teams and rules, then Start match' : 'Lobby warm-up · the host starts the match';
 }
 
 function updateHud(t) {
@@ -1252,11 +1285,7 @@ function updateHud(t) {
   const lobbyOn = r.s === 'lobby';
   const spectating = watching();
   hud.setWatching(spectating);
-  hud.setHint(spectating
-    ? spec.follow !== null ? `Spectating ${nameOf(spec.follow)} · LMB / RMB: next / previous player · W A S D: fly free · Esc: menu`
-      : 'Spectating · Mouse: look · W A S D: fly · Space / Shift: up / down · LMB: follow a player · Esc: menu'
-    : !lobbyOn ? (r.s === 'wait' ? 'Waiting for players: one team is empty' : '')
-      : isHost ? 'Lobby warm-up · press Esc to set up teams and rules, then Start match' : 'Lobby warm-up · the host starts the match');
+  hud.setHint(hintLine(r, lobbyOn, spectating));
   followHost();
   if (!$('overlay').hidden) {
     lobby.update(net.latest, myId, rules);
@@ -1332,8 +1361,8 @@ function updateHud(t) {
 
 /** A name tag: health and stamina as a share of that player's own (team health: no health, it's the team's). */
 function tagFor(p, s) {
-  const hp = cfg.teamHealth ? null : (100 * p.hp) / ownValue(p.name, 'MAX_HP');
-  return { id: p.id, name: p.name, team: p.team, x: s.x, y: s.y, hp, stamina: (100 * p.stamina) / ownValue(p.name, 'MAX_STAMINA') };
+  const hp = cfg.teamHealth ? null : (100 * p.hp) / ownValue(p.k, 'MAX_HP');
+  return { id: p.id, name: p.name, team: p.team, x: s.x, y: s.y, hp, stamina: (100 * p.stamina) / ownValue(p.k, 'MAX_STAMINA') };
 }
 
 /** Guests: show what the host is doing in the menus, and (if they follow) open the same rules. */
@@ -1441,7 +1470,7 @@ function drawFrame(tMs) {
   const h = Math.hypot(m[8], m[10]) || 1;
   sfx.setEar(m[12], m[14], -m[8] / h, -m[10] / h);
   world.seeThrough(dt);             // a wall between the camera and you turns see-through
-  const maxStamina = me ? ownValue(me.name, 'MAX_STAMINA') : 0;     // out of breath under 35% stamina
+  const maxStamina = me ? cfg.maxStamina : 0;     // out of breath under 35% stamina (cfg: my own numbers)
   sfx.breathe(me?.alive && !watching() && maxStamina ? clamp((0.35 - me.stamina / maxStamina) / 0.35, 0, 1) : 0);
   updateHud(t);
   shareHostView(t);

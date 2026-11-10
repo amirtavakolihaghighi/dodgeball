@@ -233,7 +233,7 @@ class Game:
         self.team_hp_max = [0.0, 0.0]   # ...and how much it holds
         self.team_heals = [0, 0]        # health packs bought this round, per team (prices escalate)
         self.team_hurt_at = [-99.0, -99.0]  # when anyone on each team was last hit: the bar's regeneration waits
-        self.recent_teams: dict[str, int] = {}     # name -> team, so a reconnecting player keeps theirs
+        self.recent_teams: dict[str, int] = {}     # key -> team, so a reconnecting player keeps theirs
         self.bots_play_alone = False    # tests let bots play without humans
         self.half_length, self.half_width = self._court_size(1)
 
@@ -606,7 +606,10 @@ class Game:
         return True
 
     def _check_pending(self, now):
-        for b in list(self.balls.values()):
+        # Earliest contact first. A catch or deflect is spent on the ball it meets, so when two balls
+        # wait on one player it must meet the one that reached them first (the other is then the
+        # second ball), not the one thrown first.
+        for b in sorted((b for b in self.balls.values() if b.state == "pending"), key=lambda b: b.contact_t):
             if b.state != "pending":
                 continue
             p = self.players.get(b.pending_pid)
@@ -1054,7 +1057,7 @@ class Game:
         if on:
             team = WATCHING
         elif p.team == WATCHING:
-            team = self.recent_teams.get(p.name)
+            team = self.recent_teams.get(p.key)         # by who they are, like everything they keep
             if team not in (0, 1):
                 team = self._auto_team()
         else:

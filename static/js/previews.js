@@ -1340,7 +1340,11 @@ SCENES.network = {
     const y = box.h * 0.52;
     line(ctx, x0, y, x1, y, COL.line, 1.5);
     txt(ctx, 'now', x1, y + 22, { size: 10, color: COL.text, align: 'center' });
-    rect(ctx, sx(R.MAX_LAG_COMP), y - 20, sx(0) - sx(R.MAX_LAG_COMP), 6, 'rgba(93,255,155,0.35)');
+    // Every screen already runs the view delay behind, plus the Wi-Fi's own delay: a limit that close
+    // to the view delay leaves uneven Wi-Fi without part of its compensation (the Nov office logs).
+    const tightComp = R.MAX_LAG_COMP < R.INTERP_DELAY + 0.1 - 1e-9;
+    rect(ctx, sx(R.MAX_LAG_COMP), y - 20, sx(0) - sx(R.MAX_LAG_COMP), 6, tightComp ? 'rgba(255,107,107,0.5)' : 'rgba(93,255,155,0.35)');
+    if (tightComp) txt(ctx, "Too close to the screen's delay: uneven Wi-Fi loses part of it", box.w - 10, 15, { size: 10, color: COL.bad, align: 'right' });
     txt(ctx, 'presses count up to here', sx(R.MAX_LAG_COMP), y - 24, { size: 10, color: env.focus === 'MAX_LAG_COMP' ? COL.gold : COL.dim });
     const interval = 1 / R.SNAPSHOT_RATE;
     const phase = (t % interval);

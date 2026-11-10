@@ -68,7 +68,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\people_b
 - **The same name twice:** a second "browser" (a WebSocket from the page, with its own secret code) joins under the host's name. The two get different keys, the lobby numbers them #1 and #2 (`people_same_name.png`), and own settings given to the twin reach only the twin.
 - **Renaming** with the menu's name box: a long name is cut at 32 letters, the key and team stay, a reload would rejoin under the new name, and the HUD and the tab's title follow, also back to a shorter name.
 - **The search across every tab:** "dash time" (the Dodge tab), "network" (the whole Network tab, by its title) and "perfect catch" (three tabs), with "Every tab" and each tab's count in the nav and the words marked (`rules_search.png`).
-- **The bots page:** Alex made on BLUE and given Dodge master and Berserker through the page's own controls (`bots_page.png`); Alex's ⚙ page shows its flags' values (reacts to 1.00×, every throw at full power, at the front) and the lobby its flags (`bots_alex_settings.png`); the Berserker flag's page shows the bot numbers once, under "Behaviour", and an edit applied changes the flag (`bots_flag_editor.png`); Alex moved to RED, taken off, and added back to BLUE with "Add a bot…" (`bots_lobby.png`).
+- **The bots page:** Alex made on BLUE and given Dodge master and Berserker through the page's own controls (`bots_page.png`), and the game's `ownValue` seeing the flags (`alexStaminaReserve` 0, Berserker's, against everyone's 30); Alex's ⚙ page shows its flags' values (reacts to 1.00×, every throw at full power, at the front) and the lobby its flags (`bots_alex_settings.png`); the Berserker flag's page shows the bot numbers once, under "Behaviour", and an edit applied changes the flag (`bots_flag_editor.png`); Alex moved to RED, taken off, and added back to BLUE with "Add a bot…" (`bots_lobby.png`).
 
 ## Team health
 
@@ -124,7 +124,9 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\own_sett
 - the host's own ⚙: a run speed of 11 reaches their browser while everyone else's stays 6;
 - the ball colours editor with BLUE bots' balls drafted green (`rules_colors.png`), then applied;
 - Export settings, reset everything, Import the saved file: every rule and both players' own settings come back; Bot Ace's profile exported and imported onto Bot Blitz; wrong files refused with a message;
-- a round: everyone's health as set, and the colour each ball in flight is drawn in (a RED person's orange, a RED bot's peach, BLUE bots' green), plus the ball in your hand (`ball_colors.png`).
+- Bot Blitz given its own catch window (0.6 s) and dash (0.35 s): its figure's moves fit them (`moveTimings`: Bot Blitz's catch drawn for 0.85 s and its dash 0.35 s, everyone else 0.55 s and 0.22 s). Before the fix every figure took the viewer's own timings;
+- a round: everyone's health as set, and the colour each ball in flight is drawn in (a RED person's orange, a RED bot's peach, BLUE bots' green), plus the ball in your hand (`ball_colors.png`);
+- once Bot Ace or Bot Blitz (300 health each, their own) has been hit, the health bar over every bot's head that's on screen, as drawn, against its health over its own maximum (`healthTags`: each `ok`). Before the fix, a 300-health bot's bar was its health over 100: full until under 100.
 
 ## A computer clock that runs fast
 
@@ -166,10 +168,11 @@ Add `&noarena` to any test to draw the plain court instead of the sports hall, f
 - **Auto's rules,** on a stand-in world fed made-up frame times:
   - slow at High steps down, and a step that helps is kept;
   - a step that doesn't help (30 → 31 fps) is followed by one more, to Low; when that doesn't help either, Auto goes back to High and stops changing things (`notHelped`: `medium, then low, then high, stuck true`); when Low helps, it stays there (`lowHelped`: `low, stuck false`);
-  - 20 smooth seconds try a level up, but only between rounds (`rises`: `medium during a round, high after it`), and a level that was too slow after a step up isn't tried again (`failedNotRetried`: `medium, then medium after 30 smooth seconds`);
+  - 20 smooth seconds try a level up, but only when calm, which the game makes the lobby (`rises`: `medium during a round, high after it`), and a level that was too slow after a step up isn't tried again (`failedNotRetried`: `medium, then medium after 30 smooth seconds`);
   - the host's ceiling lowers Auto but not a chosen High;
   - no graphics card starts at Low;
-  - a paused page isn't counted as slow.
+  - a paused page isn't counted as slow;
+  - nothing is judged while the game loads, nor for 3 s after, then slow seconds count again (`loading`: `high while loading, high just after, medium once slow 4 s more`).
 - **Presses timed from their key event:** a press the browser handled 40 ms or 120 ms late is logged as held that long, and its `wt` is the moment the key went down; a nonsense timestamp (2.5 s old) falls back to now.
 - **No shader built mid-match:** 35 s of play, deflecting, dodging and catching every ball in turn (rally balls, perfect-dodge afterimages, bounces, hits). It prints the shader count in the lobby and after the match.
   - Healthy: none built mid-match. Measured: 10 in the lobby and none added.

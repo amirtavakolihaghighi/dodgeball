@@ -186,12 +186,14 @@ export class Diag {
     this.store(`${KEY}${run}:acked`, seq);
   }
 
-  /** The server keeps logs: from now on send there, starting with anything an earlier page
-   *  load of this browser never got confirmed (duplicates are fine: the server skips them). */
+  /** The server keeps logs: from now on send there, oldest first: anything an earlier page load
+   *  of this browser never got confirmed, then this page's chunks from before it joined (the join
+   *  screen, the loading), then the new lines. Duplicates are fine: the server skips them. (The new
+   *  lines once went first, and the server took the older chunks for copies it already had.) */
   connect(send) {
     this.send = send;
-    this.flush();
     for (const chunk of this.unacked.values()) this.upload(chunk);
+    this.flush();
   }
 
   store(key, value) {

@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-11-04 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it; then the look-and-feel cycle (graphics, juice and sound, with the art made in Blender), on the branch `look-and-feel`; on that branch also the office logs of 31 Oct to 2 Nov and a batch of lobby requests: longer names, players known by who they are rather than their name, renaming, a search across every tab, and bots with flags; all of it merged into `main` on 2026-11-03 and released as v2.3.0, with the athletes' animations and the HUD left on `main`'s task list; then, on `main`, the animation tool: the "See every move" page, and its editor for the moves placed by hand).
+Last updated: 2026-11-10 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it; then the look-and-feel cycle (graphics, juice and sound, with the art made in Blender), on the branch `look-and-feel`; on that branch also the office logs of 31 Oct to 2 Nov and a batch of lobby requests: longer names, players known by who they are rather than their name, renaming, a search across every tab, and bots with flags; all of it merged into `main` on 2026-11-03 and released as v2.3.0, with the athletes' animations and the HUD left on `main`'s task list; then, on `main`, the animation tool: the "See every move" page, and its editor for the moves placed by hand; then the office logs of 9 and 10 Nov and their fixes: other players' health bars, two balls waiting on one press, the session logs' own gaps, the log report, Auto graphics and a loading note).
 
 ## Contents
 
@@ -1293,6 +1293,64 @@ On `main` (decision 153). The athletes' animations resume (decision 143's order:
   - a mouse step can take its place from the page (`"at"`), and a drag says `"buttons": 1`;
   - a question the page asks (an alert, "Leave site?") is answered and noted, instead of hanging the run.
 
+### Phase 18: the office logs of 9 and 10 Nov, and their fixes (2026-11-10)
+
+On `main`. **The sessions:** 9 Nov (18 min, 11 people, 30 rounds) and 10 Nov (27 min, 7 people and up to 2 bots, 52 rounds), on `main` with the animation tool's work not yet committed. The host's saved rules had sidestep compensation off, the lockout at 0, the press grace at 0.015 s, the lag compensation limit at 0.15 s (default 0.25), the aim assist at 100°/s (default 45), health regeneration only while standing still, and from the 9th's second half a bigger court; one player had 500 health of their own.
+
+**The request:** "check them and see if you can find bugs from it, list the bugs you have found and we make decision for them". Then, after the list: "ok fix all these", and a bug the user had seen themselves that the logs couldn't show.
+
+**Healthy:** no server stall (10–15% CPU), no browser error, no memory growing or frame rate falling over a session, every round ended properly, no ball ever hit twice, every "Not now" was a knocked-out player or a round not running, and own settings applied from the next round (the 500-health player fell after about 520 damage).
+
+**Fixed** (decisions 158–162):
+
+1. **Health bars over other players' heads ignored their own health** (the user's own find): `main.js tagFor` asked `ownValue` with the player's *name*, but own settings go by key since v2.3.0 (decision 145), so every tag divided by everyone's 100. A player with 500 health showed a full bar until under 100; so did a bot with the Tank flag. The out-of-breath sound did the same. Now `ownValue(p.k, rule)`, with a bot's flags under its own settings (`editor.ownOf`, the twin of `Rules.own_of`); your own breathing uses `cfg`.
+2. **Two balls waiting on one press:** `_check_pending` settled waiting balls in the order they were thrown. When an older ball reached a player after a newer one and their catch or deflect arrived over Wi-Fi after both, it went to the older ball, and the ball they had pressed for hit them with no SECOND BALL mark (the defence came after its contact): 4 hits in the two sessions, one a knockout, every press in time on the player's screen. Now earliest contact first. A new rule test failed before the fix (the newer ball hit, unmarked).
+3. **The session logs lost what a browser logged before joining:** `diag.js connect()` sent the newest chunk first, and the server skipped any chunk numbered below the highest it had stored, acknowledging it, so the browser deleted it. Every page lost its join screen, the loading time with it (14 of 20 page loads had none). Now the waiting chunks go first, oldest first, and the server keeps the set of chunks it stored for each page (at most 20,000).
+4. **A press past the lag compensation limit left no trace:** the server clamps a press's moment to the limit, so a press that takes longer to arrive counts later than it was made, and only presses that arrived after the hit were logged. Now a `capped` line, counted in the report's FAIRNESS. The late-press detector counts the press grace, as `_action_at` does.
+5. **The log report** (`tools/log_report.py`):
+   - leftover pages were told apart by the browser's own clock: a PC two minutes slow (on both days) lost its first minutes, its device line and two L marks with them. Now by page load: every `join` names its `run`;
+   - the session's times came from every clock (one PC ran two minutes fast): now the host's;
+   - "late" and "frozen" counted joining and loading (a 1.7 s loading freeze showed as a 1,769 ms late update): the 10 s after joining and 3 s after loading are left out;
+   - a frozen picture caused by the player's own page stalling was put down to their Wi-Fi. Now split three ways: host side, their computer (the page drew no frame for 150 ms or more right then) or their download. On the 10th the Wi-Fi-scanning Linux laptop came out 100% download and the overloaded laptop 58% computer. (Also counting a slow frame of code anywhere in the same second was too loose: in the logging test it blamed one 127 ms frame for a 1.2 s freeze.) An L mark is explained by the freezes that had ended by the press, split the same way;
+   - a renamed player kept their old name; L pressed four times in 0.6 s was four marks.
+6. **The battery reading works only on the host's browser:** Chrome gives `navigator.getBattery` only to secure pages, and players open `http://192.168.x.x`. It can't work without https; the manual and the report say so.
+7. **The lag compensation limit at 0.15 s:** every screen already runs about 0.11 s behind, so it left about 0.04 s for Wi-Fi delay. One player's messages arrived past it in 17% of the seconds they played, the overloaded laptop's in about half, and two of the hits that followed an in-time press came from it. Its description now says to keep it at least 0.1 s above the view delay, and the Network preview turns its bar red when it's closer. The value stays the host's.
+8. **Auto graphics:** its one try at a sharper level between rounds failed a few seconds into the next round on three laptops (26–44 fps for 3–5 s), and on the overloaded laptop it gave up for good 12 s after joining, judging partly by loading frames. Now it steps up only in the lobby (`calm`), and judges nothing until the hall and the athletes are in place, nor for 3 s after (`ready`).
+9. **Nothing said the game was still loading:** a player who joins before the hall and the athletes arrive plays on the plain court with stick figures, and one reloaded a second after joining on the 9th. The join screen and the hint line say so now.
+
+**Then, more of v2.3.0's kind** (the user: "check to see if changes in v2.3.0 might have caused other bugs"; decision 163). The health bars' bug came from v2.3.0 moving everything a player keeps from their name to their key (decision 145), so everything that goes by who a player is, on both sides, was read through. Two more:
+
+10. **Back from watching, the host went to the team with fewer people:** `spectate()` looked the team up in `recent_teams` by name, which holds keys since v2.3.0. The old test passed by coincidence (the host's team was also the emptier one). A new rule test puts everyone on the host's team first; it failed before the fix (the host came back to the empty BLUE).
+11. **Players' own timings weren't shown:** every athlete's moves were stretched to `world.timing`, which is `cfg`, the viewer's own numbers. So a beginner given a longer catch window caught for the default 0.55 s on everyone else's screen (and with your own timings, everyone moved to yours). Now `main.js movesTiming(p)` (their own window, recovery and dash time, kept per player until the rules change) goes to each figure, and `athlete.js timingOf(man)` uses it before `world.timing`. The moves page passes none, so it's unchanged: `move_print.json`'s fingerprints of all 79 scenes are identical before and after. The own-settings test checks it in the game: Bot Blitz with its own 0.6 s catch window catches for 0.85 s, the others for 0.55 s.
+
+Everything else holds: other players' ball colours and the lobby's "own settings" tags (by key), the ⚙ pages and the host's screen relay (`pl.k`), renaming, settings files, the server's `for_player` and `own_of`, "you" found by id everywhere, and the 32-letter limit in all four places.
+
+**Not the game** (told to the user):
+
+- **An overloaded laptop (10 Nov):** 34–49 fps, a frame of the game's code over 0.1 s in about a third of the seconds (once 2.2 s), where the day before it ran at 60. Battery saver or another program. Its player reloaded once and left after 8 minutes.
+- **The host PC's Wi-Fi went quiet six times on the 10th** (about 0.25 s for every other player at once; none on the 9th). It has an Ethernet port.
+- **A Linux laptop's Wi-Fi scanning,** exactly every 5 minutes on the 10th (NetworkManager's background scan); `LAG_ANALYSIS.md`'s fix hasn't been tried on it.
+- **A 2013 laptop at Medium** (its player's choice) ran at 40 fps; Low would help.
+- **Sidestep compensation off:** 61–62% of hits on people came while their own screen showed them clear, 354 knockouts among them. Raised again; the host's call.
+- **Two PCs' clocks** were two minutes off: harmless for play.
+- **Ricochets fell to 6% of hits** (50–66% in October): the aim assist at 100°/s and the wider court, not a bug.
+
+**Tests:**
+
+- Rule tests: 76 (2 new: two balls waiting on one catch; the host back from watching to their own team). Server tests: 12 (1 new: the report on these logs' cases, failing on the old report; the log test sends chunks out of order; the detector test adds the press grace and capped presses).
+- After the review's changes to `athlete.js` and `world.js`: `athletes.json`, `moves.json` (every lock holds), `move_view.json`, `move_edit.json`, the smoke test and `lobby_controls.json` (the host joins RED, their team, after watching) pass, and the moves page's fingerprints are identical.
+- The report on both sessions: the 9th's times 17:21–17:39 (18 min, not 21), a slow-clocked player's graphics card and L marks back, the overloaded laptop's frozen picture put down to its computer, the renamed player under the new name, four L presses one moment.
+- Browser tests, all with no page error:
+  - `own_settings.json`: the health bars over the bots' heads, as drawn: Bot Ace at 280 of its own 300 at 93% (the old code drew it full: 280 / 100), Bot Blitz 300 of 300 and Bot Dash 100 of 100 at 100%;
+  - `people_bots.json`: `ownValue` sees a flag (Alex's stamina reserve 0, Berserker's, against everyone's 30), and everything else as before;
+  - `graphics.json`: Auto's new case ("high while loading, high just after, medium once slow 4 s more") and the old ones unchanged; no shader built mid-match (37 before and after);
+  - the logs: `logs.json` passes, and a page that waited 12 s on the join screen before joining kept all of it on the host, its load line included (before the fix only the last few seconds survived). The report on that session left out seven pages the test browser had kept from earlier runs and sent in again. With the simulated Wi-Fi trouble (`jitter=200`), the report and the L mark both say network;
+  - `why_hit.json`: 12 hits, 9 marked too early and 2 second ball, and the same popups on screen;
+  - the auto-defender: deflect at 150 ms of lag 9 of 9, catch 10 of 10, dodge 9 balls defended for 14 presses with one hit, then 8 for 7 presses with none. A dodge covers every ball during its dash, so the new order can't touch it, and the one hit is the noise the README expects;
+  - `sidestep.json` with 150 ms of lag: 23 tried, 11 sidestepped, 7 hits, none while clear on screen;
+  - `sound.json` (the out-of-breath panting while tired, stopping after), `lobby_controls.json` (the spectating hints from the new `hintLine`), the smoke test;
+  - pictures: the join screen's loading note, the hint line while loading, and the Network preview's red bar and warning at 0.15 s.
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -1449,6 +1507,12 @@ On `main` (decision 153). The athletes' animations resume (decision 143's order:
 | 155 | The viewer plays each move as a script run on the game's own World, Stickman and Athlete, in steps of 1/120 s and with its own chance, so a moment is exact and repeatable; its list is `docs/ANIMATIONS.md` itself (the server serves that one file); the game keeps its timings in the browser for it; incoming balls come from 20° to the side | C | The same code as a match is the only way the page shows what a match shows. Exact moments make a link a shared picture: Claude can't see motion. One list, so the statuses and notes never drift apart. Straight in, a deflected ball flew back through the front camera |
 | 156 | The moves placed by hand live in `static/characters/made_moves.json`, each move described in it, loaded with the athlete; the blend times and the dashes' knees joined them; the move was proven identical by a fingerprint of every scene's every step, before and after | C | The editor needs a file that it can change and the game reads. The proof makes the move safe, as decision 154 required |
 | 157 | The editor: handles on the athlete (three.js's TransformControls, vendored), the parts and key moments that scene shows, a hand's place and turn sharing their keys, the first and last keys fixed, "slows to a stop" or "keeps moving" per key (a cubic; all stops give the old curve), Undo, Redo and Back to saved, unsaved changes kept in the browser and offered back; Save only from this computer and the source folder (not with `--fresh`), checked against the file it replaces, written in its layout, the old file kept in `move_saves/` | C | Decision 154's plan, kept simple: the user isn't a developer, so nothing to learn but dragging; a save that can't break the game; nothing lost |
+| 158 | Other players' health and stamina bars are a share of that player's own maximum: `ownValue(p.k, ...)` by key, a bot's flags under its own settings | U | The user's report after the 9 Nov session: a player given 500 health showed a full bar until under 100. The cause (names passed where keys belong since decision 145) and the fix: C |
+| 159 | Balls waiting on one player are settled in the order they touched them: a catch or deflect goes to the first, and the later one's hit says SECOND BALL | U | "Fix all these" (phase 18's list). It was always the rule ("spent on the ball it meets"); the code went by the order of throwing |
+| 160 | The session log sends a browser's waiting chunks oldest first and stores chunks in any order; presses past the lag compensation limit are logged (`capped`); the report goes by page load, leaves out joining (10 s) and loading (3 s), tells a stalling computer from Wi-Fi, keeps the host's clock and the latest names, and counts a burst of L once; the battery stays a host-only reading | U | "Fix all these". How: C. Browsers give the battery only to secure pages, so it's said in the manual rather than faked |
+| 161 | The lag compensation limit warns, in its description and with a red bar in its preview, when it's less than 0.1 s above the view delay; the value stays the host's | U | "Fix all these". Claude's advice to the host: back to 0.25 unless 0.15 was on purpose |
+| 162 | Auto graphics steps up only in the lobby and judges nothing until the game has loaded, nor for 3 s after; the join screen and the hint line say when the game is still loading | U | "Fix all these": Claude's options (a) and (b) for Auto, and the loading note |
+| 163 | Everything a player keeps goes by their key, the team they come back to after watching included; each player's moves are drawn to their own timings (`movesTiming` → `man.timing`), the moves page to its own (`world.timing`) | U | "Check to see if changes in v2.3.0 might have caused other bugs": the two found were fixed. How: C; the moves page proven unchanged by its fingerprints |
 
 ## 6. Current features
 
@@ -1648,7 +1712,7 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - `game.rules` (a `rules.Rules`) holds every number the game reads.
   - `game.next_rules` holds changes made during a match until the next countdown (`_start_countdown` → `_activate`).
   - In free play (`lobby`, `wait`) changes activate at once.
-  - `game.rules.players` holds each player's own settings, by name. `p.rules` is the set that player plays by (`for_player`, refreshed when rules activate and when they join); a ball carries its thrower's or deflector's (`b.rules`) for its damage, curve and ricochet range.
+  - `game.rules.players` holds each player's own settings, by who they are (their key, decision 145). `p.rules` is the set that player plays by (`for_player`, refreshed when rules activate and when they join); a ball carries its thrower's or deflector's (`b.rules`) for its damage, curve and ricochet range.
 - **How changes spread:** `game.rules_version` bumps on every change. The server loop then:
   - sends every client a `rules` message (its own player's client config, the live and next values, and everyone's own settings);
   - saves the host's choice to `saved_rules.json` on a background thread.
@@ -1666,7 +1730,7 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 
 - **On the server:**
   - `game_loop` calls `stats.loop` (loop gaps, tick and snapshot cost), `stats.events` (hits on people, rounds, rules) and `stats.tick` (writes a `sec` record once a second).
-  - Every message from a browser goes through `stats.message`: input rate and gaps, screen delay from `wt`, and late presses. A press is "late" when its `wt` window covers the contact time of a hit already decided for that player.
+  - Every message from a browser goes through `stats.message`: input rate and gaps, screen delay from `wt`, and late and capped presses. A press is "late" when its window (from the press grace before its `wt`) covers the contact time of a hit already decided for that player, and "capped" when it reached the server more than that player's `MAX_LAG_COMP` after its `wt` (it then counts from the limit, a little later than pressed).
   - `Client` counts dropped messages, the longest queue and the slowest send.
 - **Writing never blocks the game:**
   - `SessionLog.write` only queues; a background thread appends to the files.
@@ -1675,7 +1739,7 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 - **In the browser:**
   - `main.js` calls `diag.frame()` every frame (code time, and whether the picture was frozen: the view time is past the newest snapshot) and `diag.snapshot()` for every world update.
   - Each update's lateness is how much later it arrived than the quickest so far: `offset − (st − arrival)`.
-  - Lines go out in chunks every 5 s as `log` messages. Each chunk sits in localStorage until the server's `logack`, so after a reload the unacknowledged chunks go again; the server stores each chunk once.
+  - Lines go out in chunks every 5 s as `log` messages. Each chunk sits in localStorage until the server's `logack`, so after a reload the unacknowledged chunks go again. On joining, the waiting chunks go first, oldest first (earlier page loads, then this page's join screen), then the new lines; the server stores each chunk once, in whatever order they come.
   - **Clocks:** browser lines carry `st` (estimated server time) and `wall`; server lines carry `st` (`perf_counter`) and `wall`. So freezes on different PCs line up in time with each other and with server stalls.
 
 **Lag compensation ("view time"):**
@@ -1684,12 +1748,13 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - `offset` = the maximum of `(snapshot.st − local arrival time)`, decaying by 1 ms per second.
   - So `wt` is the server time of the world on screen, about 0.1 s behind on a LAN.
   - **Re-anchoring:** if even the least late update of a 1.5 s window arrived over 40 ms behind the estimate, the offset moves back by that much at once (this computer's clock was adjusted, or the route got slower for good). Without it, a clock running fast left the view time past the newest update for minutes.
-- **The press:** every action message carries `wt`. The server clamps it to `[now − 0.25, now]` and uses it as the press time (`action_start`). The clamp bounds cheating.
+- **The press:** every action message carries `wt`. The server clamps it to `[now − MAX_LAG_COMP, now]` (0.25 s by default) and uses it as the press time (`action_start`). The clamp bounds cheating; it also means a press that takes longer than the limit to arrive counts later than it was made, so the limit must stay well above the view delay (logged as `capped`).
   - `wt` is the view time **at the key or button event's own timestamp** (`event.timeStamp`, `input.js eventTime`), not when the page handled it: a busy page can hold an event for up to a frame. A timestamp that's missing, in the future or over 1 s old falls back to now. The log's `press` lines record how long each was held (`held`, ms).
 - **When a ball touches a player with no active action:**
   - The ball becomes `pending`: frozen at the contact point.
   - It waits until `deadline = t_c + clamp(view_lag + 0.03, 0.05, 0.28)`, where `view_lag` is smoothed from `now − wt` of the input messages.
   - If an action arrives whose window covers `t_c`, the defence succeeds. A person's window counts from `PRESS_GRACE` (0.02 s) before their press. Otherwise it's a hit. Bots get no waiting and no grace.
+  - Balls waiting on one player are settled in the order they touched them (`_check_pending`, earliest `t_c` first). A catch or deflect is spent on the ball it meets, so it goes to the first; the later one hits, marked as the second ball. (They used to be settled in the order they were thrown: an older, slower ball took the defence, and the ball the player had pressed for hit them unmarked. The 9 Nov office log.)
   - **Sidestep compensation** (`SIDESTEP_COMP`): every accepted input adds `(wt, x, z)` to the player's `seen` history. While the ball waits, as soon as a report from the contact moment has arrived (or at the deadline, the latest one), the server checks the ball against where the player was on their own screen at `t_c`. Clear: `_let_through` (event `sidestep`); the ball ignores them and is flown on from `t_c` to now. Each hit records that on-screen `gap`.
 - **The lockout:** `start_action` sets `action_end = start + window + recovery` (the action is over) and `lockout_end = start + (window + recovery) × LOCKOUT_SCALE` (another defence or a throw may start). A new press during the window takes over the old action. A successful catch or deflect ends both at once.
 - **Events** carry the contact time `t`. Clients play them when their view time reaches `t`, so effects line up with what's on screen.
@@ -1713,9 +1778,9 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
 - **Low** also leaves out the perfect-dodge afterimages (each copies the whole figure) and draws half as many afterimages behind deflected balls (every 0.07 s instead of 0.035 s). Nothing that matters for play changes with the level.
 - **Auto:**
   - A second under 45 fps is slow, and 3 slow seconds in a row step down a level.
-  - The step must raise the frame rate by 12% (measured over the next 3 seconds), or it's undone and Auto stops changing things for the session.
-  - 20 seconds in a row at 57 fps or more try a level up, at most twice a session.
-  - The 2 seconds after any change aren't counted, and neither is a gap over 0.5 s between frames (a hidden tab, a stall).
+  - The step is judged over the next 5 seconds: if it didn't raise the frame rate by 12%, Auto steps once more (Low halves the sharpness); if even that didn't help, it goes back to where it was and stops changing things for the session.
+  - 20 seconds in a row at 57 fps or more try a level up: only in the lobby (`calm`), at most twice a session, and never a level it had to leave after stepping up to it.
+  - Nothing is judged until the hall and the athletes are in place (`ready`: `world.ready`), nor for 3 seconds after; the 2 seconds after any change aren't counted, and neither is a gap over 0.5 s between frames (a hidden tab, a stall).
   - It starts at High, or at Low when the browser draws without the graphics card (`gpuInfo`: SwiftShader, llvmpipe, softpipe, "software", Basic Render Driver). On the host's computer it goes no higher than Medium.
 - Automatic changes are logged (`gfx`: from, to, why, fps) and shown in a dim popup; every `sec` line carries the level (`gfx`). The top-right readout shows it too ("1 ms · 60 fps · Medium").
 
@@ -1822,7 +1887,7 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - **Back:** the hips 0.09 m down (the crouch), 0.12 m up (the jump), then 0.1 m down (the landing); both feet tucked up 0.24 m; the upper body bends 0.15–0.2 rad.
   - **Fading:** in over 0.03 s, out over the last 0.08 s.
   - **Afterimages:** every 0.045 s during the dash, at 0.45 of the perfect dodge's strength (not on Low graphics).
-- **Actions:** each plays from when the game first shows it to the end of its window and recovery, on the figure's own clock. The same action shown 0.12 s or more younger is a new press, and starts again. A deflect seen only by its result starts 0.1 s in; a catch that met the ball hands over to the caught ball.
+- **Actions:** each plays from when the game first shows it to the end of its window and recovery, on the figure's own clock: that player's own window and recovery, and their own dash time (`man.timing`, from `main.js movesTiming`; your own figure and the moves page use `world.timing`). The same action shown 0.12 s or more younger is a new press, and starts again. A deflect seen only by its result starts 0.1 s in; a catch that met the ball hands over to the caught ball.
 - **Perfect dodges:**
   - **Timing:** 0.5 s each. The acrobatic is chosen from a hash of the player's id and the event's time; it turns towards the side the player was moving.
   - **The corkscrew:** the backflip from 0.1 s before its takeoff to its touchdown, at 28% of its height, with a full twist about the hips' length.
@@ -2019,7 +2084,7 @@ Key methods:
   - `_hit_world`: end walls kill; floor and side walls ricochet once and multiply the ball's `curve` by `RICOCHET_CURVE_KEEP`.
   - `_ricochet_target`.
   - `_contact`: invulnerability, an active action defends, otherwise pending.
-  - `_check_pending`: a late press (`_action_at`, with the press grace), sidestep compensation (`_screen_position`, `_screen_gap`, `_stepped_clear`, `_let_through`), else the hit at the deadline.
+  - `_check_pending`, the waiting balls earliest contact first: a late press (`_action_at`, with the press grace), sidestep compensation (`_screen_position`, `_screen_gap`, `_stepped_clear`, `_let_through`), else the hit at the deadline.
   - `_defend` → `_dodged`, `_caught` or `_deflected` (each records `press_met` and `defended_at`); `_hit` (marks `early` or `second`: why it got through).
 - **Player actions:** `throw`, `_aimed_velocity`, `_assist_target` (with the `_is_bank_shot` rule), `start_action`, `revive`.
 - **Cash:** `cash_of` (own cash or the team's pot), `_earn` (in or, negative, out), `_regroup_cash` (team cash switched on or off), `revive_cost`.
@@ -2072,7 +2137,7 @@ Other parts of `main.js`:
   - `applyRules()` runs on `welcome` and on every `rules` message. It sets `cfg`, the net's interpolation delay and gravity, and the ball size, redraws the court, and refreshes the editor and the lobby.
   - `updateHud` sends `sync` when a snapshot's `rv` stays ahead for over 1 s.
 - **The menu:** `showMenu()` opens the lobby panel. The match-end event drops everyone back into it.
-- **Players' own settings and colours:** `rules.players` / `rules.nextPlayers` from the server; `ownValue(name, key)` (theirs or everyone's), `ballColorOf(player)` (`BALL_COLOR_KEYS` by team and people/bots); each ball's `color` is set in `displayBalls`, each figure's held ball in `playerStates`; `tagFor` sizes name tags by their own health and stamina (no health with team health).
+- **Players' own settings and colours:** `rules.players` / `rules.nextPlayers` from the server; `ownValue(key, rule)` (a player's by their key, never their name: theirs, a bot's over its flags as `editor.ownOf` merges them, or everyone's; your own numbers are `cfg`), `ballColorOf(player)` (`BALL_COLOR_KEYS` by team and people/bots); each ball's `color` is set in `displayBalls`, each figure's held ball in `playerStates`; `tagFor` sizes name tags by their own health and stamina (no health with team health).
 - **Team health:** `hud.setTeamHealth(r.th)`, your bar from `r.th`, the R tile from `r.rc` and `cfg.teamHeal`, the `heal` event, "team" wording in hit popups and the feed.
 - **Standing still:** `trackStill` (the server's rule, for the hint) and `regenHint` → `hud.setRegenHint`; `local.hurtAt` / `teamHurtAt` from the hit events, for the pause.
 - **Settings files:** `exportSettings()`, `importSettings()` and `importSetupText()` (the lobby's buttons).
@@ -2121,7 +2186,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 **`diag.js`:** the browser's diagnostics log.
 
 - `frame()` and `snapshot()` (per-frame and per-update counters), `second()` (the `sec` line), `log()`.
-- `flush()` (chunks into localStorage and to the server), `ack()`, `connect()` (also resends unacknowledged chunks from earlier page loads), `restore()`.
+- `flush()` (chunks into localStorage and to the server), `ack()`, `connect()` (sends the unacknowledged chunks first, oldest first: earlier page loads', then this page's from before it joined; then flushes the new lines), `restore()`.
 - `download()` ("Save my log"), `status()`.
 - `main.js` gives it `clock` (server time) and `context` (ping, state, alive, lock, view delay). `drawFrame()` returns whether the picture was frozen.
 - The menu's "Lag diagnostics" section has "Save my log" and the host's "Download all logs (zip)". L logs a `mark`.
@@ -2169,7 +2234,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 
 **`juice.js`:** `CameraFx`: `shake(amount)`, `jolt(x, y, z, fov)`, `update(dt, charge)` and `apply(camera)` (the numbers above). `main.js` makes one (`camFx`), calls it from `onEvent` and `releaseThrow`, and applies it after `updateFx`.
 
-**`graphics.js`:** the graphics setting (the numbers above): `Graphics` with `choose()` (the menu), `setCeiling()` (the host's Medium), `frame()` (every frame: Auto counts frames per second and steps), `apply()` (also on resize) and `describe()` (the menu's note); `gpuInfo(renderer)` (the graphics card's name, and whether the page is drawn without one). `main.js` saves the choice in `dp.settings.graphics`, shows the warning (`gpuWarn`, `gpuWarnJoin`), logs `gfx` lines and puts the level in every `sec` line.
+**`graphics.js`:** the graphics setting (the numbers above): `Graphics` with `choose()` (the menu), `setCeiling()` (the host's Medium), `frame()` (every frame: Auto counts frames per second and steps), `apply()` (also on resize) and `describe()` (the menu's note); `gpuInfo(renderer)` (the graphics card's name, and whether the page is drawn without one). Two callbacks from `main.js`: `calm()` (may Auto step up now: only in the lobby) and `ready()` (has the game loaded: `world.ready`). `main.js` saves the choice in `dp.settings.graphics`, shows the warning (`gpuWarn`, `gpuWarnJoin`), logs `gfx` lines and puts the level in every `sec` line. While `world.ready` is false, the join screen's `loadingNote` and the hint line (`hintLine`) say the game is still loading.
 
 **Controls:**
 
@@ -2256,7 +2321,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **A test server remembers rules** that tests changed until it restarts, so restart it between test suites.
 - **Hosting from the test PC:** the browser on the server's PC is the host. Add `?guest` to a tab's URL to see the guest view.
 
-**Rule tests** (all 69 must pass) and **server tests** (all 7 must pass):
+**Rule tests** (all 76 must pass) and **server tests** (all 12 must pass):
 
 ```powershell
 .venv\Scripts\python tests\test_sim.py
@@ -2269,9 +2334,10 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **the host's screen:** relayed only from the host, cleaned (bad rules and values dropped, numbers clamped; whose page it is), sent to latecomers, and cleared when the host leaves;
 - **players' own settings:** only the host sets them, each browser gets its own numbers, the server plays by them, and a settings file replaces the whole setup (team health on, bars added up);
 - **saved rules:** saving and loading the rules and players' own settings, an older flat file, and ignoring a damaged `saved_rules.json`;
-- **the session log:** server and browser records reaching the host's zip, a resent chunk stored once, and inputs counted per player;
-- **the detectors:** stalls, late presses (and early ones that aren't), and console prints held up;
-- **the report:** it blames a freeze during a server stall on the host and a player's own freezes on them, and gives each L mark the right cause.
+- **the session log:** server and browser records reaching the host's zip, chunks out of order and a resent one each stored once, and inputs counted per player;
+- **the detectors:** stalls, late presses (one a hair after contact, by the press grace; and early ones that aren't), presses past the lag compensation limit (`capped`, and none for a late press), and console prints held up;
+- **the report:** it blames a freeze during a server stall on the host and a player's own freezes on them, and gives each L mark the right cause; and, from the 9–10 Nov logs: a page whose computer's clock runs two minutes slow kept, a page from an earlier session left out, the session's times on the host's clock, an overloaded computer's frozen picture put down to it rather than Wi-Fi, the stutter of joining left out, a renamed player under the new name, and L pressed four times in a row counted once (it fails on the old report);
+- **the moves page:** its list served, and saving the moves placed by hand.
 
 **Reading a session's logs:** `.venv\Scripts\python tools\log_report.py <zip | session folder | logs folder | saved log>`. The logging browser test and the server-freeze helper are described in the browser tests' README.
 
@@ -2285,9 +2351,10 @@ The rule tests cover:
 - slow balls bending less per metre (0, 0.5 and 1); a bounce taking curve away (0.5 and 0);
 - the press grace (a press a hair late counts, and not with grace 0); sidestep compensation (a ball misses someone clear on their screen; off, it hits and the log shows the gap; moving too late is still a hit); the lockout (normal, 0 with the new press taking over, and a short lockout never cutting the window);
 - why a hit got through: a press that ended too early (with the amount; no mark for a press long before), a second ball right after a deflect or after a dodge's dash (no mark a second later), and an ordinary hit with no mark;
+- two balls waiting on one catch that arrives late: it meets the one that reached the player first, though the other was thrown earlier, and the other's hit is marked second;
 - court growth and shrinking; the center line; knockout, revive and round end;
 - each team's bots set by the host, untouched by people joining or leaving, changed mid-match from the next round, gone with the last person; a full bots-only match;
-- the host spectating (only the host; never hit or revived; back from the next round; cancelling); shared team cash (earning, a teammate reviving from the pot, switching it off and on); cash carrying over while revive prices start over;
+- the host spectating (only the host; never hit or revived; back from the next round; cancelling; back to their own team, though the other has fewer people); shared team cash (earning, a teammate reviving from the pot, switching it off and on); cash carrying over while revive prices start over;
 - team health: one bar that the whole team falls with (knockouts, outs and cash counted), its size (added up with someone's own health, people joining and leaving, fixed from the next round), buying health (a pack at a rising price that starts over each round, all your cash at a rate, the team's pot, a full bar refused), the time limit going to more of the bar left, and a bots-only match with wipes and bots buying;
 - players' own settings: only the host sets them, rules shared by everyone are ignored, at once in the lobby and from the next round in a match, kept on reconnecting, their own value winning over an ordered pair, a thrower's own damage and a defender's own catch window; bots keeping their names and settings by slot, and a bot playing by its own profile;
 - health regeneration: the pause (and a hit restarting it), the speed, a share and a fixed amount as limits, never taking health away, a player's own regeneration, nothing with it off or with team health on; the team bar's (a hit on either teammate pausing it, a share of the bar, off by default);
@@ -2323,11 +2390,11 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 - **The team-health test** (`team_health.json`): the bars, R buying a pack, the time limit by share of the bar, and a team wipe. Re-run it after touching team health.
 - **The regeneration test** (`regen.json` + `regen.js`): the round-time buttons, both regeneration previews, and a player's health and a team bar sampled ten times a second (the pause after each hit, the speed, where it stops) with the limit markers. Re-run it after touching regeneration or the round-time buttons.
 - **The standing-still test** (`still.json` + `still.js`): with a bot that hits for 40 every 20 s, holds keys like a player through standing, walking and two kinds of dodge, and checks what each part regains and the hint, for a player and a team bar. Re-run it after touching standing still.
-- **The own-settings test** (`own_settings.json` + `own_settings.js`): a bot's and a person's own settings through the ⚙ pages, the ball colours editor, export → reset → import, a profile moved between bots, wrong files, and the colour every ball in flight is drawn in. Re-run it after touching players' own settings, the ball colours or the settings files.
-- **The people and bots test** (`people_bots.json` + `people_bots.js`): two players with the same name kept apart (#1, #2, settings for one), renaming (the HUD follows), the search across every tab, a bot made and flagged on the Bots & flags page, its ⚙ page showing its flags, a flag edited, and the bot moved, taken off and brought back. Re-run it after touching who players are, renaming, the search, or the bots page, flags and lineups.
+- **The own-settings test** (`own_settings.json` + `own_settings.js`): a bot's and a person's own settings through the ⚙ pages, the ball colours editor, export → reset → import, a profile moved between bots, wrong files, the colour every ball in flight is drawn in, the health bars over the heads of bots with 300 health of their own (their health over their own 300, not everyone's 100), and a bot's moves drawn to its own timings (its own 0.6 s catch window: a catch drawn for 0.85 s, the others' 0.55 s). Re-run it after touching players' own settings, the name tags, how a figure's moves are timed (`movesTiming`, `timingOf`), the ball colours or the settings files.
+- **The people and bots test** (`people_bots.json` + `people_bots.js`): two players with the same name kept apart (#1, #2, settings for one), renaming (the HUD follows), the search across every tab, a bot made and flagged on the Bots & flags page (and `ownValue` seeing its flags), its ⚙ page showing its flags, a flag edited, and the bot moved, taken off and brought back. Re-run it after touching who players are, renaming, the search, or the bots page, flags and lineups.
 - **The graphics test** (`graphics.json` + `graphics.js`):
   - the no-graphics-card warning and Auto at Low in headless Chrome, and the host's ceiling;
-  - Auto's rules on a stand-in world fed made-up frame times;
+  - Auto's rules on a stand-in world fed made-up frame times (stepping up only when calm, nothing judged while the game loads nor for 3 s after);
   - presses timed from their key event (held 40 and 120 ms);
   - the shader count before and after 35 s of every kind of effect.
   - Healthy: no shader built mid-match (the hall's are built as it loads). With `&nowarm`, 3 were. `&noarena` draws the plain court, to compare frame rates.
@@ -2488,7 +2555,11 @@ print(lengths, g.score, dict(counts))
 - **CSS class names are global:** the lobby's `.tag` labels and the join screen's `.tag` tagline styled each other (fixed by scoping to `.teamCol .tag`).
 - **Windows Firewall:** block rules win over allow rules. Answering its "allow access" prompt for private networks only makes *block* rules for public ones, so on an office Wi-Fi marked Public the game stays blocked until those go (`Allow friends to connect.bat` removes them).
 - **A computer's clock can run fast for a while:** an OS time correction (seen on a Linux laptop) made the browser's `performance.now()` run about 1% fast for 25 s. Anything that estimates the server clock from arrival times must be able to move back quickly, not just drift (`net.js` re-anchors).
-- **Browsers resend old log chunks:** a page keeps unsent chunks in localStorage and sends them to whichever server it reaches next, so a session folder can hold lines from earlier sessions. The report leaves out lines from before the server started.
+- **Browsers resend old log chunks:** a page keeps unsent chunks in localStorage and sends them to whichever server it reaches next, so a session folder can hold lines from earlier sessions. The report leaves out the pages that never joined this server (each file is one page load, its `run`, and every `join` names its run). It used to leave out lines from before the server started, by the browser's own clock, and so dropped the first minutes of a player whose PC clock ran two minutes slow (9–10 Nov).
+- **Send a log's waiting chunks oldest first.** The server once kept only the highest chunk number it had stored and skipped anything below it as a copy, while acknowledging it, so the browser then deleted it. `connect()` sent the newest chunk first, and every page lost what it logged on the join screen, the loading time with it. Now the server keeps the set of chunks it stored, and the browser sends oldest first.
+- **Chrome tells `navigator.getBattery` only to secure pages** (https, or this computer's own `localhost`). Players open `http://192.168.x.x`, so only the host's browser can log its battery; ask a slow laptop's player instead.
+- **Own settings go by key, everywhere:** passing a player's name where their key belonged (`ownValue(p.name, ...)`, from before decision 145) quietly gave everyone's value, so other players' health bars used 100 whatever their own health (found by the user after the 9 Nov session).
+- **A slow page looks like bad Wi-Fi in the log:** world updates wait unread while the page's own code runs, so they arrive "late" and the picture freezes. Check the frames first: a freeze with a frame of 150 ms or more right at it is the computer's (the report splits frozen time that way). A slow frame elsewhere in the same second proves nothing.
 - **Git and line endings on Windows:** with `core.autocrlf` on, files checked out before `.gitattributes` existed keep CRLF in the working tree, while git stores LF. Scripts that match text across lines must handle `\r\n`.
 - **GitHub keeps force-pushed commits:** rewriting a published history doesn't unpublish the old commits; they stay reachable by id and in the repository's Activity view. A clean history needs a new repository (phase 9).
 - **On macOS, looking up the computer's own name can stall:** `socket.gethostbyname_ex(socket.gethostname())` asks the local network. Startup caps it at 2 s; nothing on the game loop or the console may wait for it.
@@ -2497,7 +2568,7 @@ print(lengths, g.score, dict(counts))
 
 **Known limitations, by design or accepted for now:**
 
-- **Volleys:** one catch holds one ball, and a deflect is spent on the ball it meets. A second ball a fraction of a second behind still hits; that used to look as if the defence had failed (the red flash right after the CATCH or DEFLECT popup), so since v2.1.0 the hit says SECOND BALL. In the office logs, 8–9% of successful catches and deflects were followed within 0.3 s by another ball's hit, at the same rate before and after the lag settings (25, 27 and 28 Oct). A dodge covers every ball during its dash, so dodge through volleys instead.
+- **Volleys:** one catch holds one ball, and a deflect is spent on the ball it meets. A second ball a fraction of a second behind still hits; that used to look as if the defence had failed (the red flash right after the CATCH or DEFLECT popup), so since v2.1.0 the hit says SECOND BALL. In the office logs, 8–9% of successful catches and deflects were followed within 0.3 s by another ball's hit, at the same rate before and after the lag settings (25, 27 and 28 Oct). A dodge covers every ball during its dash, so dodge through volleys instead. The defence meets the ball that reached you first, even when your press arrives over Wi-Fi after both (until the 9–10 Nov logs it went to the ball thrown first, 4 times in two sessions).
 - **Close ricochets:** a ricochet bouncing right at someone's feet can be unreactable. Tune with `RICOCHET_CURVE_KEEP`, `RICOCHET_MIN_SPEED` and `RICOCHET_CONE_DEG` if it feels unfair.
 - **The perfect-dodge spin** starts when the server confirms it, about 0.1 s after the press, not instantly.
 - **Movement is trusted** to each browser within the court limits: fine among friends, not for strangers.

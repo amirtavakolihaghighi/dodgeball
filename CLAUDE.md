@@ -53,6 +53,7 @@ Quick facts:
   - A Python server (FastAPI + uvicorn) runs the authoritative rules in `sim.py` and `bots.py`.
   - Every number is a host-editable rule: `rules.py` holds the name, description, range and preview; `config.py` holds the defaults. The game reads them from `game.rules`, never from `config` directly.
   - A player (or bot) may have their own settings for the rules marked `who` in `rules.py`. A player's numbers come from `p.rules` (`Rules.for_player`: everyone's with theirs on top), a ball's from `b.rules` (its thrower's); `game.rules` only for what's the same for everyone.
+  - In the browser, your own numbers are `cfg` (the server's `for_player`); anyone else's are `main.js ownValue(p.k, rule)`: by their key, never their name (two players may share one), a bot's flags included. Passing names left everyone's health bars at the default 100 (fixed after the 9 Nov office session). The same goes for drawing them: each figure's moves fit its player's own timings (`movesTiming(p)` → `man.timing`, read by `athlete.js timingOf`), not yours.
   - The browser client is three.js (`static/js/`).
 - **The lobby:**
   - The server starts in a lobby. The host (a browser on the server's PC, or the console's `?host=KEY` link) sets up teams, bots and rules, then starts the match.
@@ -62,7 +63,7 @@ Quick facts:
   - Always pass `--no-browser` in tests, or windows open on the user's desktop.
   - Always pass `--fresh`, or tests load or overwrite the user's `saved_rules.json`.
   - Restart the server after Python changes, and between browser test suites (it keeps changed rules in memory).
-- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 74 must pass) and `tests\test_server.py` (all 11 must pass).
+- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 76 must pass) and `tests\test_server.py` (all 12 must pass).
 - **Session logs:**
   - Every server run writes `logs\<date_time>\` next to the app (`diag.py`). Every browser sends in its own log (`static/js/diag.js`; L marks a laggy moment).
   - The host downloads them all as one zip, and `tools\log_report.py <zip or folder>` turns them into a diagnosis. The user sends these zips to be analysed. Logs from before the rename are named `dodgeparry-...`; the report reads them the same way.

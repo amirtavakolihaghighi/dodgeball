@@ -19,6 +19,7 @@
   {"eval": "__makeAlex()"},
   {"wait": 500},
   {"shot": "bots_page.png"},
+  {"eval": "JSON.stringify({ownValueSeesFlags: {alexStaminaReserve: dp.ownValue('b:alex', 'BOT_STAMINA_RESERVE'), everyone: dp.rules.active.BOT_STAMINA_RESERVE, expected: 'Berserker keeps none: 0 against 30'}})"},
   {"eval": "__alexPage()"},
   {"wait": 600},
   {"shot": "bots_alex_settings.png"},

@@ -19,6 +19,8 @@
 - [Questions that would sharpen the plan](#questions-that-would-sharpen-the-plan)
 - [Update: your answers, and the logs](#update-your-answers-and-the-logs)
 - [Update 2: what three office sessions showed](#update-2-what-three-office-sessions-showed)
+- [Update 3: the 28 Oct session](#update-3-the-28-oct-session)
+- [Update 4: the 9 and 10 Nov sessions](#update-4-the-9-and-10-nov-sessions)
 
 ## Short version
 
@@ -367,3 +369,15 @@ The user approved all five suggestions, as settings with explanations (Game rule
 - **Sidestep compensation, A/B in a real session:** the host turned it off halfway. On: 233 balls missed people who had stepped clear on their own screen, and no hit while clear on screen. Off: about 400 hits on people who were clear on their own screen (up to 0.9 m).
 - **A new cause of a frozen picture: the player's own clock.** One Linux laptop's clock ran about 1% fast for 25 s (most likely the system correcting its time). Updates kept arriving normally, but the game's clock estimate only moved back 1 ms per second, so that player's picture stood still for about 5 minutes and their presses lost lag compensation. Fixed: the browser now re-anchors when every update of 1.5 s arrives over 40 ms late (tested: a +300 ms clock run now costs 2 s of frozen picture instead of minutes).
 - The server and the host were healthy; no browser errors.
+
+## Update 4: the 9 and 10 Nov sessions
+
+**The data:** 9 Nov (18 min, 11 people) and 10 Nov (27 min, 7 people and up to 2 bots), the server's log and every browser's, on `main` with the animation tool's work.
+
+- **The host and the server were healthy:** no stall over 100 ms, 10–15% CPU, memory up to 94% in use (0.9 GB free). No browser error, no memory growing over a session, no frame rate falling over one.
+- **The host's own Wi-Fi went quiet six times on the 10th:** about 0.25 s each, every remote player's updates and inputs at once, the host's own tab fine. None on the 9th. Not tied to the Wi-Fi reading the server takes every 30 s. The host PC has an Ethernet port; a cable would end them.
+- **A Linux laptop's Wi-Fi scanning, as in Update 2:** bursts of 8–15 freezes of 150–200 ms, 0.45 s apart, for about 5 s, exactly every 5 minutes on the 10th (NetworkManager's background scan). The fix in Update 2 hasn't been tried on it.
+- **A laptop short of CPU (10 Nov):** 34–49 fps, and in about a third of the seconds one frame of the game's own code took over 0.1 s (once 2.2 s); the same laptop ran at 60 fps the day before. Its frozen picture (28% of the time) and its input gaps came from its own page stalling, not from its Wi-Fi: world updates waited unread while the page was busy. Battery saver or another program; the log can't tell which, because browsers give the battery only to secure pages. Its player reloaded once and left after 8 minutes. The report now tells a stalling computer from Wi-Fi.
+- **The host's network settings:** sidestep compensation off (61–62% of hits on people came while their own screen showed them clear, 354 knockouts among them), the lockout 0, the press grace 0.015 s and the lag compensation limit 0.15 s. That limit sits only about 0.04 s above where every screen already is (the 0.10 s view delay plus the Wi-Fi), so a press that took longer to arrive counted a little late: one player's messages arrived past it in 17% of the seconds they played, the overloaded laptop's in about half. Two of the hits that followed a press in time on the player's screen came from it. The rule's description now says to keep it at least 0.1 s above the view delay, and its preview turns red when it's closer.
+- **Two balls waiting on one press:** the defence went to the ball thrown first, not the one that reached the player first, so the ball they had pressed for hit them, with no SECOND BALL mark: 4 hits in the two sessions. Fixed.
+- **The logs' own gaps, fixed:** every browser lost what it logged before joining (the loading time with it: 14 of 20 page loads had none); a press cut by the lag compensation limit left no trace; and the report put a slow computer's frozen picture down to its Wi-Fi, counted the stutter of joining as lag, and dropped the first minutes of a player whose PC clock ran two minutes slow.

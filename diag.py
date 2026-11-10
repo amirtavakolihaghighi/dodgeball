@@ -36,6 +36,7 @@ from pathlib import Path
 
 KEEP_SESSIONS = 30              # older session folders are deleted when the server starts
 MAX_CLIENT_BYTES = 30_000_000   # per browser page per session, so a runaway tab can't fill the disk
+MAX_CLIENT_CHUNKS = 20_000      # ...and chunks remembered per page (one every 5 s: over a day)
 STALL_MS = 100                  # game-loop gaps longer than this are logged one by one
 PRINT_BLOCK_MS = 100            # so are console prints held up this long (a QuickEdit selection)
 HOST_POLL = 30                  # seconds between Wi-Fi / power readings
@@ -62,7 +63,7 @@ class SessionLog:
         self.dir = self.root / datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.dir.mkdir(exist_ok=True)
         self._queue = queue.SimpleQueue()
-        self._runs = {}             # browser page (run id) -> [file name, last chunk stored, bytes]
+        self._runs = {}             # browser page (run id) -> [file name, chunk numbers stored, bytes]
         self._files = {}
         self.failed = None
         threading.Thread(target=self._writer, daemon=True, name="session-log").start()
@@ -77,17 +78,18 @@ class SessionLog:
 
     def client(self, run, name, tab, seq, lines):
         """A chunk of a browser's log. False if it's malformed, True once stored (or if it was
-        already: the browser resends chunks whose acknowledgement it never got)."""
+        already: the browser resends chunks whose acknowledgement it never got). Chunks may come in
+        any order; each is stored once."""
         run = UNSAFE.sub("", str(run))[:24]
         if not run or isinstance(seq, bool) or not isinstance(seq, int) or not isinstance(lines, list):
             return False
         entry = self._runs.get(run)
         if entry is None:
             label = UNSAFE.sub("_", str(name or ""))[:24].strip("_") or "player"
-            entry = self._runs[run] = [f"client-{run}-{label}", 0, 0]
+            entry = self._runs[run] = [f"client-{run}-{label}", set(), 0]
             self.write({"ty": "file", "run": run, "tab": UNSAFE.sub("", str(tab))[:24], "name": str(name)[:32],
                         "wall": wall_ms()}, entry[0])
-        if seq <= entry[1]:
+        if seq in entry[1] or len(entry[1]) >= MAX_CLIENT_CHUNKS:
             return True
         for line in lines[:5000]:
             if not isinstance(line, dict):
@@ -97,7 +99,7 @@ class SessionLog:
             if entry[2] > MAX_CLIENT_BYTES:
                 break
             self._queue.put((entry[0], text))
-        entry[1] = seq
+        entry[1].add(seq)
         return True
 
     def _writer(self):
@@ -383,25 +385,33 @@ class Stats:
             c.lag_n += 1
             c.lag_max = max(c.lag_max, lag)
             if kind == "act":
-                self._late_press(pid, msg.get("a"), wt, now, game)
+                self._press(pid, msg.get("a"), wt, now, game)
 
-    def _late_press(self, pid, action, wt, now, game):
-        """A defence whose press was in time on the player's screen, but that reached the
-        server after the ball had already been counted as a hit: lag cost them that ball."""
+    def _press(self, pid, action, wt, now, game):
+        """A dodge, catch or deflect press, judged as the server judges it (sim.py _view_time and
+        _action_at). Late: in time on the player's screen, but it reached the server after the ball
+        had already been counted as a hit, so lag cost them that ball. Capped: it reached the server
+        more than the lag compensation limit after the moment their screen showed, so it counts from
+        the limit instead, a little later than they pressed."""
         player = game.players.get(pid)
-        rules = player.rules if player is not None else game.rules     # their own windows, if they have any
+        rules = player.rules if player is not None else game.rules     # their own windows and limit, if any
         spec = rules.actions.get(action) if isinstance(action, str) else None
-        hits = self.hits.get(pid)
-        if spec is None or not hits:
+        if spec is None:
             return
+        behind = now - wt
+        over = behind > rules.MAX_LAG_COMP
+        hits = self.hits.get(pid)
         while hits and now - hits[0][1] > 2.0:
             hits.popleft()
-        for contact, decided in hits:
-            if wt <= contact <= wt + spec.window:
+        for contact, decided in hits or ():
+            if wt - rules.PRESS_GRACE <= contact <= wt + spec.window:
                 self.log.write({"ty": "late_press", "st": round(now, 3), "p": pid, "a": action, "contact": round(contact, 3),
-                                "wt": round(wt, 3), "screen_ms": ms(now - wt), "after_hit_ms": ms(now - decided),
-                                "over_cap": now - wt > rules.MAX_LAG_COMP, "wall": wall_ms()})
+                                "wt": round(wt, 3), "screen_ms": ms(behind), "after_hit_ms": ms(now - decided),
+                                "over_cap": over, "wall": wall_ms()})
                 return
+        if over:
+            self.log.write({"ty": "capped", "st": round(now, 3), "p": pid, "a": action, "screen_ms": ms(behind),
+                            "cap_ms": ms(rules.MAX_LAG_COMP), "wall": wall_ms()})
 
     def events(self, events, now, game):
         for e in events:
