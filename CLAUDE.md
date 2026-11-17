@@ -13,7 +13,8 @@
   - Never change a **Locked** move without the user's say. When a move is locked, add its key numbers to `LOCKS` in `tests/browser/moves.js` and a `__lock` step to `moves.json`, so a later change that alters it prints `FAIL` and the run exits with 1; re-run `moves.json` after every change to the moves.
   - Claude can't see motion: show pictures of the moment that matters, and ask for a picture of the pose the user wants.
 - **The HUD and menus** in the new look (the look-and-feel plan's step 9): not started.
-- **The internet server** (phase 20; open task 4 in section 15 of `docs/PROJECT.md`): the three fixes from its logs (server mode, who changed which rule, a log folder per game night) are built and tested, waiting for the user's word to push. Still open: the lag compensation limit back to 0.25 s (the host's setting), and the friend's answer on `X-Forwarded-For` (replaced or added to).
+- **Future work** (ideas, not planned): the list at the end of section 15 of `docs/PROJECT.md`, headed by the user's gameplay ideas of 2026-11-17 (a combo meter, ball techniques bought with a catch, a healing ball for a downed teammate, NPC bosses, a roguelike shop between rounds). Discuss an idea before building it; the user picks what comes next.
+- **The internet server** (phase 20; open task 4 in section 15 of `docs/PROJECT.md`): the three fixes from its logs (server mode, who changed which rule, a log folder per game night) are built, tested and pushed (2026-11-17). Still open: the lag compensation limit back to 0.25 s (the host's setting), and the friend's answer on `X-Forwarded-For` (replaced or added to).
 
 **The art and sound** (the look-and-feel cycle: phase 15 in `docs/PROJECT.md`; `docs/LOOK_AND_FEEL.md` holds its plan, the budgets, the style samples and its log):
 

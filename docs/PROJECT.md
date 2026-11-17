@@ -1436,6 +1436,8 @@ On `main`. **The friend's server.** The user's friend, the developer who was to 
   - New browser test `server_mode.json` (in CI's Docker job too): it passes with `--server-mode` and fails without it.
   - Re-run and passing with no page error: the smoke test, `graphics.json`, `lobby_controls.json` and `logs.json`.
 
+**Then** the user: "yes" (push them), and five ideas for future work, now at the head of section 15's list: a combo meter like Devil May Cry's style meter, ball techniques bought with a catch, a healing ball for a downed teammate, NPC bosses, and a roguelike shop between rounds. The earlier ideas are in the same list, grouped by theme.
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -2713,21 +2715,21 @@ print(lengths, g.score, dict(counts))
    - The animation tool (phase 17: the "See every move" page and its editor) stays until then; it's separate from the game.
 2. **The HUD and menus** in the new look (the look-and-feel plan's step 9): not started.
 3. **Tested by the user:** the lobby batch of v2.3.0 (names, renaming, same names, the search, bots with flags): built and tested by Claude, not yet on purpose by the user. (The meter and R's tile were played with and approved: phase 19.)
-4. **The internet server** (phase 20): the three fixes (server mode, who changed which rule, a log folder per game night) are built and tested, waiting for the user's word to push. Still open: the lag compensation limit back to 0.25 s (the host's setting, Esc › Game rules › Network), and, with the friend, whether the login replaces `X-Forwarded-For` rather than adding to it.
+4. **The internet server** (phase 20): the three fixes (server mode, who changed which rule, a log folder per game night) are built, tested and pushed (2026-11-17); the friend updates when the user tells them. Still open: the lag compensation limit back to 0.25 s (the host's setting, Esc › Game rules › Network), and, with the friend, whether the login replaces `X-Forwarded-For` rather than adding to it.
 
-**Ideas, not started:**
+**Future work: ideas, not started.** None is planned yet; the user picks what comes next, and an open-ended one is discussed before anything is built.
 
-- **The lag plan:** the next office session's logs will show what the new settings do (the report's FAIRNESS section). Still open: a per-player "your Wi-Fi is dropping out" notice; buffering a press made just before a lockout ends.
-- A list of saved setups in the lobby to pick from (settings files exist; today you pick the file yourself).
-- Kicking a player from the lobby.
-- Touch controls for phones.
-- Obstacles and cover.
-- A short practice mode or tutorial for the timing windows.
-- Spectating for everyone, not just the host.
-- Simple character colors/hats.
-- Score history.
-- A Mac build.
-- Code signing.
+- **Gameplay, the user's ideas (2026-11-17):**
+  - **A combo meter,** like Devil May Cry's style meter (a reference for the feel, not something to copy): good play climbs through letter ranks, a higher rank gives a small buff, and getting hit drops you down.
+  - **Ball techniques:** a player spends a catch to give their next throw a special property: undodgeable, unparryable or uncatchable, or one that must be dodged, must be caught or must be parried.
+  - **A healing ball:** thrown to a "downed" teammate before they're out, it heals them back up. (Today 0 health knocks a player out at once, and teammates revive them with cash.)
+  - **NPC bosses** with abilities and scenarios of their own.
+  - **A roguelike shop** between rounds, for buffs.
+- **Gameplay, earlier ideas:** obstacles and cover; a short practice mode or tutorial for the timing windows.
+- **The lobby and the host:** a list of saved setups to pick from (settings files exist; today you pick the file yourself); kicking a player from the lobby; spectating for everyone, not just the host.
+- **The network** (what's left of the lag plan): a per-player "your Wi-Fi is dropping out" notice; buffering a press made just before a lockout ends.
+- **Looks and records:** simple character colours or hats; score history.
+- **Platforms:** touch controls for phones; a Mac build; code signing.
 
 ## 16. Glossary
 
