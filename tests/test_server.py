@@ -128,11 +128,14 @@ async def scenario(url, host_key):
 
 
 @contextlib.contextmanager
-def running_server(*extra):
-    """server.py on a free port (--no-browser --fresh plus `extra`): yields (port, host key)."""
+def running_server(*extra, fresh=True):
+    """server.py on a free port (--no-browser --fresh plus `extra`): yields (port, host key).
+    fresh=False only with a --data-dir of the test's own, so your saved rules stay untouched."""
     port = free_port()
+    assert fresh or "--data-dir" in extra
     proc = subprocess.Popen([sys.executable, "-u", str(ROOT / "server.py"), "--port", str(port), "--no-browser",
-                             "--fresh", *extra], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                             *(["--fresh"] if fresh else []), *extra], cwd=ROOT, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True)
     lines = queue.Queue()
     threading.Thread(target=lambda: [lines.put(line) for line in proc.stdout], daemon=True).start()
     try:
@@ -471,6 +474,66 @@ def test_the_hosts_rules_are_saved_and_come_back():
         server.game = Game()
         server.load_saved_rules()
         assert server.game.rules.GRAVITY == rules_mod.DEFAULTS["GRAVITY"]
+
+
+def test_a_data_folder_keeps_the_saved_rules_and_the_logs():
+    """--data-dir (the Docker image's /data, a volume that outlives each update): the host's rules
+    and the session logs are written there, come back from there at the next start, and nothing
+    is written next to the app. The image has no git: its version comes from build_info.json."""
+    import server
+
+    def next_to_the_app():
+        logs = ROOT / "logs"
+        return (ROOT / "saved_rules.json").read_bytes() if (ROOT / "saved_rules.json").is_file() else None, \
+            sorted(p.name for p in logs.iterdir()) if logs.is_dir() else []
+    before = next_to_the_app()
+    with tempfile.TemporaryDirectory() as tmp:
+        data = Path(tmp) / "data"                         # made by the server
+        url = None
+
+        async def change_a_rule():
+            host = await Browser.join(url, "Host")
+            assert host.welcome["host"] is True and host.welcome["rules"]["GRAVITY"] == rules_mod.DEFAULTS["GRAVITY"]
+            await host.send(t="rules", set={"GRAVITY": 7.5})
+            await host.pump(0.4)
+            await host.ws.close()
+
+        async def rule_came_back():
+            host = await Browser.join(url, "Host")
+            await host.ws.close()
+            return host.welcome["rules"]["GRAVITY"]
+
+        with running_server("--data-dir", str(data), fresh=False) as (port, _key):
+            url = f"ws://127.0.0.1:{port}/ws"
+            asyncio.run(change_a_rule())
+            for _ in range(50):
+                if (data / "saved_rules.json").is_file():
+                    break
+                time.sleep(0.1)
+        saved = json.loads((data / "saved_rules.json").read_text(encoding="utf-8"))
+        assert saved["rules"] == {"GRAVITY": 7.5}, saved
+        sessions = list((data / "logs").iterdir())
+        assert len(sessions) == 1 and (sessions[0] / "server.jsonl").is_file(), sessions
+        with running_server("--data-dir", str(data), fresh=False) as (port, _key):
+            url = f"ws://127.0.0.1:{port}/ws"
+            assert asyncio.run(rule_came_back()) == 7.5
+        assert len(list((data / "logs").iterdir())) == 2      # a session folder per run, as next to the app
+    assert next_to_the_app() == before
+
+    # The version: git's description in a copy of the source; without git, the build info.
+    real_dir, real_run = server.APP_DIR, server.subprocess.run
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            server.APP_DIR = Path(tmp)
+
+            def no_git(*_args, **_kwargs):
+                raise FileNotFoundError("git")
+            server.subprocess.run = no_git
+            assert server.version_info() == {"commit": "unknown"}
+            (Path(tmp) / "build_info.json").write_text(json.dumps({"commit": "v9.9.9-1-gabc1234"}), encoding="utf-8")
+            assert server.version_info() == {"commit": "v9.9.9-1-gabc1234"}
+    finally:
+        server.APP_DIR, server.subprocess.run = real_dir, real_run
 
 
 def test_a_dropped_connection_is_only_noted():

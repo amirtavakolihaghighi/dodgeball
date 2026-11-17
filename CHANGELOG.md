@@ -20,11 +20,12 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 - **The session log notes every press that reached the host past the lag compensation limit** (it then counts a little later than it was made), and the log report counts them under FAIRNESS.
 - **The incoming-ball meter** (Esc › Your settings › Incoming-ball marker, the new default): an arc around the crosshair on the side a ball comes from, pointing at it, growing longer and thicker as it comes. Its three stripes are your defences, outer dodge (blue), middle catch (green), inner deflect (pink): each lights up when pressing it would work, by your own timings, and turns gold at its perfect moment. Its shape (crescent or band), its colours (all three, or one stripe for one defence), its width and its size are yours to set.
 - **R's tile calls for attention when you can use it** (a revive, or with team health a health pack): it pops up, then glows gold and shines until you can't any more.
+- **Running the game on a server, with Docker:** a `Dockerfile` and a `compose.yaml` for a server behind an HTTPS proxy with a login, and `docs/SERVER.md` for whoever runs it: the first start, updating with `git pull` and one command, who becomes the host, the data and the logs. The host's rules and the session logs live in a volume that outlives every update, the image runs as a user without rights, and only the proxy can reach it.
+- **`--data-dir`** puts the saved rules and the session logs in a folder of your choice (the Docker image's `/data`) instead of next to the app.
 
 ### Changed
 
 - **H switches the incoming-ball marker** between Meter, Ring (the circle that was there before) and Off, and the menu has the same three. If you had the ring turned off, it stays off.
-
 - The moves made by hand moved out of the code into a file of their own, `static/characters/made_moves.json`, which the editor saves. They play exactly as before: every step of every move was compared before and after.
 - **Auto graphics tries a sharper picture only in the lobby,** never during a match: between rounds a level could look fine and then fail a few seconds into the next round. It also judges nothing until the game has loaded.
 - **The lag compensation limit** (Game rules › Network) says to keep it at least 0.1 s above the view delay, and its preview turns red when it's closer.
@@ -43,6 +44,10 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 - **Two balls at once:** when two balls reached you a split second apart while your catch or deflect was still on its way over Wi-Fi, it went to the ball thrown first, not the one that reached you first. So the ball you pressed for hit you, with no "SECOND BALL" label. Now the first ball to reach you is the one caught or deflected, and the other's hit says SECOND BALL.
 - **The session logs lost most of what a browser recorded before its player joined,** the loading time with it: the browser sent its newest lines first, and the server took the older ones for copies it already had. Now they go oldest first, and the server takes them in any order.
 - The log's late presses count the press grace, as the game does.
+
+### Security
+
+- **`opentelemetry-api` 1.45.2**, a library FastAPI uses, fixes a denial of service: a crafted `traceparent` header took the server quadratic time to read ([GHSA-mf5v-w3w3-f6cg](https://github.com/advisories/GHSA-mf5v-w3w3-f6cg)). It matters now that the game runs on an internet server.
 
 ## [2.3.0] - 2026-11-03
 

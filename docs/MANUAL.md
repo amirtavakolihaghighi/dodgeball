@@ -74,6 +74,10 @@ If other devices can't connect, it's almost always Windows Firewall. **Don't tur
 - double-click **`Allow friends to connect.bat`** (next to `Dodgeball.exe`, or in the project folder) once. It asks for administrator permission, then lets computers on your local network (never the internet) reach the game's ports 8000–8019, whether Windows calls the Wi-Fi Public or Private, and removes the old "block" rules Windows made when its "allow access" prompt was answered for private networks only. `Allow friends to connect.bat check` shows what it would do; `... undo` removes the rule; or
 - set the Wi-Fi network to **Private** in Windows settings, and allow the app when Windows asks.
 
+## Play over the internet, on a server
+
+For people who aren't on the same Wi-Fi, the game can run on a server, behind an HTTPS address with a login of its own (the game has no accounts or passwords). Whoever runs the server follows [SERVER.md](SERVER.md): it runs in Docker, and an update is two commands. Who the host is there depends on how the login is set up (SERVER.md explains it), and the host link the server prints when it starts works too. The players open the https address, sign in, then pick their name in the game as usual.
+
 ## Testing alone
 
 - **Bots:** by default RED gets 1 and BLUE 2. Set each team's count (0–12) and the skill (easy/normal/hard) in the lobby. In the lobby that happens at once; during a match, from the next round.

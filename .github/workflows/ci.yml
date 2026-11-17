@@ -73,3 +73,76 @@ jobs:
       - name: Server output (when something failed)
         if: failure()
         run: cat server.log
+
+  docker:
+    name: Docker image (build it as compose.yaml does, play a match against it, update it)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0        # git describe needs the tags
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Build the image and start it, as docs/SERVER.md says
+        run: |
+          export DODGEBALL_VERSION=$(git describe --tags --always --dirty)
+          docker compose up -d --build
+          for i in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q dodgeball)")" = healthy ] && break
+            sleep 1
+          done
+          docker compose ps
+          [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q dodgeball)")" = healthy ]
+          curl -fsS -o index.html http://127.0.0.1:8000/ && grep -q "<title>Dodgeball</title>" index.html
+          curl -fsS -o animations.md http://127.0.0.1:8000/docs/ANIMATIONS.md && grep -q "^# " animations.md
+      - name: It runs as a user without rights, writing only to /data, and knows its version
+        run: |
+          [ "$(docker compose exec -T dodgeball id -u)" = 10001 ]
+          if docker compose exec -T dodgeball touch /app/static/x; then echo "it can change the game's files"; exit 1; fi
+          docker compose exec -T dodgeball python -c "
+          import glob, json
+          meta = json.loads(open(glob.glob('/data/logs/*/server.jsonl')[0]).readline())
+          print('build:', meta['version'], '| args:', meta['args'])
+          assert meta['version']['commit'] == '$(git describe --tags --always --dirty)'
+          assert meta['args']['data_dir'] == '/data'"
+      - name: Join as the host with the host link, start a match and play it in headless Chrome
+        env:
+          CHROME: /usr/bin/google-chrome
+        run: |
+          key=$(docker compose logs dodgeball | grep -o '?host=[^ ]*' | head -1 | cut -d= -f2)
+          [ -n "$key" ]
+          node tests/browser/cdp.js "http://127.0.0.1:8000/?nolock&host=$key" tests/browser/smoke.json | tee smoke.txt
+          grep -q '"s":"play"' smoke.txt
+          ! grep -E "EXCEPTION|TIMEOUT|\[console\.error\]" smoke.txt
+      - name: An update (a new container) keeps the host's rules
+        run: |
+          key=$(docker compose logs dodgeball | grep -o '?host=[^ ]*' | head -1 | cut -d= -f2)
+          node -e "
+            const ws = new WebSocket('ws://127.0.0.1:8000/ws');
+            ws.onopen = () => ws.send(JSON.stringify({t: 'join', name: 'CI', hostKey: process.argv[1]}));
+            ws.onmessage = (e) => {
+              const m = JSON.parse(e.data);
+              if (m.t !== 'welcome') return;
+              if (!m.host) { console.error('not the host'); process.exit(1); }
+              ws.send(JSON.stringify({t: 'rules', set: {GRAVITY: 7.5}}));
+              setTimeout(() => process.exit(0), 1500);
+            };" "$key"
+          docker compose exec -T dodgeball cat /data/saved_rules.json
+          time docker compose up -d --force-recreate
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8000/ && break; sleep 1; done
+          node -e "
+            const ws = new WebSocket('ws://127.0.0.1:8000/ws');
+            ws.onopen = () => ws.send(JSON.stringify({t: 'join', name: 'CI'}));
+            ws.onmessage = (e) => {
+              const m = JSON.parse(e.data);
+              if (m.t !== 'welcome') return;
+              console.log('gravity after the update:', m.rules.GRAVITY, '| the host:', m.host);
+              process.exit(m.rules.GRAVITY === 7.5 && !m.host ? 0 : 1);
+            };"
+          [ "$(docker compose exec -T dodgeball sh -c 'ls -d /data/logs/*/ | wc -l')" = 2 ]
+          time docker compose stop
+      - name: Server output (when something failed)
+        if: failure()
+        run: docker compose logs

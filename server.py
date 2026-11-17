@@ -1,15 +1,16 @@
 """Dodgeball LAN server.
 
 Serves the browser client and runs the authoritative game simulation (sim.py).
-Run:  python server.py [--port 8000] [--no-browser] [--fresh]
-Also packaged as a standalone Windows app by build_exe.bat (no Python needed to run that).
+Run:  python server.py [--port 8000] [--no-browser] [--fresh] [--data-dir DIR]
+Also packaged as a standalone Windows app by build_exe.bat (no Python needed to run that), and
+as a Docker image for a server (Dockerfile, compose.yaml; docs/SERVER.md).
 
 The host is whoever plays in a browser on this computer (or opens the secret host link that
 the console shows): they set up the lobby (teams, bots, rules) and start the match. The rules
-they choose are saved next to the app and come back the next time it starts.
+they choose are saved next to the app (or in --data-dir) and come back the next time it starts.
 
-Every run also writes a session log under logs/ next to the app (diag.py): the server's own
-numbers plus every browser's log, which the browsers send in. --no-log turns it off.
+Every run also writes a session log under logs/ next to the app, or in --data-dir (diag.py): the
+server's own numbers plus every browser's log, which the browsers send in. --no-log turns it off.
 """
 from __future__ import annotations
 
@@ -45,9 +46,11 @@ FROZEN = getattr(sys, "frozen", False)     # running as the packaged .exe
 # Bundled files sit next to this script, or inside the packaged app.
 STATIC = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "static"
 DOCS = Path(__file__).resolve().parent / "docs"     # in a copy of the source only (the moves page's list)
-# Files the app writes go next to the .exe (or this script), where the user can find them.
+# Files the app writes go next to the .exe (or this script), where the user can find them, or into
+# --data-dir (the Docker image's /data, a volume that outlives the container).
 APP_DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent
-RULES_FILE = APP_DIR / "saved_rules.json"
+DATA_DIR = APP_DIR
+RULES_FILE = DATA_DIR / "saved_rules.json"
 MOVES_FILE = STATIC / "characters" / "made_moves.json"   # the moves placed by hand: the moves page's editor saves here,
 MOVE_SAVES = APP_DIR / "move_saves"                       # keeping each file it replaces here
 HOST_KEY = secrets.token_urlsafe(6)         # the console's host link carries it, for hosting from another device
@@ -187,17 +190,22 @@ def loop_error(loop, context):
 
 
 def version_info() -> dict:
-    """Which code this is: the packaged app's build info, or git's description of the source."""
-    if FROZEN:
+    """Which code this is: the packaged app's build info, git's description of the source, or the
+    build info the Docker image was built with (it has no git)."""
+    def build_info(folder: Path) -> dict | None:
         with contextlib.suppress(OSError, ValueError):
-            return json.loads((STATIC.parent / "build_info.json").read_text(encoding="utf-8"))
-        return {"commit": "unknown"}
+            info = json.loads((folder / "build_info.json").read_text(encoding="utf-8"))
+            if isinstance(info, dict) and info.get("commit"):
+                return info
+        return None
+    if FROZEN:
+        return build_info(STATIC.parent) or {"commit": "unknown"}
     with contextlib.suppress(OSError, subprocess.SubprocessError):
         out = subprocess.run(["git", "describe", "--always", "--dirty", "--tags"], cwd=APP_DIR, capture_output=True,
                              text=True, timeout=3)
         if out.stdout.strip():
             return {"commit": out.stdout.strip()}
-    return {"commit": "unknown"}
+    return build_info(APP_DIR) or {"commit": "unknown"}
 
 
 def may_download_logs(ip: str | None, key: str | None) -> bool:
@@ -594,6 +602,14 @@ def set_moves_file(path: Path):
     MOVE_SAVES = path.parent / "move_saves"
 
 
+def set_data_dir(path: Path):
+    """--data-dir: the saved rules and the session logs go there instead of next to the app."""
+    global DATA_DIR, RULES_FILE
+    path.mkdir(parents=True, exist_ok=True)
+    DATA_DIR = path
+    RULES_FILE = path / "saved_rules.json"
+
+
 def main():
     global port, save_rules, save_moves, own_ips, VERSION
     parser = argparse.ArgumentParser(description="Dodgeball LAN server")
@@ -603,12 +619,16 @@ def main():
     parser.add_argument("--fresh", action="store_true",
                         help="start with the default rules, don't save rule changes and don't log (for tests)")
     parser.add_argument("--no-log", action="store_true", help="don't write a session log")
-    parser.add_argument("--log-dir", help="where session logs go (default: logs next to the app); logs even with --fresh")
+    parser.add_argument("--data-dir", help="where the saved rules (saved_rules.json) and the session logs (logs/) go "
+                        "(default: next to the app; the Docker image uses /data)")
+    parser.add_argument("--log-dir", help="where session logs go (default: logs in the data folder); logs even with --fresh")
     parser.add_argument("--moves-file", help="the file the moves page saves the moves placed by hand into (default: "
                         "static/characters/made_moves.json; the files it replaces go into move_saves/ next to it); "
                         "saves even with --fresh (for tests)")
     args = parser.parse_args()
     port = args.port or first_free_port(args.host, 8000)
+    if args.data_dir:
+        set_data_dir(Path(args.data_dir).resolve())
     save_rules = not args.fresh
     if args.moves_file:
         set_moves_file(Path(args.moves_file).resolve())
@@ -634,7 +654,7 @@ def main():
         load_saved_rules()
     if not args.no_log and (args.log_dir or not args.fresh):
         try:
-            start_logging(Path(args.log_dir).resolve() if args.log_dir else APP_DIR / "logs", args)
+            start_logging(Path(args.log_dir).resolve() if args.log_dir else DATA_DIR / "logs", args)
             print(f"  This session is logged to {session_log.dir}")
             print("  Afterwards, in the game: Esc > Download all logs, and send that zip.\n")
         except OSError as e:

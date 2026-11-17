@@ -1,0 +1,40 @@
+# Dodgeball's server with Docker Compose (docs/SERVER.md explains it all).
+#
+# First start, and every update afterwards, from this folder:
+#   git pull
+#   DODGEBALL_VERSION=$(git describe --tags --always --dirty) docker compose up -d --build
+# Stop it (players are cut off at once; the saved rules and logs stay): docker compose stop
+# What it prints (joins, the host link, errors):                         docker compose logs -f
+services:
+  dodgeball:
+    build:
+      context: .
+      args:
+        VERSION: ${DODGEBALL_VERSION:-unknown}     # shown in the session logs as the build
+    image: dodgeball
+    restart: unless-stopped
+    init: true                                     # stops at once on `docker compose stop`
+    ports:
+      # Only this machine can reach the game: the HTTPS proxy (and its login) in front of it sends
+      # players here. "8000:8000" would let anyone on the internet past the login, and Docker's
+      # published ports skip firewalls like ufw.
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Which proxies may tell the game a player's real address (the X-Forwarded-For header). The
+      # address decides who is the host (docs/SERVER.md), so trust only the proxy: its connections
+      # come from Docker's own networks. "*" would take a forged header from a player at its word.
+      FORWARDED_ALLOW_IPS: "127.0.0.1,::1,172.16.0.0/12"
+    volumes:
+      - dodgeball-data:/data                       # the host's saved rules and the session logs
+    logging:                                       # what it prints, kept to 3 x 10 MB
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Light: about 0.4 of a CPU core and 180 MB of memory with eight players and four bots.
+    # deploy:
+    #   resources:
+    #     limits: {cpus: "2", memory: 512M}
+
+volumes:
+  dodgeball-data:

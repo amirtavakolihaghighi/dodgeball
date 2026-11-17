@@ -1,0 +1,38 @@
+# What the Docker image leaves out: it needs the server, the files it serves (static/) and the
+# moves page's list (docs/ANIMATIONS.md), nothing else.
+
+# Local and personal: environments, the host's saved rules, session logs, collected office logs
+.venv/
+**/__pycache__/
+*.pyc
+saved_rules.json
+logs/
+testlog/
+move_saves/
+build_info.json
+
+# Git, CI and builds of the Windows app
+.git/
+.github/
+build/
+dist/
+*.bat
+build_exe.py
+requirements-build.*
+icon.ico
+
+# Not needed to run: the tests and their pictures, the Blender and sound scripts and their output,
+# the docs (all but the moves page's list)
+tests/
+/*.png
+art/
+docs/*
+!docs/ANIMATIONS.md
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

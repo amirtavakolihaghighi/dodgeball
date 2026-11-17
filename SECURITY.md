@@ -27,7 +27,8 @@ Fixes go into the next release; only the latest release is supported.
   like a password for the evening.
 - Traffic is **plain HTTP and WebSocket, not encrypted**. Anyone on the same network can read
   it: player names, inputs and the game state.
-- **Files it writes**, next to the app (or `server.py`):
+- **Files it writes**, next to the app (or `server.py`), or in the folder given with `--data-dir`
+  (the Docker image's `/data`):
   - `saved_rules.json`: the host's game rules, the host's bots and flags, and each player's own
     settings under their key (see below) with the name they last played under;
   - `logs/`: one folder per run (the 30 newest are kept) with the server's numbers and every
@@ -75,5 +76,13 @@ release lists the SHA-256 checksum of its zip.
 - Cheating with a modified browser.
 - Anyone who gets the host link, or who can use the host's computer (and read its log folder).
 
-**Don't expose the game to the internet** (no port forwarding, no public cloud server). It is
-made for a room full of people you know.
+**Don't expose the game to the internet as it is** (no port forwarding, no public server with
+its port open). It is made for a room full of people you know.
+
+**On a server**, run it behind an HTTPS reverse proxy that asks for a login, with the game's port
+reachable only by that proxy: `Dockerfile` and `compose.yaml` do the second part, and
+[docs/SERVER.md](docs/SERVER.md) explains the rest. There, the host is a browser whose address
+the proxy reports as the server itself (`127.0.0.1`, through `X-Forwarded-For` from the
+addresses in `FORWARDED_ALLOW_IPS`), or one with the host link. So the proxy must write each
+player's real address in `X-Forwarded-For`, never pass on one the browser sent. The image runs as
+a user without rights who can write only to its data volume (the saved rules and the logs).

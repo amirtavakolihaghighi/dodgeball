@@ -18,8 +18,11 @@ saved_rules.json
 logs/
 move_saves/
 
-# Written by build_exe.py during a build
+# Written by build_exe.py during a build (and inside the Docker image)
 build_info.json
+
+# A server's own Docker Compose settings (its proxy's network, say), next to compose.yaml
+compose.override.yaml
 
 # Session logs collected from play sessions: players' names and LAN addresses
 /testlog/

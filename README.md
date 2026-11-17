@@ -86,6 +86,12 @@ On Windows you can double-click `run.bat` instead: it sets everything up the fir
 time. On macOS and Linux, use `python3` if `python` isn't found. `--port 8080` picks the port
 (the default is 8000, or the next free one), and `--no-browser` doesn't open a browser.
 
+### On a server, with Docker
+
+To play over the internet, run the game on a server behind an HTTPS proxy that asks for a login:
+the game has no accounts of its own. `Dockerfile` and `compose.yaml` build and run it, and
+[docs/SERVER.md](docs/SERVER.md) covers setting it up, updating it and who becomes the host.
+
 ## How a game goes
 
 1. **The host sets up the lobby.** The browser on the hosting computer is the host. Press **Esc**
@@ -128,9 +134,11 @@ You need a keyboard and mouse: there are no touch controls yet.
 
 ## Safety and privacy
 
-- **For your local network only.** The game listens on TCP port 8000 (up to 8019 if that's busy)
-  on all of the computer's network connections. There are no passwords: anyone who can reach that
-  address can join. Don't expose it to the internet or run it on a network you don't trust.
+- **For your local network, or behind a login.** The game listens on TCP port 8000 (up to 8019
+  if that's busy) on all of the computer's network connections. There are no passwords: anyone
+  who can reach that address can join. Don't expose it to the internet as it is, or run it on a
+  network you don't trust. On a server, put it behind an HTTPS proxy with a login
+  ([docs/SERVER.md](docs/SERVER.md)).
 - **The host link** printed in the game's window (`...?host=...`) gives whoever opens it the
   host's controls. Don't share it.
 - **Nothing goes to the internet.** The game makes no internet connections, and three.js is
@@ -158,6 +166,8 @@ The full threat model, and how to report a vulnerability privately, is in [SECUR
   architecture and the network protocol.
 - [docs/LAG_ANALYSIS.md](docs/LAG_ANALYSIS.md): what the office sessions' logs showed about lag,
   and what was done about it.
+- [docs/SERVER.md](docs/SERVER.md): running the game on a server with Docker, behind a login:
+  the first start, updates, who becomes the host, the data and the logs.
 - [docs/LOOK_AND_FEEL.md](docs/LOOK_AND_FEEL.md): how the hall, the athletes, the effects and the
   sound were made (in Blender, from CC0 sources), and [docs/ANIMATIONS.md](docs/ANIMATIONS.md):
   every move the athletes make.
