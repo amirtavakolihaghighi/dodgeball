@@ -18,8 +18,12 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
   - Undo, Redo, Back to saved, and Save, which works on the computer the game runs on (from its source folder). Each save keeps the file it replaces, and unsaved changes are offered back next time.
 - **A note while the game loads:** the join screen says the sports hall and the characters are still loading (you can join already, and play on a plain court with stick figures until they're ready), and so does the line under the score bar.
 - **The session log notes every press that reached the host past the lag compensation limit** (it then counts a little later than it was made), and the log report counts them under FAIRNESS.
+- **The incoming-ball meter** (Esc › Your settings › Incoming-ball marker, the new default): an arc around the crosshair on the side a ball comes from, pointing at it, growing longer and thicker as it comes. Its three stripes are your defences, outer dodge (blue), middle catch (green), inner deflect (pink): each lights up when pressing it would work, by your own timings, and turns gold at its perfect moment. Its shape (crescent or band), its colours (all three, or one stripe for one defence), its width and its size are yours to set.
+- **R's tile calls for attention when you can use it** (a revive, or with team health a health pack): it pops up, then glows gold and shines until you can't any more.
 
 ### Changed
+
+- **H switches the incoming-ball marker** between Meter, Ring (the circle that was there before) and Off, and the menu has the same three. If you had the ring turned off, it stays off.
 
 - The moves made by hand moved out of the code into a file of their own, `static/characters/made_moves.json`, which the editor saves. They play exactly as before: every step of every move was compared before and after.
 - **Auto graphics tries a sharper picture only in the lobby,** never during a match: between rounds a level could look fine and then fail a few seconds into the next round. It also judges nothing until the game has loaded.

@@ -74,10 +74,19 @@ const lobby = new Lobby(net, {
 });
 editor.onMessage = (text, cls) => hud.popup(text, cls);
 
-const settings = { sens: 1, volume: 0.6, ring: true, follow: true, graphics: 'auto', shake: 1, incoming: 'whoosh' };
+// marker: the incoming-ball marker, 'meter' (an arc on the ball's side), 'ring' (the first one: a
+// ring around the crosshair) or 'off'; the meter's look is each player's own (hud.js setMeter).
+const settings = {
+  sens: 1, volume: 0.6, follow: true, graphics: 'auto', shake: 1, incoming: 'whoosh',
+  marker: 'meter', meterShape: 'crescent', meterWidth: 24, meterSize: 150, meterColours: 'all',
+};
 try {
-  Object.assign(settings, JSON.parse(localStorage.getItem('dp.settings') || '{}'));
+  const saved = JSON.parse(localStorage.getItem('dp.settings') || '{}');
+  Object.assign(settings, saved);
+  if (saved.marker === undefined && saved.ring === false) settings.marker = 'off';     // had turned the ring off
 } catch { /* private mode etc: defaults are fine */ }
+const MARKER_NAMES = { meter: 'Meter', ring: 'Ring', off: 'Off' };
+if (!MARKER_NAMES[settings.marker]) settings.marker = 'meter';
 settings.levels = { ...LEVELS, ...settings.levels };     // the volume of each kind of sound
 const saveSettings = () => {
   try { localStorage.setItem('dp.settings', JSON.stringify(settings)); } catch { /* ignore */ }
@@ -351,7 +360,6 @@ input.onLockChange = (locked) => {
 
 $('sensInput').value = settings.sens;
 $('volInput').value = settings.volume;
-$('ringInput').checked = settings.ring;
 $('shakeInput').value = settings.shake;
 $('shakeInput').addEventListener('input', (e) => {
   settings.shake = Number(e.target.value);
@@ -389,7 +397,25 @@ for (const kind of KINDS) {
     saveSettings();
   });
 }
-$('ringInput').addEventListener('change', (e) => { settings.ring = e.target.checked; saveSettings(); });
+// The incoming-ball marker and the meter's look (shape, colours, width, size): each player's own.
+const showMarkerSettings = () => {
+  $('markerSelect').value = settings.marker;
+  $('meterOptions').hidden = settings.marker !== 'meter';
+};
+showMarkerSettings();
+$('markerSelect').addEventListener('change', (e) => {
+  settings.marker = e.target.value;
+  showMarkerSettings();
+  saveSettings();
+});
+for (const [id, key, number] of [['meterShape', 'meterShape'], ['meterColours', 'meterColours'],
+  ['meterWidth', 'meterWidth', true], ['meterSize', 'meterSize', true]]) {
+  $(id).value = settings[key];
+  $(id).addEventListener('input', (e) => {
+    settings[key] = number ? Number(e.target.value) : e.target.value;
+    saveSettings();
+  });
+}
 $('incomingSelect').value = settings.incoming;
 $('incomingSelect').addEventListener('change', (e) => {
   settings.incoming = e.target.value;
@@ -484,11 +510,12 @@ input.onPress = (a, at) => {
     hud.popup('Laggy moment noted in the log. Thanks!', 'dim');
     return;
   }
-  if (a === 'ring') {
-    settings.ring = !settings.ring;
-    $('ringInput').checked = settings.ring;
+  if (a === 'ring') {       // H: the incoming-ball marker, Meter → Ring → Off → Meter
+    const order = Object.keys(MARKER_NAMES);
+    settings.marker = order[(order.indexOf(settings.marker) + 1) % order.length];
+    showMarkerSettings();
     saveSettings();
-    hud.popup(`Timing ring ${settings.ring ? 'on' : 'off'}`, 'dim');
+    hud.popup(`Incoming-ball marker: ${MARKER_NAMES[settings.marker]} (H)`, 'dim');
     return;
   }
   if (watching()) {
@@ -981,8 +1008,23 @@ function findThreat() {
   return best;
 }
 
+/** Which way a ball is from where you face: 0 straight ahead (the top of the screen), positive to
+ *  your right, ±π behind you. */
+function ballBearing(b) {
+  const ux = b.pos.x - local.x;
+  const uz = b.pos.z - local.z;
+  const fwd = ux * Math.sin(local.yaw) + uz * Math.cos(local.yaw);
+  const right = -ux * Math.cos(local.yaw) + uz * Math.sin(local.yaw);
+  return Math.atan2(right, fwd);
+}
+
+/** The incoming-ball marker (Your settings): the meter, the ring, or nothing; the rally count shows
+ *  with all three. */
 function showThreat() {
-  if (!threat || !me?.alive) return hud.setThreat(null);
+  if (!threat || !me?.alive) {
+    hud.setMeter(null);
+    return hud.setThreat(null);
+  }
   const { b, tti } = threat;
   const key = `${b.id}:${b.rally}`;
   if (!warned.has(key) && tti < 0.9) {
@@ -990,22 +1032,19 @@ function showThreat() {
     sfx.incoming(settings.incoming, tti, b.pos);
     if (warned.size > 60) warned.clear();
   }
-  if (!settings.ring) return hud.setThreat(b.rally ? { radius: 0, level: '', arrow: null, text: `RALLY ×${b.rally}` } : null);
+  const rally = b.rally ? `RALLY ×${b.rally}` : '';
+  if (settings.marker !== 'ring') {
+    hud.setThreat(rally ? { radius: 0, level: '', arrow: null, text: rally } : null);
+    return hud.setMeter(settings.marker !== 'meter' ? null : {
+      dir: ballBearing(b), tti, windows: cfg.actions, shape: settings.meterShape, width: settings.meterWidth,
+      size: settings.meterSize, colours: settings.meterColours,
+    });
+  }
+  hud.setMeter(null);
   const radius = 26 + Math.min(tti, 1.2) * 150;
   const s = world.project(b.pos.x, b.pos.y, b.pos.z);
-  let arrow = null;
-  if (!s || Math.hypot(s.x - innerWidth / 2, s.y - innerHeight / 2) > radius) {
-    const ux = b.pos.x - local.x;
-    const uz = b.pos.z - local.z;
-    const fwd = ux * Math.sin(local.yaw) + uz * Math.cos(local.yaw);
-    const right = -ux * Math.cos(local.yaw) + uz * Math.sin(local.yaw);
-    arrow = Math.atan2(right, fwd);
-  }
-  hud.setThreat({
-    radius, arrow,
-    level: tti <= 0.1 ? 'now' : tti <= 0.3 ? 'near' : '',
-    text: b.rally ? `RALLY ×${b.rally}` : '',
-  });
+  const offRing = !s || Math.hypot(s.x - innerWidth / 2, s.y - innerHeight / 2) > radius;
+  hud.setThreat({ radius, arrow: offRing ? ballBearing(b) : null, level: tti <= 0.1 ? 'now' : tti <= 0.3 ? 'near' : '', text: rally });
 }
 
 function sendInput(t) {
@@ -1482,7 +1521,7 @@ requestAnimationFrame(frame);
 // Handle for automated tests and console poking.
 window.dp = {
   net, input, local, aim, world, lobby, editor, rules, diag, graphics, camFx, sfx, placeCamera, computeAim, showMenu, spec, followNext,
-  exportSettings, importSetupText, settingsFile, ownValue, ballColorOf, botsPage,
+  exportSettings, importSetupText, settingsFile, ownValue, ballColorOf, botsPage, hud, settings,
   get hostView() { return hostView; }, get myKey() { return myKey; }, get myName() { return myName; },
   get me() { return me; }, get threat() { return threat; }, get view() { return view; }, get cfg() { return cfg; }, get isHost() { return isHost; },
 };

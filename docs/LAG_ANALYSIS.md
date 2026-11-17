@@ -162,7 +162,7 @@ These change how the game feels. With the new lobby rules editor, they can be tr
 
 | Shortage | What that player notices | What others notice | How to recognize it |
 | --- | --- | --- | --- |
-| **Weak GPU, or Chrome drawing without the GPU** | Low FPS: a choppy picture, sluggish mouse, the timing ring jumps. Presses are still judged fairly, apart from up to one frame of delay | Nothing | Low fps in the corner (~19 fps means no GPU) |
+| **Weak GPU, or Chrome drawing without the GPU** | Low FPS: a choppy picture, sluggish mouse, the incoming-ball marker jumps. Presses are still judged fairly, apart from up to one frame of delay | Nothing | Low fps in the corner (~19 fps means no GPU) |
 | **CPU busy** (Teams, an antivirus scan, many tabs) | Stutters (long frames) | **They see this player teleport**, because position updates go out in bursts | fps dips |
 | **RAM short** | Long stalls when Windows swaps the browser out | The same teleporting, worse | Laptop sluggish overall |
 | **Wi-Fi weak, congested or power saving** | Others and balls **freeze and jump**. "Pressed in time but got hit" once the delay passes 0.25 s. Their own throws appear late | They stutter | Ping (ms in the corner) high or jumpy |

@@ -1351,6 +1351,30 @@ Everything else holds: other players' ball colours and the lobby's "own settings
   - `sound.json` (the out-of-breath panting while tired, stopping after), `lobby_controls.json` (the spectating hints from the new `hintLine`), the smoke test;
   - pictures: the join screen's loading note, the hint line while loading, and the Network preview's red bar and warning at 0.15 s.
 
+### Phase 19: the incoming-ball meter, and an R tile that calls for attention (2026-11-12)
+
+On `main`. **The request:** the circle that warns of a ball coming at you should become three options, "off, current and one new style", because a friend of the user's had found it not visible enough, and small. The new style: "like a detection meter" (a picture of a stealth game's, which the user put in `logs/` for Claude to see and then delete). "The shape expands to show incoming ball, with noticeable width, put options that each player can customize the shape and width. It changes color when you should catch/parry/dodge or perfect version of each." And: "when you are able to revive or add health, the button should have animation and effect that catches attention." Asked how the colours should work, the user chose three stripes, one for each defence; asked where to build it, `main`.
+
+**Built** (decisions 164–166):
+
+1. **The incoming-ball marker** is a setting now (Esc › Your settings, and H in the game): **Meter** (the default), **Ring** (the old one, unchanged) or **Off**. H goes Meter → Ring → Off and says which. A browser that had the ring switched off starts on Off.
+2. **The meter:** an arc on the ball's side of the crosshair (a ball ahead at the top, behind at the bottom), with a pointer at its middle. Over the ball's last 1.2 s it grows from 18° to 112° around the crosshair and from 60% to 100% of its width, and its grey brightens. Three stripes: outer dodge (blue), middle catch (green), inner deflect (pink). Each lights in its colour from the moment pressing it would work, by the player's own windows (by default dodge 0.32 s before the ball arrives, catch 0.30 s, deflect 0.18 s), and turns gold at its perfect moment (0.12, 0.10 and 0.06 s). The glow and the pointer take the colour of the latest defence to light, and gold once any is perfect. A dark edge and backing keep it readable on any background: in the first test picture the blue stripe vanished against the windows' sky and the green one against the hills.
+3. **The meter's own settings,** shown under the marker setting while the meter is chosen and saved in the browser like the others: Shape (Crescent, with pointed ends, or Band, even), Colours (all three defences as stripes, or one stripe for one defence: Dodge only, Catch only or Deflect only), Width (6–36 px, 24 by default; the first try's 18 px left each stripe about 5 px thick) and Size (80–260 px from the crosshair, 150 by default).
+4. **R's tile, while R can be used** (a teammate down and the cash to revive them, or with team health the bar below full and the cash for a pack): it pops up once (to 122% and back in 0.45 s), then pulses with a gold glow every 1.1 s while a shine sweeps across it every 2.2 s, and its name turns gold. It goes back to normal as soon as R can't be used.
+
+**How:** `index.html`'s `#meter` is an SVG over the crosshair (the glow, the dark edge, three stripes and the pointer), drawn by `hud.js setMeter` from `main.js showThreat`. It shows the same ball as the ring (`findThreat`), on its side (`ballBearing`). `hud.js meterLook(tti, windows, colours)` says what each stripe shows. The tile's effect is CSS (`.act.ready`, and `.act.ready.pop` for the first moment), switched by `hud.setActions` when `canSpend` changes.
+
+**Tests:**
+
+- `marker.json` + `marker.js` (new), with checks that fail the run:
+  - the settings: the defaults, the meter's options shown only with the meter, H going Meter → Ring → Off with its message, the width saved;
+  - what the meter shows at exact moments by the default windows: 0.50 s before the ball arrives all three early, 0.31 s dodge, 0.25 s dodge and catch, 0.15 s all three, 0.11 s dodge perfect, 0.08 s catch perfect too, 0.05 s all perfect; catch alone lit at 0.20 s and perfect at 0.09 s;
+  - how it's drawn: the three stripes in order, the pointer at 0° for a ball ahead, 90° on the right and 180° behind, the size setting placing it, 26° around the crosshair 1.1 s out against 112° as the ball arrives, the dark edge, the band's three stripes;
+  - in a match against three hard bots: for every one of 88 frames with a ball coming at the player the meter was shown, pointing within 0.0° of the ball, in all five colours over the 15 s;
+  - R's tile: ready and popping only while usable, back to normal after; in the match, with free health packs and the team bar at 130 of 200, the real tile ready;
+  - pictures: the meter at 16 moments at its real size (both shapes, one colour), R's tile over 1.5 s (the pop, the glow, the shine), the meter in the match, and the settings with the meter and with the ring.
+- The other suites, with no page error: the smoke test; `lobby_controls.json` (watching, the hints as before); `team_health.json` (R buying a pack at 133 of 200, the wipe); `sound.json` (the incoming-ball whoosh 10 times in its match, so `showThreat` still plays it); `juice.json`; the auto-defender, catching: 18 of 19 balls defended, 17 perfect, no hit.
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -1513,6 +1537,9 @@ Everything else holds: other players' ball colours and the lobby's "own settings
 | 161 | The lag compensation limit warns, in its description and with a red bar in its preview, when it's less than 0.1 s above the view delay; the value stays the host's | U | "Fix all these". Claude's advice to the host: back to 0.25 unless 0.15 was on purpose |
 | 162 | Auto graphics steps up only in the lobby and judges nothing until the game has loaded, nor for 3 s after; the join screen and the hint line say when the game is still loading | U | "Fix all these": Claude's options (a) and (b) for Auto, and the loading note |
 | 163 | Everything a player keeps goes by their key, the team they come back to after watching included; each player's moves are drawn to their own timings (`movesTiming` → `man.timing`), the moves page to its own (`world.timing`) | U | "Check to see if changes in v2.3.0 might have caused other bugs": the two found were fixed. How: C; the moves page proven unchanged by its fingerprints |
+| 164 | The incoming-ball marker is each player's choice, in Your settings and with H: the meter (the default), the ring as before, or off. The meter is an arc on the ball's side that grows as the ball comes, with its own shape (crescent or band), width (24 px by default) and size (150 px from the crosshair) | U | "I want it to have three options: off, current and one new style", a detection meter "with noticeable width", its shape and width each player's to change; a friend had found the ring hard to see, and small. The meter as the default, the size setting and the dark edge: C |
+| 165 | The meter's colours: three stripes, outer dodge, middle catch, inner deflect, each lit in its colour while pressing it would work (by the player's own windows) and gold at its perfect moment; or one stripe for one defence | U | "It changes color when you should catch/parry/dodge or perfect version of each." The user chose the stripes from Claude's two options; the single stripe stays as a setting, the user's standing preference for two good designs |
+| 166 | R's tile calls for attention while R can be used (a revive, or a team health pack): it pops up, then pulses with a gold glow and a passing shine | U | "When you are able to revive or add health, the button should have animation and effect that catches attention." The effect: C |
 
 ## 6. Current features
 
@@ -1561,10 +1588,10 @@ Everything else holds: other players' ball colours and the lobby's "own settings
 - **HUD:**
   - HP and stamina bars, with a cost preview on the stamina bar while charging.
   - A throw box (ball ready, cooldown, or speed/damage/cost while charging).
-  - Action costs; team scores with alive pips (and, with team health, each team's bar); round timer; kill feed.
-  - Name tags with HP and stamina; the aim-assist marker; the timing ring with a direction arrow.
+  - Action costs (R's tile pops up and pulses gold while R can be used); team scores with alive pips (and, with team health, each team's bar); round timer; kill feed.
+  - Name tags with HP and stamina; the aim-assist marker; the incoming-ball marker: the meter (an arc on the ball's side that grows as it comes and lights for each defence), the ring with a direction arrow, or off.
   - Popups (including "Still recovering" when a press comes during a recovery, and why a hit got through: "TOO EARLY (0.05 s)" or "SECOND BALL"); gold and red screen flashes; a Tab scoreboard; a hint line in the lobby; a line saying what the host is doing.
-  - An Esc menu that doubles as the lobby: teams, match settings, the rules editor, your own settings (sensitivity, volume, ring, graphics), controls and join addresses.
+  - An Esc menu that doubles as the lobby: teams, match settings, the rules editor, your own settings (sensitivity, volume, the incoming-ball marker, graphics), controls and join addresses.
 - **A graphics setting** for each player: Auto (default), High, Medium, Low. Auto steps down when the frame rate stays low and undoes a step that doesn't help; the host's Auto stays at Medium or lower. A warning on the join screen and in the menu when the browser draws without the graphics card.
 - Every effect's shader is built while the game loads, so nothing freezes the picture the first time it appears.
 - **Juice:** an impact freeze on the hit player, specks of light from impacts, balls that stretch with speed and spin (seams), and a camera that shakes, jolts and zooms while charging. Screen shake is each player's own setting, and none of it moves the aim.
@@ -1766,7 +1793,7 @@ These are the **defaults**, all in `config.py`. The host can change any of them 
   - A ball that becomes pending between snapshots **arrives at full speed at the true contact moment**.
   - Balls removed between snapshots keep flying until they vanish.
 - **Convergence:** balls within 4 m of you are shifted onto your *present* position, weighted `w = 1 − d/4`. The server judged them against where it last knew you, and that offset is how far your browser is ahead. **Only while sidestep compensation is off:** with it on, the server judges against your screen, so balls are drawn where they are.
-- **Threat detection** (the timing ring and incoming warning) predicts the time to impact for enemy balls:
+- **Threat detection** (the incoming-ball marker and sound) predicts the time to impact for enemy balls:
   - The horizontal closest approach, plus a gravity height check.
   - Balls homing on you always count. Balls homing on someone else count if they'd pass within the hit radius (0.62 m) plus 0.6 m. Free-flying balls count only within the hit radius plus 0.15 m.
   - A ball you've already pressed for is skipped, so the next one shows.
@@ -2217,7 +2244,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **`Trail`:** a camera-facing ribbon with vertex alpha. Life is 0.09 s for normal balls and 0.35 + 0.12 × rally s for deflected ones; old trails keep fading after their ball is gone.
 - **`BallView`:** its thrower's colour (`b.color`) until deflected, then the rally colours; glow, trail, ghosts every 0.035 s when rally ≥ 1, and a height-scaled shadow. A figure's held ball takes its `ballColor`.
 
-**`hud.js`:** DOM updates only when values change; names always go in via `textContent`. The timing ring radius is 26 + 150 × time-to-impact px, with "near" at ≤ 0.3 s and "now" at ≤ 0.1 s.
+**`hud.js`:** DOM updates only when values change; names always go in via `textContent`. The incoming-ball meter (`setMeter`, `meterLook`) sits `meterSize` px from the crosshair (150), and over the ball's last 1.2 s grows from 18° to 112° around it and from 60% to 100% of `meterWidth` (24 px); each stripe lights from its defence's window to its perfect moment. The ring's radius is 26 + 150 × time-to-impact px, with "near" at ≤ 0.3 s and "now" at ≤ 0.1 s.
 
 **`input.js`:** bindings, pointer lock (`?nolock` bypasses it for tests), and everything released on blur, visibility change or loss of the lock. Releasing on blur cancels a wind-up instead of throwing. `onPress(action, at)` and `onRelease(action, at)` pass when the key or button really went down (`eventTime`: the event's `timeStamp`, or now if it's missing, in the future or over 1 s old).
 
@@ -2246,9 +2273,9 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 | Space / Shift | Dodge |
 | Right mouse / F | Catch |
 | E | Deflect |
-| R | Revive |
+| R | Revive, or with team health a health pack |
 | Tab | Scoreboard |
-| H | Toggle the timing ring |
+| H | The incoming-ball marker: Meter → Ring → Off |
 | Esc | The lobby / pause menu (the host's controls are here) |
 | L | Marks "this feels laggy" in the session log |
 | Spectating (host) | Mouse look, WASD fly, Space/Shift up/down, LMB/RMB follow the next/previous player |
@@ -2388,6 +2415,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
 - **The sidestep test** (`sidestep.json` + `sidestep.js`, with `&lag=150`, and `&comp=0` for compensation off) walks out of every incoming ball's path and counts balls sidestepped, hits, and hits while clear on screen. Re-run it after touching sidestep compensation, position reports or the pending logic.
 - **The why-hit test** (`why_hit.json` + `why_hit.js`) plays against three hard bots and deflects every other ball about 0.27 s too early. Healthy: the hits marked `early` or `second` and the TOO EARLY and SECOND BALL popups on screen match one for one. Re-run it after touching the hit marks or the hit popup.
 - **The team-health test** (`team_health.json`): the bars, R buying a pack, the time limit by share of the bar, and a team wipe. Re-run it after touching team health.
+- **The marker test** (`marker.json` + `marker.js`): the incoming-ball marker's settings and H, what the meter shows at exact moments by the default windows, how it's drawn (stripes, colours, pointer, size, growing, the dark edge), R's tile (ready only while usable), and in a match against three hard bots the meter shown for every ball coming at you, pointing at it. It takes pictures of the meter at 16 moments and of the tile over 1.5 s. Re-run it after touching the incoming-ball marker (`hud.js setMeter` and `meterLook`, `main.js showThreat`, its settings) or the tile's effect.
 - **The regeneration test** (`regen.json` + `regen.js`): the round-time buttons, both regeneration previews, and a player's health and a team bar sampled ten times a second (the pause after each hit, the speed, where it stops) with the limit markers. Re-run it after touching regeneration or the round-time buttons.
 - **The standing-still test** (`still.json` + `still.js`): with a bot that hits for 40 every 20 s, holds keys like a player through standing, walking and two kinds of dodge, and checks what each part regains and the hint, for a player and a team bar. Re-run it after touching standing still.
 - **The own-settings test** (`own_settings.json` + `own_settings.js`): a bot's and a person's own settings through the ⚙ pages, the ball colours editor, export → reset → import, a profile moved between bots, wrong files, the colour every ball in flight is drawn in, the health bars over the heads of bots with 300 health of their own (their health over their own 300, not everyone's 100), and a bot's moves drawn to its own timings (its own 0.6 s catch window: a catch drawn for 0.85 s, the others' 0.55 s). Re-run it after touching players' own settings, the name tags, how a figure's moves are timed (`movesTiming`, `timingOf`), the ball colours or the settings files.
@@ -2585,7 +2613,7 @@ print(lengths, g.score, dict(counts))
 - **Own settings follow a browser:** a person who comes back on another computer, another browser or in a private window is someone new to the game; the host gives them their settings again. Settings from older files go to the first person with that name.
 - **A flag can't set a value back to everyone's:** on a bot's ⚙ page, an own value equal to everyone's counts as no own setting, so the flag's value stays; take the flag off instead.
 - **Uneven teams stay uneven:** 2 bots against 4 lose nearly every round, and team health with a fixed bar hardly changes that (the bigger team throws twice as many balls). Players' own settings (more health, say) are the tool for it.
-- **Untested on a real GPU:** visual tuning (afterimage density, trail lengths, ring sizes) was judged from headless screenshots.
+- **Untested on a real GPU:** visual tuning (afterimage density, trail lengths, the ring's and the meter's sizes) was judged from headless screenshots.
 - **The standalone app is Windows-only and unsigned**, so SmartScreen warns and antivirus may flag it.
 - **Phones/touch:** none yet. The user deferred them.
 
@@ -2596,7 +2624,7 @@ print(lengths, g.score, dict(counts))
    - **Stage 2, the editor** for the moves placed by hand ("Edit this move" on that page): built 2026-11-04 (phase 17), waiting for the user to try it. Their numbers are in `static/characters/made_moves.json` now, proven identical.
    - Then `docs/ANIMATIONS.md`, one move at a time: the user tries a move, Claude fixes only that one (or the user fixes it in the editor), and an approved move is locked (and checked by the moves test). Start with the mistakes the user found with the viewer. Already found: in a match the parry and the catch fall short of their keys (phase 17).
 2. **The HUD and menus** in the new look (the look-and-feel plan's step 9): not started.
-3. **The lobby batch of v2.3.0, tested by the user** (names, renaming, same names, the search, bots with flags): built and tested by Claude, not yet by the user.
+3. **Tested by the user:** the lobby batch of v2.3.0 (names, renaming, same names, the search, bots with flags), and the incoming-ball meter and R's tile (phase 19): built and tested by Claude, not yet by the user.
 4. **Internet mode:** on its own branch, waiting for the user's friend to test it on a cloud server (phase 14).
 
 **Ideas, not started:**
@@ -2634,7 +2662,9 @@ print(lengths, g.score, dict(counts))
 | **Pending** | A ball touching a player with no active defence, frozen briefly to wait for a late press |
 | **tp** | Teleport counter. The server bumps it on spawn/revive; client inputs with an old `tp` are ignored |
 | **Convergence** | Shifting balls near you onto your present position for display |
-| **Handled ball** | A ball you already pressed for; the timing ring skips it to show the next one |
+| **Handled ball** | A ball you already pressed for; the incoming-ball marker skips it to show the next one |
+| **Incoming-ball marker** | What shows a ball coming at you (Your settings, H): the meter (the default), the ring around the crosshair (the first one, once called the timing ring), or off |
+| **Meter** | The incoming-ball marker's default: an arc on the ball's side of the crosshair that grows as it comes, with a stripe for each defence lit while pressing it would work and gold at its perfect moment |
 | **Afterimage (rule)** | During a dodge, a ball reaching the dodge's start point counts as dodged |
 | **Bots per team** | `BOTS_RED` / `BOTS_BLUE`: set by the host, never balanced automatically (replaced "fill") |
 | **Spectating / WATCHING** | The host watching instead of playing: team −1, not alive, free or follow camera |

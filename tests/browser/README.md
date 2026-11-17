@@ -153,6 +153,22 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\why_hit.
 
 `why_hit.js` plays alone against three hard bots, with free deflects and no lockout, and deflects every other incoming ball about 0.27 s too early (the rest on time). It prints the presses, the hits, how many hits the server marked `early` ("TOO EARLY") or `second` ("SECOND BALL"), and how many of those popups appeared on screen. Healthy: the marked hits and the popups match one for one (measured: 10 hits, 6 too early and 3 second ball, and the same 6 + 3 popups).
 
+## The incoming-ball marker and R's tile
+
+```powershell
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\marker.json
+```
+
+`marker.json` (+ `marker.js`) clears the browser's saved settings first (an earlier run may have kept its own), then checks, each check printing `FAIL` if it doesn't hold:
+
+- the settings: Meter, crescent, all three colours, width 24 and size 150 by default; the meter's options shown only while the meter is chosen; H going Meter → Ring → Off with its message; the width saved;
+- what the meter shows at exact moments by the default windows (`__meterLook`): 0.50 s before the ball arrives all three early, 0.31 s dodge lit, 0.25 s catch too, 0.15 s all three, 0.11 s dodge perfect, 0.08 s catch perfect too, 0.05 s all three perfect; catch alone lit at 0.20 s and perfect at 0.09 s;
+- how it's drawn (`__meterDraw`): the three stripes in order, the pointer at 0° for a ball ahead, 90° on the right and 180° behind, the size setting placing it, growing from 26° around the crosshair 1.1 s out to 112° as the ball arrives, the dark edge, the band;
+- R's tile (`__reviveTile`): `ready` and `pop` only while R can be used, and their animations; then, in a match, the real tile ready once the team bar is down and the packs are free;
+- a match against three hard BLUE bots with free health packs (`__meterMatch`, 15 s): for every frame with a ball coming at you the meter is shown and points at it (measured: 88 frames, within 0.0°, all five colours seen).
+
+Pictures: `marker_meter_gallery.png` (the meter at 16 moments, at its real size: both shapes, and one colour), `marker_tile_1.png` to `_6.png` (the tile over 1.5 s: the pop, the glow, the shine), `marker_revive_ready.png`, `marker_meter_match.png`.
+
 ## Graphics, presses timed from their key, effects prepared in advance
 
 ```powershell

@@ -113,7 +113,7 @@ time. On macOS and Linux, use `python3` if `python` isn't found. `--port 8080` p
 | Right mouse or F | **catch**: the ball becomes yours |
 | E | **deflect**: tighter timing, sends the ball straight back, faster |
 | R | revive a teammate, or with team health buy health for the team (costs cash) |
-| Tab / H / Esc | scores / timing ring on or off / the lobby menu |
+| Tab / H / Esc | scores / incoming-ball marker: Meter, Ring or Off / the lobby menu |
 | L | "this feels laggy": marks the moment in the session log |
 
 You need a keyboard and mouse: there are no touch controls yet.

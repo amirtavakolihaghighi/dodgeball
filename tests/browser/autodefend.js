@@ -1,5 +1,5 @@
 // Injected into the game page: presses a defence key ~80 ms before each incoming ball would
-// hit (using the same threat detection that drives the timing ring), and records why any
+// hit (using the same threat detection that drives the incoming-ball marker), and records why any
 // hit got through. Measures the whole timing path: client prediction -> key press -> server
 // lag-compensated judgement -> event back. Mode comes from the URL: ?mode=catch|deflect|dodge.
 // Read the results with __report().

@@ -153,7 +153,7 @@ Each player picks their own in the menu (Esc), under **Your settings › Graphic
   - It judges nothing while the game is still loading: the picture stutters then whatever the level.
   - On the host's computer, which also runs the server, Auto stays at Medium or lower. Pick High there to override it.
 - **The top-right corner** shows the level next to the frame rate, for example "1 ms · 60 fps · Medium". Low softens only the 3D picture: names, bars and the crosshair stay sharp.
-- **Nothing that matters for play changes** with the setting: the balls, their trails, the timing ring and the throw preview look the same on every level, so a low setting is never a disadvantage.
+- **Nothing that matters for play changes** with the setting: the balls, their trails, the incoming-ball marker and the throw preview look the same on every level, so a low setting is never a disadvantage.
 - **Without the graphics card:** when the browser draws the game in software, the game runs at about 19 frames a second. The join screen and the menu then show a warning. The fix: in Chrome or Edge, open Settings › System, switch on "Use graphics acceleration when available", and restart the browser. Auto starts at Low there meanwhile.
 - **Presses are timed from the key itself.** A slow laptop can handle a key press up to a frame late (50 ms at 20 frames a second), but the server is told when the key really went down.
 - **Every effect is prepared while the game loads,** so nothing freezes the picture the first time it appears in a match.
@@ -166,7 +166,18 @@ Each player picks their own in the menu (Esc), under **Your settings › Graphic
 - **The ball** is grippy rubber with a bright edge in its colour, so you can pick it out against the colourful hall.
 - **Balls stretch along their flight when they're fast** (up to 30% longer) and spin; their seams show the spin.
 - **The camera** shakes when you're hit (harder for a knockout) and when a ball ricochets near you. It jolts when you throw (harder throws kick more), catch or deflect, punches in on a perfect press and on your own hits, and zooms in a little while you charge a throw.
-- **Esc › Your settings › Screen shake** scales all of that camera motion; all the way left turns it off. It only moves the picture: your aim, the crosshair's target and the timing ring never move with it.
+- **Esc › Your settings › Screen shake** scales all of that camera motion; all the way left turns it off. It only moves the picture: your aim, the crosshair's target and the incoming-ball marker never move with it.
+
+## A ball coming at you
+
+**Esc › Your settings › Incoming-ball marker** (or H in the game) picks how a ball coming at you is shown:
+
+- **Meter** (the default): an arc around the crosshair on the side the ball comes from (ahead of you at the top, behind you at the bottom), pointing at it. It grows longer and thicker as the ball comes. Its three stripes are your three defences: the outer one dodge (blue), the middle one catch (green), the inner one deflect (pink). A stripe lights up in its colour when pressing that defence would work, and turns gold at its perfect moment. With the usual timings they light from the outside in, and turn gold in the same order. The timings are your own: if the host gave you a longer catch window, your green stripe lights earlier.
+  - **Shape:** Crescent (pointed ends) or Band (even all along).
+  - **Colours:** all three defences as stripes, or one stripe for the defence you use: Dodge only, Catch only or Deflect only.
+  - **Width,** and **Size**: how far from the crosshair it sits.
+- **Ring:** the first marker, a circle that closes in on the crosshair, orange when the ball is near and gold at the moment to press, with an arrow towards a ball outside it.
+- **Off.**
 
 ## Sound
 
@@ -196,8 +207,8 @@ Each player picks their own in the menu (Esc), under **Your settings › Graphic
 | Space or Shift | **dodge**: a dash you can't be hit during |
 | Right mouse or F | **catch**: the ball becomes yours, so you can throw right away |
 | E | **deflect**: tighter timing, returns the ball instantly and faster |
-| R | revive a fallen teammate (costs cash); with team health on, buy health for your team's bar |
-| Tab / H / Esc | scoreboard / toggle timing ring / the lobby menu |
+| R | revive a fallen teammate (costs cash); with team health on, buy health for your team's bar. Its tile glows gold whenever you can |
+| Tab / H / Esc | scoreboard / the incoming-ball marker: Meter, Ring or Off / the lobby menu |
 | L | something feels laggy right now: marks the moment in the log |
 | Spectating (host) | mouse look, W A S D fly, Space / Shift up / down, left / right click follow the next / previous player |
 

@@ -3,7 +3,7 @@
 //
 // Fairness: main.js applies all of this after the aim has been worked out, and only to the
 // picture: the next frame places the camera afresh. Shaking never moves where a throw goes, or
-// which ball the timing ring follows.
+// which ball the incoming-ball marker follows.
 
 const OMEGA = 18;               // how fast a jolt springs back (rad/s; critically damped)
 const JOLT = OMEGA * Math.E;    // initial speed per metre (or degree) of peak displacement

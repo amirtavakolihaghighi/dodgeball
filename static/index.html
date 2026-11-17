@@ -26,6 +26,12 @@
   <div id="assist"></div>
   <div id="crosshair"></div>
   <div id="ring"><div id="ringArrow"></div></div>
+  <svg id="meter" viewBox="-320 -320 640 640" aria-hidden="true">
+    <path class="halo" fill="none" stroke-width="9" stroke-linejoin="round" stroke-opacity="0.35"></path>
+    <path class="edge" fill="#0a0f1e" fill-opacity="0.6" stroke="#0a0f1e" stroke-width="3.5" stroke-opacity="0.75" stroke-linejoin="round"></path>
+    <path class="stripe"></path><path class="stripe"></path><path class="stripe"></path>
+    <path class="tip" stroke="#0a0f1e" stroke-width="2.5" stroke-opacity="0.75" stroke-linejoin="round" paint-order="stroke"></path>
+  </svg>
   <div id="threatText"></div>
   <div id="popups"></div>
   <div id="banner"><div id="bannerText"></div><div id="bannerSub"></div></div>
@@ -141,7 +147,22 @@
         <p class="note"><a href="/static/moves.html" target="_blank">See every move</a> (opens a new tab)</p>
         <label>Screen shake <input id="shakeInput" type="range" min="0" max="1" step="0.05"
           title="Shake, jolts and the zoom while charging. They move the picture, never your aim. All the way left turns them off."></label>
-        <label class="check"><input id="ringInput" type="checkbox"> Timing ring for incoming balls (H)</label>
+        <label title="Shows a ball coming at you, and when to press. H switches between them in the game">Incoming-ball marker (H)
+          <select id="markerSelect">
+            <option value="meter">Meter: an arc on the ball's side (recommended)</option>
+            <option value="ring">Ring around the crosshair</option>
+            <option value="off">Off</option>
+          </select></label>
+        <div id="meterOptions" class="meterOptions">
+          <label>Shape <select id="meterShape"><option value="crescent">Crescent</option><option value="band">Band</option></select></label>
+          <label title="Each defence's colour when pressing it would work, gold for its perfect moment">Colours
+            <select id="meterColours">
+              <option value="all">All three defences, as stripes</option>
+              <option value="dodge">Dodge only</option><option value="catch">Catch only</option><option value="deflect">Deflect only</option>
+            </select></label>
+          <label>Width <input id="meterWidth" type="range" min="6" max="36" step="1"></label>
+          <label>Size <input id="meterSize" type="range" min="80" max="260" step="5" title="How far from the crosshair it sits"></label>
+        </div>
         <label title="When a ball is less than a second from reaching you">Incoming-ball sound
           <select id="incomingSelect">
             <option value="whoosh">Whoosh from where it comes (recommended)</option>

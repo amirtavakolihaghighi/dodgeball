@@ -1,4 +1,5 @@
-// DOM HUD: bars, round info, name tags, timing ring, popups, kill feed and scoreboard.
+// DOM HUD: bars, round info, name tags, the incoming-ball marker (the meter or the ring), popups,
+// kill feed and scoreboard.
 // Player names only ever go in through textContent.
 
 const $ = (id) => document.getElementById(id);
@@ -20,6 +21,52 @@ function placeLimit(el, limit, full, fromRight = false) {
 
 function setText(el, text) {
   if (el.textContent !== text) el.textContent = text;
+}
+
+// ------------------------------------------------------------------ the incoming-ball meter
+// An arc around the crosshair on the side the ball comes from (up: in front of you, down: behind),
+// with a pointer at its middle, like a stealth game's detection meter. It grows longer, thicker and
+// brighter as the ball comes, and shows when pressing each defence would work (its colour) and its
+// perfect moment (gold), by the player's own windows. "All three": stripes, outer dodge, middle
+// catch, inner deflect, since their windows overlap (dodge 0.32 s, catch 0.30, deflect 0.18).
+
+export const METER_COLOURS = { early: '#e9eef9', dodge: '#6fd0ff', catch: '#5dff9b', deflect: '#ff6bd8', perfect: '#ffc940' };
+const METER_DEFENCES = ['dodge', 'catch', 'deflect'];      // the stripes, outer to inner
+const METER_SPAN = 1.2;     // seconds of the ball's approach it shows (main.js findThreat looks as far)
+const METER_STEPS = 36;     // points along each edge of a stripe
+const METER_SHAPES = {      // a stripe's thickness along the arc (u: -1 .. 1, 0 the middle)
+  crescent: (u) => Math.cos((u * Math.PI) / 2) ** 0.75,          // thick in the middle, pointed ends
+  band: (u) => Math.min(1, (1 - Math.abs(u)) / 0.08) ** 0.5,      // even, with soft ends
+};
+
+/** What the meter shows `tti` seconds before the ball arrives: for each defence shown, 'early'
+ *  (pressing it now would be too early), 'now' (it would work) or 'perfect', and its colour.
+ *  windows: cfg.actions (the player's own); colours: 'all' or one defence. */
+export function meterLook(tti, windows, colours = 'all') {
+  return (colours === 'all' ? METER_DEFENCES : [colours]).map((kind) => {
+    const w = windows[kind];
+    const state = tti <= w.perfect ? 'perfect' : tti <= w.window ? 'now' : 'early';
+    return { kind, state, colour: state === 'now' ? METER_COLOURS[kind] : METER_COLOURS[state] };
+  });
+}
+
+/** SVG path data for the region between radii rIn(u) and rOut(u), u from -1 to 1 along an arc
+ *  centred on `dir` (radians: 0 straight up, clockwise) with half-span `half`. */
+function arcPath(dir, half, rIn, rOut) {
+  const at = (u, r) => {
+    const a = dir + u * half;
+    return `${(Math.sin(a) * r).toFixed(1)} ${(-Math.cos(a) * r).toFixed(1)}`;
+  };
+  let d = '';
+  for (let i = 0; i <= METER_STEPS; i++) {
+    const u = -1 + (2 * i) / METER_STEPS;
+    d += `${i ? 'L' : 'M'}${at(u, rOut(u))}`;
+  }
+  for (let i = METER_STEPS; i >= 0; i--) {
+    const u = -1 + (2 * i) / METER_STEPS;
+    d += `L${at(u, rIn(u))}`;
+  }
+  return `${d}Z`;
 }
 
 export class Hud {
@@ -156,6 +203,10 @@ export class Hud {
     setText(rev.querySelector('span'), !heal ? `${price} cash`
       : cfg.teamHeal.mode === 'pack' ? `+${cfg.teamHeal.amount} · ${price} cash` : `all cash · ${cfg.teamHeal.perCash}/cash`);
     rev.classList.toggle('no', !canSpend);
+    if (!!canSpend !== rev.classList.contains('ready')) {     // R can revive or buy health right now
+      rev.classList.toggle('ready', !!canSpend);
+      rev.classList.toggle('pop', !!canSpend);                 // it pops up each time it becomes usable
+    }
   }
 
   setTags(list) {
@@ -211,6 +262,52 @@ export class Hud {
       arrow.style.transformOrigin = `8px ${t.radius + 12}px`;
       arrow.style.transform = `rotate(${t.arrow}rad)`;
     }
+  }
+
+  /** The meter (Your settings › Incoming-ball marker). m: {dir (radians: 0 the ball ahead, positive
+   *  to your right), tti, windows: cfg.actions, shape, width, size (px from the crosshair),
+   *  colours: 'all' | 'dodge' | 'catch' | 'deflect'}, or null to hide it. */
+  setMeter(m) {
+    const svg = $('meter');
+    if (!m) {
+      if (svg.classList.contains('on')) svg.classList.remove('on');
+      return;
+    }
+    svg.classList.add('on');
+    const near = Math.min(1, Math.max(0, 1 - m.tti / METER_SPAN));     // 0 far away .. 1 arriving
+    const half = ((9 + 47 * near) * Math.PI) / 180;                     // 18° long, growing to 112°
+    const width = m.width * (0.6 + 0.4 * near);
+    const thick = METER_SHAPES[m.shape] ?? METER_SHAPES.crescent;
+    const look = meterLook(m.tti, m.windows, m.colours);
+    const n = look.length;
+    const top = m.size + width / 2;
+    const stripes = svg.querySelectorAll('.stripe');
+    stripes.forEach((el, k) => {          // stripe k: the k-th n-th of the thickness, from the outside
+      const s = look[k];
+      if (!s) {
+        el.setAttribute('d', '');
+        return;
+      }
+      const edge = (u, j) => m.size + width * thick(u) * (0.5 - j / n);
+      const gap = (u) => Math.min(1, ((width * thick(u)) / n) * 0.12);    // a hairline between stripes
+      el.setAttribute('d', arcPath(m.dir, half, (u) => edge(u, k + 1) + (k < n - 1 ? gap(u) : 0),
+        (u) => edge(u, k) - (k > 0 ? gap(u) : 0)));
+      el.setAttribute('fill', s.colour);
+      el.setAttribute('fill-opacity', s.state === 'early' ? (0.35 + 0.45 * near).toFixed(2) : '1');
+    });
+    // the glow and the pointer: gold once any is perfect, else the tightest defence that would work
+    const lit = look.filter((s) => s.state !== 'early');
+    const main = lit.some((s) => s.state === 'perfect') ? METER_COLOURS.perfect : lit.at(-1)?.colour ?? METER_COLOURS.early;
+    const halo = svg.querySelector('.halo');
+    const whole = arcPath(m.dir, half, (u) => m.size - (width * thick(u)) / 2, (u) => m.size + (width * thick(u)) / 2);
+    halo.setAttribute('d', whole);
+    halo.setAttribute('stroke', main);
+    svg.querySelector('.edge').setAttribute('d', whole);       // a dark edge under the stripes: seen on any background
+    const base = Math.max(9, width * 0.85) / 2 / top;                  // the pointer's half-width, as an angle
+    const tip = (a, r) => `${(Math.sin(a) * r).toFixed(1)} ${(-Math.cos(a) * r).toFixed(1)}`;
+    const pointer = svg.querySelector('.tip');
+    pointer.setAttribute('d', `M${tip(m.dir - base, top - 1)}L${tip(m.dir, top + Math.max(7, width * 0.55))}L${tip(m.dir + base, top - 1)}Z`);
+    pointer.setAttribute('fill', main);
   }
 
   popup(text, cls = 'good') {

@@ -8,8 +8,8 @@
 // match (a level that copes between rounds can fail in the next round's play), and never tries
 // again a level it had to leave. Nothing is judged while the game loads: the page stutters then.
 // The host's computer also runs the server, so there Auto stays at Medium or lower.
-// Nothing that matters for play changes with the level: balls, trails, the timing ring and the
-// throw preview look the same everywhere, so a low setting is never a disadvantage.
+// Nothing that matters for play changes with the level: balls, trails, the incoming-ball marker and
+// the throw preview look the same everywhere, so a low setting is never a disadvantage.
 
 export const LEVELS = ['low', 'medium', 'high'];
 export const LEVEL_NAMES = { low: 'Low', medium: 'Medium', high: 'High' };
