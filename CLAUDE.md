@@ -13,7 +13,7 @@
   - Never change a **Locked** move without the user's say. When a move is locked, add its key numbers to `LOCKS` in `tests/browser/moves.js` and a `__lock` step to `moves.json`, so a later change that alters it prints `FAIL` and the run exits with 1; re-run `moves.json` after every change to the moves.
   - Claude can't see motion: show pictures of the moment that matters, and ask for a picture of the pose the user wants.
 - **The HUD and menus** in the new look (the look-and-feel plan's step 9): not started.
-- **The internet server's findings** (phase 20; open task 4 in section 15 of `docs/PROJECT.md`): waiting for the user's decision.
+- **The internet server** (phase 20; open task 4 in section 15 of `docs/PROJECT.md`): the three fixes from its logs (server mode, who changed which rule, a log folder per game night) are built and tested, waiting for the user's word to push. Still open: the lag compensation limit back to 0.25 s (the host's setting), and the friend's answer on `X-Forwarded-For` (replaced or added to).
 
 **The art and sound** (the look-and-feel cycle: phase 15 in `docs/PROJECT.md`; `docs/LOOK_AND_FEEL.md` holds its plan, the budgets, the style samples and its log):
 
@@ -41,7 +41,7 @@ Quick facts:
   - `testlog/` holds the session logs the user collected (git-ignored: coworkers' names and IPs), and so does `logs/`, where the user also drops zips. Run `tools/log_report.py` on a session folder first.
 - **The internet server:** a friend of the user's (a developer) runs `main` on an internet server of their own since 11 Nov, behind an HTTPS login they built (an account per person, a Player or an Administrator); the office plays there too.
   - Its administrators arrive as `127.0.0.1`, so the game makes them hosts (`is_this_computer`). Don't change how the host is found without asking: it changes who is the host there.
-  - When `main` has a new version, the user tells the friend, who updates it with Docker: `Dockerfile`, `compose.yaml`, `docs/SERVER.md` (`git pull`, then `docker compose up -d --build`). The friend can send the server's session logs.
+  - When `main` has a new version, the user tells the friend, who updates it with Docker: `Dockerfile`, `compose.yaml`, `docs/SERVER.md` (`git pull`, then `docker compose up -d --build`). The image runs `server.py --server-mode` (nobody plays at the server itself). The friend can send the server's session logs.
   - Never write the server's address, the friend's name or anything about their login's setup into the repository.
   - There's no Docker on this PC: CI's "Docker image" job builds and tests the image, so a change to `Dockerfile`, `compose.yaml` or `.dockerignore` is checked by pushing it (when the user says so).
 - **Git and GitHub:**
@@ -69,7 +69,7 @@ Quick facts:
   - Always pass `--no-browser` in tests, or windows open on the user's desktop.
   - Always pass `--fresh`, or tests load or overwrite the user's `saved_rules.json`.
   - Restart the server after Python changes, and between browser test suites (it keeps changed rules in memory).
-- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 76 must pass) and `tests\test_server.py` (all 13 must pass).
+- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 77 must pass) and `tests\test_server.py` (all 17 must pass).
 - **Session logs:**
   - Every server run writes `logs\<date_time>\` next to the app (`diag.py`). Every browser sends in its own log (`static/js/diag.js`; L marks a laggy moment).
   - The host downloads them all as one zip, and `tools\log_report.py <zip or folder>` turns them into a diagnosis. The user sends these zips to be analysed. Logs from before the rename are named `dodgeparry-...`; the report reads them the same way.
@@ -85,6 +85,7 @@ Quick facts:
   - A change that must not alter any move (moving numbers, tidying `athlete.js`): run `move_print.json` (same address) before and after, and compare the printed fingerprints.
   - Re-run `sound.json` after touching `sfx.js`, the sound calls in `main.js`, or `static/sounds/`.
   - Re-run `team_health.json` after touching team health, `regen.json` after touching health regeneration or the lobby's round-time buttons, `still.json` after touching standing still (what counts as walking, the dodge's dash, the hint), and `own_settings.json` after touching players' own settings, the ball colours or the settings files (export/import).
+  - Re-run `server_mode.json` (on a server started with `--server-mode`) after touching server mode or the welcome's `local` and `server`.
   - Re-run `people_bots.json` after touching who players are (keys, `server.identity`), renaming, the rules search, or the bots page, flags and lineups.
   - Kill test servers by their process tree (the venv's `python.exe` is a launcher with the server as its child).
 - **Standalone Windows app:** `build_exe.bat` produces `dist\Dodgeball-windows.zip`, with `Allow friends to connect.bat` (the firewall helper) next to the exe. Rebuild to ship any change; releases are built by GitHub Actions.

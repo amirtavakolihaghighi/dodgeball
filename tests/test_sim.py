@@ -1593,6 +1593,42 @@ def test_bot_counts_and_files_keep_working():
     assert copy.roster == {} and copy.flags == {} and copy.lineup[0][:1] == ["ace"]
 
 
+def test_every_rule_change_is_kept_for_the_log_with_its_values():
+    """The session log says who changed which rule, and from what to what: the game keeps each
+    change with its values (server.py takes them after each message and adds who sent it). A guest's
+    try and a change to the same value keep nothing."""
+    g = Game(seed=3)
+    host = g.add_player("Host", 0, 0.0, host=True, key="u0123456789")
+    guest = g.add_player("Pia", 1, 0.0, key="ua1b2c3d4e5")
+    g.handle(guest.id, {"t": "rules", "set": {"GRAVITY": 1}}, 1.0)
+    assert g.take_rule_log() == []
+    g.handle(host.id, {"t": "rules", "set": {"MAX_LAG_COMP": 0.05}}, 1.0)
+    assert g.take_rule_log() == [{"how": "rules", "next": False, "changes": [
+        {"rule": "MAX_LAG_COMP", "label": "Lag compensation limit", "from": 0.25, "to": 0.05}]}]
+    assert g.take_rule_log() == []                                  # taken once
+    g.handle(host.id, {"t": "rules", "set": {"MAX_LAG_COMP": 0.05}}, 1.0)
+    assert g.take_rule_log() == []                                  # nothing changed
+    g.handle(host.id, {"t": "rules", "player": "ua1b2c3d4e5", "set": {"MAX_HP": 300}}, 2.0)
+    g.handle(host.id, {"t": "rules", "player": "ua1b2c3d4e5", "set": {"MAX_HP": None}}, 2.0)
+    assert [e["changes"] for e in g.take_rule_log()] == [
+        [{"player": "Pia", "rule": "MAX_HP", "label": "Health", "from": None, "to": 300}],
+        [{"player": "Pia", "rule": "MAX_HP", "label": "Health", "from": 300, "to": None}]]
+    g.handle(host.id, {"t": "rules", "import": {"rules": {"GRAVITY": 4}}}, 3.0)     # a file: the rest back to defaults
+    (loaded,) = g.take_rule_log()
+    assert loaded["how"] == "file" and sorted((c["rule"], c["from"], c["to"]) for c in loaded["changes"]) == [
+        ("GRAVITY", DEFAULTS["GRAVITY"], 4.0), ("MAX_LAG_COMP", 0.05, DEFAULTS["MAX_LAG_COMP"])]
+    g.handle(host.id, {"t": "start"}, 4.0)                          # in a match: from the next round
+    g.handle(host.id, {"t": "rules", "set": {"TEAM_CASH": True}}, 5.0)
+    g.handle(host.id, {"t": "rules", "discard": True}, 6.0)
+    assert g.take_rule_log() == [
+        {"how": "rules", "next": True, "changes": [{"rule": "TEAM_CASH", "label": "Shared team cash", "from": False,
+                                                    "to": True}]},
+        {"how": "discard", "next": False, "changes": []}]
+    g.handle(host.id, {"t": "rules", "reset": True}, 7.0)
+    (reset,) = g.take_rule_log()
+    assert reset["how"] == "reset" and reset["next"] and [c["rule"] for c in reset["changes"]] == ["GRAVITY"]
+
+
 def run_all():
     tests = [(name, fn) for name, fn in globals().items() if name.startswith("test_") and callable(fn)]
     failed = 0

@@ -22,10 +22,13 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 - **R's tile calls for attention when you can use it** (a revive, or with team health a health pack): it pops up, then glows gold and shines until you can't any more.
 - **Running the game on a server, with Docker:** a `Dockerfile` and a `compose.yaml` for a server behind an HTTPS proxy with a login, and `docs/SERVER.md` for whoever runs it: the first start, updating with `git pull` and one command, who becomes the host, the data and the logs. The host's rules and the session logs live in a volume that outlives every update, the image runs as a user without rights, and only the proxy can reach it.
 - **`--data-dir`** puts the saved rules and the session logs in a folder of your choice (the Docker image's `/data`) instead of next to the app.
+- **Server mode** (`--server-mode`, on in the Docker image): nobody plays at the server's own computer, so the menu offers the address the browser opened instead of the server's own (on the first internet server it listed its public and VPN addresses), no host's graphics are held at Medium for sharing a computer with the server, the moves page doesn't save, and the host's menu shows no folder of the server's.
+- **The session log says who changed which rule,** when, and from what to what, and the log report lists the changes under RULES THE HOST CHANGED (a run of clicks on one setting is one line). Before, it named the rules only: on the first internet server, with several hosts, nobody could tell who had set the lag compensation limit to 0.05 s.
 
 ### Changed
 
 - **H switches the incoming-ball marker** between Meter, Ring (the circle that was there before) and Off, and the menu has the same three. If you had the ring turned off, it stays off.
+- **A session log folder per game night:** a server left running starts a new folder when someone joins after half an hour with nobody on, and writes nothing while nobody is connected. The first internet server had written 40 MB in three days into one folder, 37 MB of it while nobody played.
 - The moves made by hand moved out of the code into a file of their own, `static/characters/made_moves.json`, which the editor saves. They play exactly as before: every step of every move was compared before and after.
 - **Auto graphics tries a sharper picture only in the lobby,** never during a match: between rounds a level could look fine and then fail a few seconds into the next round. It also judges nothing until the game has loaded.
 - **The lag compensation limit** (Game rules › Network) says to keep it at least 0.1 s above the view delay, and its preview turns red when it's closer.
@@ -44,6 +47,7 @@ applying), a MINOR version adds features, a PATCH version fixes bugs.
 - **Two balls at once:** when two balls reached you a split second apart while your catch or deflect was still on its way over Wi-Fi, it went to the ball thrown first, not the one that reached you first. So the ball you pressed for hit you, with no "SECOND BALL" label. Now the first ball to reach you is the one caught or deflected, and the other's hit says SECOND BALL.
 - **The session logs lost most of what a browser recorded before its player joined,** the loading time with it: the browser sent its newest lines first, and the server took the older ones for copies it already had. Now they go oldest first, and the server takes them in any order.
 - The log's late presses count the press grace, as the game does.
+- **A host who came in with the host link from another computer** had their Auto graphics held at Medium, as if their computer ran the server.
 
 ### Security
 

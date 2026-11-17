@@ -16,13 +16,18 @@ page is for whoever runs that server. The image and the Compose file are `Docker
 - **The proxy** must pass WebSocket upgrades on `/ws`, and send each player's address in
   `X-Forwarded-For`, overwriting whatever the browser sent. The address decides who is the
   host: see [Who is the host](#who-is-the-host).
+- **Server mode:** the image runs `server.py --server-mode`. Nobody plays at the server itself, so
+  players are shown the address they opened (not the server's own), no host's graphics are held
+  lower for sharing a computer with the server, the moves page's editor doesn't save, and the
+  host's menu shows no folder of the server's.
 - **Resources:** light. Measured on a server with eight players and four bots: about 0.4 of a CPU
   core and 180 MB of memory. 35–70 kbit/s per player.
 - **Security:** it runs as a user without rights (uid 10001): it can read the game and write only
   to `/data`. Docker checks its health every 30 s (`docker compose ps` shows `healthy`).
 - **Tested:** on every push to `main`, GitHub Actions builds this image with `compose.yaml`,
-  plays a match against it in headless Chrome, and replaces the container to check that the
-  host's rules survive (the "Docker image" job in `.github/workflows/ci.yml`).
+  plays a match against it in headless Chrome, checks server mode in the browser, and replaces
+  the container to check that the host's rules survive (the "Docker image" job in
+  `.github/workflows/ci.yml`).
 
 ## First start
 
@@ -59,7 +64,7 @@ DODGEBALL_VERSION=$(git describe --tags --always --dirty) docker compose up -d -
 docker image prune -f      # optional: removes the image it replaced
 ```
 
-- It builds the new image (about a minute; the dependencies are reused unless
+- It builds the new image (under a minute; the dependencies are reused unless
   `requirements.txt` changed), then replaces the container. The saved rules and the logs stay:
   they're in the volume.
 - **Do it when nobody is playing.** The game's state is in memory: a match in progress is lost,
@@ -96,10 +101,12 @@ Several hosts at once is fine: each has the host's controls. For everyone else:
 
 - `saved_rules.json`: the host's rules, bots and players' own settings, loaded at every start.
   Esc › Game rules › Reset all clears them from the game; deleting the file does it too.
-- `logs/`: the session logs, a folder per server start (the 30 newest are kept). The host
-  downloads them from the game (Esc › Download all logs), and `tools/log_report.py` reads them:
-  `docker compose exec dodgeball python tools/log_report.py /data/logs/<folder>`. While the server
-  runs, its folder grows by about 17 MB a day, most of it one line a second while nobody plays.
+- `logs/`: the session logs, a folder per game night: one starts with the server, and another
+  when someone joins after 30 minutes with nobody on. Nothing is written while nobody is
+  connected, and the 30 newest folders are kept. Each starts with the rules in force, and records
+  every rule a host changes, with who changed it and from what to what. The host downloads them
+  from the game (Esc › Download all logs), and `tools/log_report.py` reads them:
+  `docker compose exec dodgeball python tools/log_report.py /data/logs/<folder>`.
 - A copy: `docker compose cp dodgeball:/data ./dodgeball-data`.
 
 ## Stopping it
@@ -122,5 +129,5 @@ Several hosts at once is fine: each has the host's controls. For everyone else:
 
 The server and what it serves (`static/`), the moves page's list (`docs/ANIMATIONS.md`) and
 `tools/log_report.py`; not the tests, the Blender and sound scripts, the other docs or the Windows
-files (`.dockerignore`). The moves page's editor can't save there: the game's files are
-read-only in the container.
+files (`.dockerignore`). The moves page's editor can't save there (server mode; the game's files
+are read-only in the container too).

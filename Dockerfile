@@ -35,4 +35,6 @@ VOLUME /data
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=4)"]
-CMD ["python", "server.py", "--host", "0.0.0.0", "--port", "8000", "--no-browser", "--data-dir", "/data"]
+# --server-mode: nobody plays at the server itself (no host's graphics held lower, players shown the
+# address they opened, the moves page doesn't save).
+CMD ["python", "server.py", "--host", "0.0.0.0", "--port", "8000", "--no-browser", "--server-mode", "--data-dir", "/data"]

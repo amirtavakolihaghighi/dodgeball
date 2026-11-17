@@ -1,6 +1,9 @@
 """Session logs, to trace the lag people report back to its cause.
 
-Each server run gets a folder under logs/ (next to the app) holding JSON-lines files:
+Each game night gets a folder under logs/ (next to the app, or in --data-dir) holding JSON-lines
+files. A folder starts with the server, and again when someone joins after NEW_SESSION_AFTER with
+nobody on, so a server that runs for weeks keeps one folder per night of play. While nobody is
+connected, nothing is written.
 
 - server.jsonl: what the server saw. Its own timing (game-loop stalls, tick cost), the host
   computer (CPU, memory, power, Wi-Fi signal, network adapters, console QuickEdit), each
@@ -34,7 +37,8 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-KEEP_SESSIONS = 30              # older session folders are deleted when the server starts
+KEEP_SESSIONS = 30              # older session folders are deleted when a new one starts
+NEW_SESSION_AFTER = 30 * 60     # a join after this long with nobody on starts a new folder (server.py)
 MAX_CLIENT_BYTES = 30_000_000   # per browser page per session, so a runaway tab can't fill the disk
 MAX_CLIENT_CHUNKS = 20_000      # ...and chunks remembered per page (one every 5 s: over a day)
 STALL_MS = 100                  # game-loop gaps longer than this are logged one by one
@@ -60,18 +64,30 @@ class SessionLog:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self._prune()
-        self.dir = self.root / datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.dir = self._folder_name()
         self.dir.mkdir(exist_ok=True)
+        self._writing = self.dir    # the writer thread's folder: it moves to a new one in queue order
         self._queue = queue.SimpleQueue()
         self._runs = {}             # browser page (run id) -> [file name, chunk numbers stored, bytes]
         self._files = {}
         self.failed = None
         threading.Thread(target=self._writer, daemon=True, name="session-log").start()
 
-    def _prune(self):
+    def _folder_name(self):
+        """A folder named by the time it starts (two starts in the same second share it)."""
+        return self.root / datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    def _prune(self, keep=KEEP_SESSIONS - 1):
         sessions = sorted(p for p in self.root.iterdir() if p.is_dir() and SESSION_NAME.fullmatch(p.name))
-        for old in sessions[:max(0, len(sessions) - (KEEP_SESSIONS - 1))]:
+        for old in sessions[:max(0, len(sessions) - keep)]:
             shutil.rmtree(old, ignore_errors=True)
+
+    def new_session(self):
+        """Start a new folder (a new game night): everything written from now on goes there. The
+        writer thread closes the old folder's files once it has written what was queued before."""
+        self.dir = self._folder_name()
+        self._runs = {}
+        self._queue.put((None, ("new folder", self.dir)))
 
     def write(self, record, file="server"):
         self._queue.put((file, json.dumps(record, separators=(",", ":"), default=str)))
@@ -110,6 +126,17 @@ class SessionLog:
                     batch.append(self._queue.get_nowait())
             touched, waiting = set(), []
             for name, text in batch:
+                if name is None and isinstance(text, tuple):    # a new folder (new_session)
+                    for f in self._files.values():
+                        with contextlib.suppress(OSError):
+                            f.close()
+                    touched.clear()
+                    self._files = {}
+                    with contextlib.suppress(OSError):
+                        self._prune()
+                        text[1].mkdir(exist_ok=True)
+                    self._writing = text[1]
+                    continue
                 if name is None:                # a flush request: text is the Event to set
                     waiting.append(text)
                     continue
@@ -118,7 +145,7 @@ class SessionLog:
                 try:
                     f = self._files.get(name)
                     if f is None:
-                        f = self._files[name] = open(self.dir / f"{name}.jsonl", "a", encoding="utf-8")
+                        f = self._files[name] = open(self._writing / f"{name}.jsonl", "a", encoding="utf-8")
                     f.write(text + "\n")
                     touched.add(f)
                 except OSError as e:
@@ -306,14 +333,22 @@ def route_ip(target):
     return None
 
 
-def watch_host(log, host):
-    """Background thread: the host's adapters once, then Wi-Fi and power every HOST_POLL s."""
+def host_record(host):
+    """The host computer's network adapters, routes, QuickEdit and power: the top of every folder.
+    Slow on Windows (ipconfig): call it off the game loop."""
+    return {"ty": "host", "wall": wall_ms(), "adapters": adapters(), "route_lan": route_ip("10.255.255.255"),
+            "route_internet": route_ip("8.8.8.8"), "quick_edit": host.quick_edit(), **host.power()}
+
+
+def watch_host(log, host, busy=lambda: True):
+    """Background thread: the host's adapters once, then Wi-Fi and power every HOST_POLL s while
+    `busy()` (someone is connected)."""
     def loop():
-        log.write({"ty": "host", "wall": wall_ms(), "adapters": adapters(), "route_lan": route_ip("10.255.255.255"),
-                   "route_internet": route_ip("8.8.8.8"), "quick_edit": host.quick_edit(), **host.power()})
+        log.write(host_record(host))
         while True:
-            log.write({"ty": "poll", "st": round(time.perf_counter(), 3), "wall": wall_ms(), "wifi": wifi_status() if WIN else None,
-                       **host.power()})
+            if busy():
+                log.write({"ty": "poll", "st": round(time.perf_counter(), 3), "wall": wall_ms(),
+                           "wifi": wifi_status() if WIN else None, **host.power()})
             time.sleep(HOST_POLL)
     threading.Thread(target=loop, daemon=True, name="host-watch").start()
 
@@ -338,7 +373,8 @@ class _Conn:
 class Stats:
     """Per-second numbers from the game loop and each player's connection, plus notable moments.
     The server calls loop() every iteration, message() for every message from a browser,
-    events() with every snapshot's events, and tick() often (it writes once a second)."""
+    events() with every snapshot's events, and tick() often (it writes once a second). While
+    nobody is connected it writes nothing: no seconds, no stalls (nobody is there to feel them)."""
 
     def __init__(self, log, host):
         self.log = log
@@ -347,6 +383,8 @@ class Stats:
         self.hits = collections.defaultdict(collections.deque)    # pid -> recent (contact time, learned at)
         self.last_loop = None
         self.next_write = 0.0
+        self.active = False         # someone was connected at the last tick()
+        self.was_active = False     # ...or during the second being counted (its last record is written)
         self._reset()
 
     def _reset(self):
@@ -360,7 +398,7 @@ class Stats:
         if self.last_loop is not None:
             gap = now - self.last_loop
             self.gap_max = max(self.gap_max, gap)
-            if gap * 1000 > STALL_MS:
+            if gap * 1000 > STALL_MS and self.active:
                 self.log.write({"ty": "stall", "st": round(self.last_loop, 3), "ms": ms(gap), "wall": wall_ms()})
         self.last_loop = now
         self.loops += 1
@@ -435,14 +473,18 @@ class Stats:
 
     def tick(self, now, game, clients):
         """Writes the last second's numbers once a second. `clients`: pid -> server.Client."""
+        self.active = bool(clients)
+        self.was_active = self.was_active or self.active
         if now < self.next_write:
             return
         first = self.next_write == 0.0
         self.next_write = now + 1.0
-        if first:
+        if first or not self.was_active:
             self.host.sample()
             self._reset()
+            self.was_active = self.active
             return
+        self.was_active = self.active
         humans = sum(not p.bot for p in game.players.values())
         record = {"ty": "sec", "st": round(now, 3), "wall": wall_ms(), "state": game.state, "round": game.round_no,
                   "loops": self.loops, "gap_max": ms(self.gap_max), "tick_avg": ms(self.tick_sum / max(1, self.loops)),

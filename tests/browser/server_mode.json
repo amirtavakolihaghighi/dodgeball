@@ -1,0 +1,5 @@
+[
+  {"eval": "document.getElementById('nameInput').value = 'Admin'; document.getElementById('playBtn').click(); 'joined'"},
+  {"waitFor": "dp.cfg && dp.net.latest && document.querySelector('#joinInfo h3')", "timeout": 10000},
+  {"eval": "(async () => { const saving = await (await fetch('/moves/saving')).json(); const box = document.getElementById('joinInfo'); const out = { host: dp.isHost, ceiling: dp.graphics.ceiling, heading: box.querySelector('h3').textContent, join: [...box.querySelectorAll('code')].map((c) => c.textContent), logFolder: document.getElementById('diagWhere').textContent, saving }; const problems = []; if (!out.host) problems.push('not the host'); if (out.ceiling !== 'high') problems.push(`the host's graphics held at ${out.ceiling}`); if (out.heading !== 'Others join at') problems.push(`the heading says ${out.heading}`); if (out.join.length !== 1 || out.join[0] !== location.origin) problems.push(`join addresses ${out.join.join(', ')}`); if (out.logFolder) problems.push('a log folder shown'); if (saving.can) problems.push('the moves page can save'); return (problems.length ? `FAIL ${problems.join('; ')} ` : '') + JSON.stringify(out); })()"}
+]

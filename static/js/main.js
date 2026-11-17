@@ -293,13 +293,15 @@ net.on('welcome', (m) => {
   editor.setup(m.schema, m.defaults, isHost);
   lobby.setHost(isHost, m.cfg.botsMax);
   botsPage.setHost(isHost);
-  if (isHost) graphics.setCeiling('medium');      // this computer also runs the server
+  // The host's computer also runs the server, unless it's somewhere else: a server (m.server), or
+  // a host who came in with the host link from another device.
+  if (isHost && m.local) graphics.setCeiling('medium');
   $('gfxNote').textContent = graphics.describe();
   applyRules(m);
   hud.show(true);
   const box = $('joinInfo');
   const h = document.createElement('h3');
-  h.textContent = 'Others on the same Wi-Fi open';
+  h.textContent = m.server ? 'Others join at' : 'Others on the same Wi-Fi open';
   box.replaceChildren(h);
   for (const url of cfg.joinUrls.length ? cfg.joinUrls : [location.origin]) {
     const code = document.createElement('code');

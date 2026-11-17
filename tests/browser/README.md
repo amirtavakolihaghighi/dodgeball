@@ -169,6 +169,15 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\marker.j
 
 Pictures: `marker_meter_gallery.png` (the meter at 16 moments, at its real size: both shapes, and one colour), `marker_tile_1.png` to `_6.png` (the tile over 1.5 s: the pop, the glow, the shine), `marker_revive_ready.png`, `marker_meter_match.png`.
 
+## On a server (`--server-mode`)
+
+```powershell
+.venv\Scripts\python server.py --port 8123 --no-browser --fresh --server-mode
+node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\server_mode.json
+```
+
+`server_mode.json` joins as the host (a browser on the server's own computer still is one, which is how a login in front of the game can make its administrators hosts) and checks, printing `FAIL` if any doesn't hold: the host's graphics aren't held at Medium, the menu offers the address the browser opened ("Others join at"), no log folder is shown, and the moves page can't save. Against a server without `--server-mode` it fails, as it should. CI runs it against the Docker image, joining with the host link.
+
 ## Graphics, presses timed from their key, effects prepared in advance
 
 ```powershell

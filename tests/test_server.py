@@ -81,6 +81,7 @@ async def scenario(url, host_key):
     guest = await Browser.join(url, "Guest", guest=True)
     w = host.welcome
     assert w["host"] is True and guest.welcome["host"] is False         # localhost = host, unless ?guest
+    assert w["local"] is True and w["server"] is False and w["logging"] is False      # its graphics stay lower
     assert len(w["schema"]["params"]) == len(rules_mod.PARAMS) and w["defaults"] == rules_mod.DEFAULTS
     assert w["rules"] == rules_mod.DEFAULTS and w["next"] is None and w["cfg"]["gravity"] == rules_mod.DEFAULTS["GRAVITY"]
 
@@ -277,6 +278,7 @@ async def log_scenario(port):
     while (welcome := json.loads(await ws.recv()))["t"] != "welcome":
         pass
     assert welcome["logging"] is True and welcome["host"] is True and welcome["logDir"] and welcome["version"]["commit"]
+    await ws.send(json.dumps({"t": "rules", "set": {"MAX_LAG_COMP": 0.05}}))     # who changed what goes in the log
     end = time.perf_counter() + 2.5
     while time.perf_counter() < end:
         now = time.perf_counter()
@@ -314,6 +316,9 @@ def test_the_session_log_keeps_the_server_and_every_browser():
     assert inputs and max(inputs) >= 20                 # ~30 inputs a second, seen from the server
     assert [r["ty"] for r in client_lines] == ["file", "sec", "sec", "sec"]     # each chunk stored once...
     assert sorted((r["seq"], r["i"]) for r in client_lines[1:]) == [(1, 0), (1, 1), (2, 0)]   # ...whatever the order
+    (changed,) = [r for r in server_lines if r["ty"] == "rules"]
+    assert changed["p"] == join["p"] and changed["name"] == "Logan" and changed["how"] == "rules" and not changed["next"]
+    assert changed["changes"] == [{"rule": "MAX_LAG_COMP", "label": "Lag compensation limit", "from": 0.25, "to": 0.05}]
 
 
 class Recorder:
@@ -335,6 +340,7 @@ def test_stalls_late_presses_and_held_up_prints_are_logged():
     from sim import Game
     log = Recorder()
     stats = diag.Stats(log, diag.HostInfo())
+    stats.active = True                                  # someone is connected (tick() keeps it current)
     for t in (10.0, 10.016, 10.4, 10.416):              # one 384 ms gap in the game loop
         stats.loop(t, 0.001, 0.0)
     assert [round(r["ms"]) for r in log.of("stall")] == [384]
@@ -659,6 +665,135 @@ def test_the_moves_page_saves_the_moves_made_here():
         assert code == 400 and why.startswith("Not saved:"), (name, code, why)
     assert final == after_save                                                     # none of them changed the file
     assert real.read_text(encoding="utf-8") == original
+
+
+def test_on_a_server_nobody_plays_at_its_computer():
+    """--server-mode (the Docker image): a browser that comes in as the server's own computer
+    (127.0.0.1, as a login in front lets its administrators in) is still the host, but nobody plays
+    at the server itself: its Auto graphics isn't held lower (local), no join addresses of the
+    server's own, no folder path, and the moves page doesn't save. The console gives the host link
+    for the https address."""
+    async def join(url):
+        browser = await Browser.join(url, "Admin")
+        await browser.ws.close()
+        return browser.welcome
+    with tempfile.TemporaryDirectory() as tmp, running_server("--server-mode", "--log-dir", tmp) as (port, key):
+        w = asyncio.run(join(f"ws://127.0.0.1:{port}/ws"))
+        saving = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/moves/saving", timeout=5).read())
+    assert key
+    assert w["host"] is True and w["local"] is False and w["server"] is True and w["logging"] is True
+    assert w["cfg"]["joinUrls"] == [] and "logDir" not in w
+    assert saving["can"] is False and "server" in saving["why"], saving
+
+
+def test_a_game_night_gets_its_own_log_folder():
+    """A server that runs for weeks keeps a folder per night of play: a join after NEW_SESSION_AFTER
+    with nobody on starts a new one, with its own meta record. A join sooner doesn't, and nor do a
+    fresh server's first players. A browser's log goes to the folder of the night it's sent in."""
+    import diag
+    import server
+    saved = server.session_log, server.stats, server.clients, server.log_had_players, server.log_idle_since
+    night = diag.NEW_SESSION_AFTER
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:     # the writer keeps its files open
+        log = diag.SessionLog(Path(tmp))
+        server.session_log, server.stats, server.clients = log, None, {}
+        server.log_had_players, server.log_idle_since = False, None
+        try:
+            server.write_meta()
+            first = log.dir
+            server.note_join_for_logs(100.0)                # a fresh server's first player: its first folder
+            server.clients[1] = object()
+            assert log.client("run1", "Pia", "tab1", 0, [{"ty": "sec", "n": 1}])
+            server.clients.clear()
+            server.note_leave_for_logs(200.0)
+            server.note_join_for_logs(200.0 + night - 1)    # back within the half hour: the same night
+            assert log.dir == first
+            server.clients[2] = object()
+            server.clients.clear()
+            server.note_leave_for_logs(300.0)
+            time.sleep(1.1)                                 # folders are named by the second
+            server.note_join_for_logs(300.0 + night)        # the next night
+            second = log.dir
+            server.clients[3] = object()
+            assert second != first and log.client("run1", "Pia", "tab1", 0, [{"ty": "sec", "n": 2}])   # stored anew
+            log.flush()
+        finally:
+            server.session_log, server.stats, server.clients, server.log_had_players, server.log_idle_since = saved
+        assert sorted(p.name for p in Path(tmp).iterdir()) == sorted([first.name, second.name])
+        for folder, n in ((first, 1), (second, 2)):
+            lines = [json.loads(line) for line in (folder / "server.jsonl").read_text(encoding="utf-8").splitlines()]
+            assert lines[0]["ty"] == "meta" and [r["ty"] for r in lines].count("meta") == 1, lines   # one start each
+            client = [json.loads(line) for line in (folder / "client-run1-Pia.jsonl").read_text(encoding="utf-8").splitlines()]
+            assert [r["ty"] for r in client] == ["file", "sec"] and client[1]["n"] == n
+
+
+def test_nothing_is_logged_while_nobody_is_on():
+    """A server waiting for players writes nothing a second (the friend's server wrote 37 of its
+    40 MB that way in three days), and a stall then freezes nobody, so it isn't logged either. With
+    someone on, both are, and so is the second they leave in."""
+    import diag
+    from types import SimpleNamespace
+    from sim import Game
+    log = Recorder()
+
+    class Host:
+        def sample(self):
+            return {}
+    stats = diag.Stats(log, Host())
+    game = Game()
+    on = {1: SimpleNamespace(q_max=0, dropped=0, send_max=0.0, queue=queue.Queue())}
+
+    def run(start, end, clients):
+        t = start
+        while t < end - 1e-9:
+            stats.loop(t, 0.001, 0.0)
+            stats.tick(t, game, clients)
+            t = round(t + 0.02, 6)
+    run(0.0, 3.0, {})                   # three seconds with nobody on
+    run(3.4, 4.0, {})                   # a 420 ms stall, with nobody on
+    assert log.records == []
+    run(4.0, 6.0, on)                   # someone on: a line each second
+    run(6.5, 7.0, on)                   # a 520 ms stall while they're on
+    run(7.0, 9.0, {})                   # they left: the second they left in, then nothing
+    assert [r["st"] for r in log.of("sec")] == [4.4, 5.4, 6.5, 7.5], [r["st"] for r in log.of("sec")]
+    assert [round(r["ms"]) for r in log.of("stall")] == [520]
+
+
+def test_the_report_lists_who_changed_which_rule():
+    """RULES THE HOST CHANGED: who, when, from what to what. A run of clicks on one rule is one line,
+    a settings file says so, and logs from before who and what were kept name the rules only."""
+    from datetime import datetime, timezone
+    report = load_report()
+    wall = 1_794_000_000_000
+
+    def at(s):
+        return {"st": 1000.0 + s, "wall": wall + round(s * 1000)}
+
+    def clock(s):
+        return datetime.fromtimestamp((wall + s * 1000) / 1000, timezone.utc).strftime("%H:%M:%S")
+    meta = {"ty": "meta", **at(0), "version": {"commit": "test"}, "utc_offset_min": 0}
+    secs = [{"ty": "sec", **at(i), "humans": 1, "bots": 0, "net": []} for i in range(60)]
+    changes = [
+        {"ty": "rules", **at(10), "p": 1, "name": "Robin", "how": "rules", "next": True,
+         "changes": [{"rule": "MAX_LAG_COMP", "label": "Lag compensation limit", "from": 0.25, "to": 0.05}]},
+        *({"ty": "rules", **at(20 + i * 0.2), "p": 1, "name": "Robin", "how": "rules", "next": False,
+           "changes": [{"rule": "BOTS_RED", "label": "RED bots", "from": i, "to": i + 1}]} for i in range(5)),
+        {"ty": "rules", **at(30), "p": 2, "name": "Sam", "how": "player", "next": False,
+         "changes": [{"player": "Bot Ace", "rule": "MAX_HP", "label": "Health", "from": None, "to": 300}]},
+        {"ty": "rules", **at(40), "p": 1, "name": "Robin", "how": "file", "next": False,
+         "changes": [{"rule": "GRAVITY", "label": "Gravity", "from": 6.0, "to": 4.0},
+                     {"rule": "TEAM_CASH", "label": "Shared team cash", "from": False, "to": True}]},
+    ]
+    text = report.report("night", {"server": [meta, *secs, *changes]})
+    section = text.split("RULES THE HOST CHANGED (who, when, from what to what)\n")[1].split("\n\n")[0].splitlines()
+    assert section == [
+        f"  {clock(10)}  Robin: Lag compensation limit 0.25 → 0.05 (from the next round)",
+        f"  {clock(20)}  Robin: RED bots 0 → 5 (5 changes)",
+        f"  {clock(30)}  Sam: Bot Ace › Health everyone's → 300",
+        f"  {clock(40)}  Robin: loaded a settings file (2 changes: Gravity 6 → 4; Shared team cash off → on)"], section
+    old = report.report("old", {"server": [meta, *secs, {"ty": "game", **at(10), "k": "rules", "n": 1,
+                                                          "names": ["Lag compensation limit"], "next": True}]})
+    assert "this log names them only" in old and f"  {clock(10)}  Lag compensation limit (from the next round)" in old
 
 
 def run_all():

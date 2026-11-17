@@ -422,6 +422,12 @@ def report(session, files):
                 parts.append(f"{len(p.second_hits)} hit(s) by a second ball right after they had stopped one")
             say(f"  {p.name}: " + "; ".join(parts))
 
+    changes = rule_lines(server, clock)
+    if changes:
+        say("")
+        say(changes[0])
+        out.extend(f"  {line}" for line in changes[1:])
+
     stalls = [r for r in server if r.get("ty") == "stall"]
     attribute_freezes(players, stalls)
     shared = shared_freezes(players)
@@ -466,6 +472,90 @@ def report(session, files):
             again = f" (L {presses} times)" if presses > 1 else ""
             say(f"  {clock.st(m.get('st'), m.get('wall'))}  {p.name:<12} {explain_mark(p, m, stalls)}{again}")
     return "\n".join(out)
+
+
+RULE_LINES_MAX = 40         # rule changes listed; the rest are counted
+SAME_CHANGE_S = 15          # the same rule changed again this soon by the same person is one line ("RED bots 0 -> 10")
+
+
+def show_value(v):
+    """A rule's value as the report shows it: on/off, everyone's (a player's own setting removed)."""
+    if v is None:
+        return "everyone's"
+    if isinstance(v, bool):
+        return "on" if v else "off"
+    if isinstance(v, float):
+        return f"{v:g}"
+    return str(v)
+
+
+def rule_lines(server, clock):
+    """RULES THE HOST CHANGED: one line per change, with who, when, and from what to what (the
+    session logs record it since 2026-11-17; older ones name the rules only). The title first."""
+    def change_text(c):
+        if "note" in c:
+            return c["note"]
+        label = f"{c['player']} › {c['label']}" if c.get("player") else c.get("label", c.get("rule", "?"))
+        return f"{label} {show_value(c.get('from'))} → {show_value(c.get('to'))}"
+
+    records = [r for r in server if r.get("ty") == "rules"]
+    if records:
+        merged = []     # [record, its changes, how many changes were folded into it]
+        for r in records:
+            last = merged[-1] if merged else None
+            one = r.get("changes") or []
+            if (last and len(one) == 1 and len(last[1]) == 1 and last[0].get("p") == r.get("p")
+                    and last[0].get("how") == r.get("how") and r.get("st", 0) - last[3] <= SAME_CHANGE_S
+                    and (one[0].get("rule"), one[0].get("player"), one[0].get("note"))
+                    == (last[1][0].get("rule"), last[1][0].get("player"), last[1][0].get("note"))
+                    and last[0].get("next") == r.get("next")):
+                last[1] = [{**last[1][0], "to": one[0].get("to")}]
+                last[2] += 1
+                last[3] = r.get("st", 0)
+                continue
+            merged.append([r, list(one), 1, r.get("st", 0)])
+        lines = ["RULES THE HOST CHANGED (who, when, from what to what)"]
+        for r, items, times, _ in merged[:RULE_LINES_MAX]:
+            how = r.get("how")
+            texts = [change_text(c) for c in items]
+            more = r.get("more", 0) + max(0, len(texts) - 4)
+            listed = "; ".join(texts[:4]) + (f"; and {more} more" if more else "")
+            if how == "discard":
+                what = "cancelled the changes waiting for the next round"
+            elif how == "reset":
+                what = f"put everything back to the defaults ({len(items) + r.get('more', 0)} changes: {listed})"
+            elif how == "file":
+                what = f"loaded a settings file ({len(items) + r.get('more', 0)} changes: {listed})"
+            else:
+                what = listed + (f" ({times} changes)" if times > 1 else "")
+            when = " (from the next round)" if r.get("next") else ""
+            lines.append(f"{clock.st(r.get('st'), r.get('wall'))}  {r.get('name', '?')}: {what}{when}")
+        if len(merged) > RULE_LINES_MAX:
+            lines.append(f"... and {len(merged) - RULE_LINES_MAX} more")
+        return lines
+
+    named = []          # [record, times, time of the last]: the same names again soon after are one line
+    for r in server:
+        if r.get("ty") != "game" or r.get("k") != "rules" or r.get("discard"):
+            continue
+        last = named[-1] if named else None
+        if (last and last[0].get("names") == r.get("names") and last[0].get("n") == r.get("n")
+                and last[0].get("next") == r.get("next") and r.get("st", 0) - last[2] <= SAME_CHANGE_S):
+            last[1] += 1
+            last[2] = r.get("st", 0)
+            continue
+        named.append([r, 1, r.get("st", 0)])
+    if not named:
+        return []
+    lines = ["RULES THE HOST CHANGED (this log names them only: not who changed them, nor to what)"]
+    for r, times, _ in named[:RULE_LINES_MAX]:
+        names = ", ".join(r.get("names") or [])
+        extra = r.get("n", 0) - len(r.get("names") or [])
+        lines.append(f"{clock.st(r.get('st'), r.get('wall'))}  {names}{f' and {extra} more' if extra > 0 else ''}"
+                     f"{f' ({times} changes)' if times > 1 else ''}{' (from the next round)' if r.get('next') else ''}")
+    if len(named) > RULE_LINES_MAX:
+        lines.append(f"... and {len(named) - RULE_LINES_MAX} more")
+    return lines
 
 
 def attribute_freezes(players, stalls):

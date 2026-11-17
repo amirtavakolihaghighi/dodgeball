@@ -61,9 +61,13 @@ clients: dict[int, "Client"] = {}
 port = 8000
 save_rules = True
 save_moves = True                           # off with --fresh (tests), unless --moves-file names a file to save into
+SERVER_MODE = False                         # --server-mode: on a server (the Docker image), where nobody plays at this computer
 own_ips: list[str] = []                     # this computer's addresses (likely LAN first): browsers from them are the host
 session_log: diag.SessionLog | None = None  # None: not logging (--no-log / --fresh)
 stats: diag.Stats | None = None
+log_args: dict = {}                         # the command line, for each session folder's meta record
+log_had_players = False                     # whether the current session folder has seen anyone join
+log_idle_since: float | None = None         # since when nobody has been connected (None: someone is)
 VERSION: dict = {}
 host_view: dict | None = None               # what the host's screen shows (menu, rule in focus, unapplied edits), for everyone else
 HOST_VIEWS = ("game", "menu", "rules")
@@ -217,7 +221,10 @@ def client_config(key: str | None = None) -> dict:
     """Rules the browser needs for its HUD and its own movement (the server stays in charge):
     the ones its player plays by, with their own settings."""
     mine = game.rules.for_player(key) if key else game.rules
-    return {**mine.for_client(), "joinUrls": [f"http://{ip}:{port}" for ip in own_ips]}
+    # On a server its own addresses are no use to players (they come in through its https address):
+    # the browser shows the address it opened instead.
+    urls = [] if SERVER_MODE else [f"http://{ip}:{port}" for ip in own_ips]
+    return {**mine.for_client(), "joinUrls": urls}
 
 
 def rules_message(key: str | None = None) -> dict:
@@ -388,6 +395,8 @@ def why_no_saving(ip: str | None) -> str | None:
     """Why the moves page can't save the moves placed by hand here (None: it can)."""
     if FROZEN:
         return "Saving works when the game runs from its source folder (run.bat), not in the app."
+    if SERVER_MODE:
+        return "This game runs on a server: saving works where it runs from its source folder on your own computer."
     if not save_moves:
         return "This server was started with --fresh (for tests), so it doesn't change any file."
     if not is_this_computer(ip):
@@ -467,10 +476,15 @@ async def play(ws: WebSocket):
                 client.key = rules_mod.identity_key(code)
                 p = game.add_player(msg.get("name"), None, now, host=host, key=client.key)
                 client.pid, client.name = p.id, p.name
+                note_join_for_logs(now)
                 clients[p.id] = client
-                extra = {"logDir": str(session_log.dir)} if host and session_log else {}
+                extra = {"logDir": str(session_log.dir)} if host and session_log and not SERVER_MODE else {}
+                # local: this browser is on the computer that runs the server (its Auto graphics stays
+                # lower); never on a server, where nobody plays at the server itself.
+                local = is_this_computer(ip) and not SERVER_MODE
                 client.send(dumps({**rules_message(client.key), "t": "welcome", "id": p.id, "host": host, "who": code,
                                    "key": client.key, "defaults": rules_mod.DEFAULTS, "schema": SCHEMA,
+                                   "local": local, "server": SERVER_MODE,
                                    "logging": session_log is not None, "version": VERSION, **extra}))
                 if host_view and not host:
                     client.send(dumps(host_view))
@@ -497,6 +511,10 @@ async def play(ws: WebSocket):
                 except Exception as e:
                     traceback.print_exc()
                     note_error(f"a '{str(msg.get('t'))[:20]}' message", e)
+                for change in game.take_rule_log():         # who changed which rule, and to what
+                    if session_log:
+                        session_log.write({"ty": "rules", "st": round(now, 3), "wall": diag.wall_ms(), "p": client.pid,
+                                           "name": client.name, **change})
                 p = game.players.get(client.pid)
                 if p is not None and p.name != client.name:     # they renamed themselves
                     say(f"  ~ {client.name} is now {p.name}")
@@ -510,6 +528,7 @@ async def play(ws: WebSocket):
         pump.cancel()
         if client.pid is not None:
             clients.pop(client.pid, None)
+            note_leave_for_logs(time.perf_counter())
             p = game.players.get(client.pid)
             if session_log:
                 session_log.write({"ty": "leave", "st": round(time.perf_counter(), 3), "wall": diag.wall_ms(), "p": client.pid,
@@ -543,6 +562,7 @@ def retire(client: Client):
     socket closes in the background (it may be dead already)."""
     if client.pid is not None:
         clients.pop(client.pid, None)
+        note_leave_for_logs(time.perf_counter())
         p = game.players.get(client.pid)
         if session_log:
             session_log.write({"ty": "leave", "st": round(time.perf_counter(), 3), "wall": diag.wall_ms(), "p": client.pid,
@@ -581,19 +601,49 @@ def open_browser_when_ready(url, port):
 
 
 def start_logging(folder, args):
-    global session_log, stats
+    global session_log, stats, log_args
     session_log = diag.SessionLog(folder)
     host = diag.HostInfo()
     stats = diag.Stats(session_log, host)
+    log_args = vars(args)
+    write_meta()
+    diag.watch_host(session_log, host, busy=lambda: bool(clients))
+    atexit.register(session_log.flush, 2.0)
+
+
+def write_meta():
+    """The top of a session folder: which code, which computer, and the rules in force."""
     changed = {k: v for k, v in game.rules.values().items() if v != rules_mod.DEFAULTS[k]}
     offset = datetime.now().astimezone().utcoffset()
+    host = stats.host if stats else diag.HostInfo()
     session_log.write({"ty": "meta", "st": round(time.perf_counter(), 3), "wall": diag.wall_ms(), "version": VERSION,
                        "python": platform.python_version(), "os": platform.platform(), "machine": platform.machine(),
                        "cpus": os.cpu_count(), "ram_mb": host.total_ram_mb(), "frozen": FROZEN, "port": port,
-                       "own_ips": own_ips, "args": vars(args), "rules_changed": changed, "players_own": game.rules.players,
+                       "own_ips": own_ips, "args": log_args, "server_mode": SERVER_MODE, "rules_changed": changed,
+                       "players_own": game.rules.players,
                        "utc_offset_min": round(offset.total_seconds() / 60) if offset else 0})
-    diag.watch_host(session_log, host)
-    atexit.register(session_log.flush, 2.0)
+
+
+def note_join_for_logs(now: float):
+    """Someone joins. After NEW_SESSION_AFTER with nobody on, the session log starts a new folder,
+    so a server that runs for weeks keeps one per night of play (a fresh server's first folder is
+    kept for its first players)."""
+    global log_had_players, log_idle_since
+    if (session_log and log_had_players and not clients and log_idle_since is not None
+            and now - log_idle_since >= diag.NEW_SESSION_AFTER):
+        session_log.new_session()
+        write_meta()
+        host = stats.host if stats else diag.HostInfo()
+        threading.Thread(target=lambda: session_log.write(diag.host_record(host)), daemon=True).start()
+        say(f"  A new session log (nobody had played for a while): {session_log.dir}")
+    log_had_players, log_idle_since = True, None
+
+
+def note_leave_for_logs(now: float):
+    """Someone left: if it was the last one, the server is empty from now (see note_join_for_logs)."""
+    global log_idle_since
+    if not clients:
+        log_idle_since = now
 
 
 def set_moves_file(path: Path):
@@ -611,7 +661,7 @@ def set_data_dir(path: Path):
 
 
 def main():
-    global port, save_rules, save_moves, own_ips, VERSION
+    global port, save_rules, save_moves, own_ips, VERSION, SERVER_MODE
     parser = argparse.ArgumentParser(description="Dodgeball LAN server")
     parser.add_argument("--port", type=int, help="default: 8000, or the next free port")
     parser.add_argument("--host", default="0.0.0.0", help="0.0.0.0 = reachable from the LAN")
@@ -619,6 +669,10 @@ def main():
     parser.add_argument("--fresh", action="store_true",
                         help="start with the default rules, don't save rule changes and don't log (for tests)")
     parser.add_argument("--no-log", action="store_true", help="don't write a session log")
+    parser.add_argument("--server-mode", action="store_true",
+                        help="running on a server (the Docker image): nobody plays at this computer, so its own addresses "
+                             "aren't shown as the ones to join, no host's graphics are held lower, and the moves page "
+                             "doesn't save")
     parser.add_argument("--data-dir", help="where the saved rules (saved_rules.json) and the session logs (logs/) go "
                         "(default: next to the app; the Docker image uses /data)")
     parser.add_argument("--log-dir", help="where session logs go (default: logs in the data folder); logs even with --fresh")
@@ -629,6 +683,7 @@ def main():
     port = args.port or first_free_port(args.host, 8000)
     if args.data_dir:
         set_data_dir(Path(args.data_dir).resolve())
+    SERVER_MODE = args.server_mode
     save_rules = not args.fresh
     if args.moves_file:
         set_moves_file(Path(args.moves_file).resolve())
@@ -640,16 +695,20 @@ def main():
             ctypes.windll.winmm.timeBeginPeriod(1)   # 1 ms timer resolution for a steady 60 Hz loop
     own_ips = lan_addresses(wait=2.0)    # don't hold the console up; the watcher adds late ones
     watch_addresses()
-    print("\n  DODGEBALL server")
-    print(f"    this computer : http://localhost:{port}    <- you're the host here: set up the lobby, then Start")
-    for ip in own_ips:
-        print(f"    same Wi-Fi    : http://{ip}:{port}")
-    print(f"    host from another device: http://{own_ips[0] if own_ips else 'localhost'}:{port}/?host={HOST_KEY}"
-          "  (keep it private)")
-    if sys.platform == "win32":
-        print("  Friends can't connect? Don't turn the firewall off: double-click 'Allow friends to connect.bat'")
-        print("  in this folder once (it asks for administrator permission), or set this Wi-Fi to Private.")
-    print("  Close this window (or press Ctrl+C) to stop the server.\n")
+    if SERVER_MODE:
+        print(f"\n  DODGEBALL server, on a server: port {port}, behind your https address")
+        print(f"    the host link: <your https address>/?host={HOST_KEY}  (keep it private; a new one every start)\n")
+    else:
+        print("\n  DODGEBALL server")
+        print(f"    this computer : http://localhost:{port}    <- you're the host here: set up the lobby, then Start")
+        for ip in own_ips:
+            print(f"    same Wi-Fi    : http://{ip}:{port}")
+        print(f"    host from another device: http://{own_ips[0] if own_ips else 'localhost'}:{port}/?host={HOST_KEY}"
+              "  (keep it private)")
+        if sys.platform == "win32":
+            print("  Friends can't connect? Don't turn the firewall off: double-click 'Allow friends to connect.bat'")
+            print("  in this folder once (it asks for administrator permission), or set this Wi-Fi to Private.")
+        print("  Close this window (or press Ctrl+C) to stop the server.\n")
     if not args.fresh:
         load_saved_rules()
     if not args.no_log and (args.log_dir or not args.fresh):

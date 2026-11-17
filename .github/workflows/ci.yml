@@ -106,7 +106,7 @@ jobs:
           meta = json.loads(open(glob.glob('/data/logs/*/server.jsonl')[0]).readline())
           print('build:', meta['version'], '| args:', meta['args'])
           assert meta['version']['commit'] == '$(git describe --tags --always --dirty)'
-          assert meta['args']['data_dir'] == '/data'"
+          assert meta['args']['data_dir'] == '/data' and meta['server_mode'] is True"
       - name: Join as the host with the host link, start a match and play it in headless Chrome
         env:
           CHROME: /usr/bin/google-chrome
@@ -116,6 +116,12 @@ jobs:
           node tests/browser/cdp.js "http://127.0.0.1:8000/?nolock&host=$key" tests/browser/smoke.json | tee smoke.txt
           grep -q '"s":"play"' smoke.txt
           ! grep -E "EXCEPTION|TIMEOUT|\[console\.error\]" smoke.txt
+      - name: On a server, as the host - no graphics held lower, the address it opened, no Save
+        env:
+          CHROME: /usr/bin/google-chrome
+        run: |
+          key=$(docker compose logs dodgeball | grep -o '?host=[^ ]*' | head -1 | cut -d= -f2)
+          node tests/browser/cdp.js "http://127.0.0.1:8000/?nolock&host=$key" tests/browser/server_mode.json
       - name: An update (a new container) keeps the host's rules
         run: |
           key=$(docker compose logs dodgeball | grep -o '?host=[^ ]*' | head -1 | cut -d= -f2)

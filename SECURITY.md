@@ -31,7 +31,8 @@ Fixes go into the next release; only the latest release is supported.
   (the Docker image's `/data`):
   - `saved_rules.json`: the host's game rules, the host's bots and flags, and each player's own
     settings under their key (see below) with the name they last played under;
-  - `logs/`: one folder per run (the 30 newest are kept) with the server's numbers and every
+  - `logs/`: one folder per game night (the 30 newest are kept; nothing is written while nobody is
+    connected) with the server's numbers, the rules the host changed (and who changed them), and every
     browser's own log. These contain **player names, LAN IP addresses, browser and device
     details** (graphics card, CPU cores, screen size), and the host computer's CPU, memory, power,
     network adapters (names and IPv4 addresses, so a VPN shows up) and Wi-Fi signal (network

@@ -89,11 +89,12 @@ For people who aren't on the same Wi-Fi, the game can run on a server, behind an
 
 Every session writes a diagnostics log, so lag can be traced to its cause instead of guessed.
 
-- **The server** writes its own numbers into a `logs` folder next to the app, one folder per run:
+- **The server** writes its own numbers into a `logs` folder next to the app, one folder per game night: a run starts one, and so does someone joining after half an hour with nobody on (a server left running for days keeps one folder per day of play). While nobody is connected it writes nothing. In it:
   - its timing, including any moment it stalled;
   - the host computer's CPU, memory, power, Wi-Fi signal, network adapters (VPNs) and whether the console window was clicked into;
   - each player's connection as it arrives (input gaps, how far behind their screen runs);
-  - presses that arrived after the ball had already hit, and presses that arrived past the lag compensation limit (they count a little later than they were made).
+  - presses that arrived after the ball had already hit, and presses that arrived past the lag compensation limit (they count a little later than they were made);
+  - every rule the host changed: who changed it, when, and from what to what.
 - **Every browser** keeps its own log and sends it to the host's computer every few seconds. Nobody has to collect anything from the other PCs. It contains:
   - frame rate and hitches, and how late world updates arrive;
   - how long the picture of the others stood frozen, and the ping;
@@ -103,7 +104,7 @@ Every session writes a diagnostics log, so lag can be traced to its cause instea
 - **Press L** in the game the moment something feels laggy. The log marks it, so the numbers around that moment can be read later.
 - **After the session** the host opens the menu (Esc) and clicks **Download all logs (zip)**, then sends that zip. If someone's connection dropped, they can click **Save my log** to keep their own copy (it goes to their Downloads folder).
 - **What's in it:** player names, LAN addresses, device details (browser, graphics card, CPU cores, screen) and performance numbers. Nothing else.
-- **Housekeeping:** the 30 newest sessions are kept. `--no-log` turns logging off.
+- **Housekeeping:** the 30 newest game nights are kept. `--no-log` turns logging off.
 
 To read a session: `python tools\log_report.py <the zip or a session folder>`. It prints:
 
@@ -111,6 +112,7 @@ To read a session: `python tools\log_report.py <the zip or a session folder>`. I
 - a table of every player: frame rate, frozen time, late updates, ping, input gaps while playing, late presses, presses made while still recovering (the first seconds after joining and loading are left out: the game stutters while it builds the hall and the players);
 - how long each browser took to load;
 - what the press grace, sidestep compensation and the lag compensation limit did, and the hits that came just after a press or a defence (too early, second ball);
+- every rule the host changed, with who, when, and the old and new values (a run of clicks on one setting is one line; older logs name the rules only);
 - for each frozen picture, whose it was: the host's (several players froze together), the player's own computer (it stalled meanwhile) or their Wi-Fi;
 - freezes several players shared, which point at the host;
 - the numbers just before every L (pressing it several times in a row counts once);

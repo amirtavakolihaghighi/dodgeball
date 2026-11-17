@@ -145,7 +145,8 @@ You need a keyboard and mouse: there are no touch controls yet.
   bundled with it.
 - **What it writes to disk**, next to the app: the host's rules, the host's bots and flags, and
   each player's own settings with the name they last played under (`saved_rules.json`), and
-  session logs (`logs/`, the 30 newest sessions). The logs contain player names, LAN addresses and
+  session logs (`logs/`, a folder per game night, the 30 newest kept; nothing is written while
+  nobody is connected). The logs contain player names, LAN addresses and
   device details (browser, graphics card, screen) and stay on the host's computer unless you send
   them to someone. `--no-log` turns logging off. An exported settings file holds the rules, the
   bots and the names of players with their own settings.

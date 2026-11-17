@@ -29,6 +29,7 @@ TEAM_NAMES = ("RED", "BLUE")
 WATCHING = -1                        # the team of a player who spectates instead of playing (the host)
 STAT_KEYS = ("hits", "kos", "catches", "deflects", "perfects", "outs")
 HOST_ONLY = {"rules", "start", "end", "move", "shuffle", "spectate"}
+RULE_LOG_MAX = 60       # changes listed per entry of the session log's rule changes (a settings file can change them all)
 FREE_PLAY = ("lobby", "wait")        # no round running: warm-up, the downed stand back up
 
 CAPSULE_Y0, CAPSULE_Y1 = 0.25, 1.45   # hit capsule = this vertical segment + PLAYER_RADIUS
@@ -218,6 +219,9 @@ class Game:
         self.players: dict[int, Player] = {}
         self.balls: dict[int, Ball] = {}
         self.events: list[dict] = []
+        # Every rule change with its old and new values, for the session log only: server.py takes
+        # them after each message (take_rule_log) and writes them with who sent it.
+        self.rule_log: deque[dict] = deque(maxlen=50)
         self._next_id = 1
         self.state = "lobby"            # lobby | count | play | over | wait
         self.state_until = 0.0
@@ -923,7 +927,7 @@ class Game:
     def set_rules(self, values, now):
         """The host's rule edits. In free play (lobby, waiting) they apply at once; during a
         match they wait for the next round. Returns the keys that changed."""
-        return self._change_rules(lambda target: target.update(values), now)
+        return self._change_rules(lambda target: target.update(values), now, "rules")
 
     def set_player_rules(self, name, values, now, replace=False):
         """The host's edits to one player's (or bot's) own settings, {key: value or None for
@@ -935,12 +939,12 @@ class Game:
                 if not p.bot:
                     target.label(p.key, p.name)
             return changed
-        return self._change_rules(edit, now)
+        return self._change_rules(edit, now, "player")
 
     def change_bots(self, op, now):
         """The host's edits to the bots (rules.Rules.bot_change): which bots play on which team, the
         host's own bots and the flags. When they apply: like any rule change."""
-        return self._change_rules(lambda target: target.bot_change(op), now)
+        return self._change_rules(lambda target: target.bot_change(op), now, "bots")
 
     def import_rules(self, data, now):
         """The host loaded a settings file: its rules (any it leaves out go back to their default),
@@ -948,12 +952,14 @@ class Game:
         if not isinstance(data, dict):
             return []
         return self._change_rules(lambda target: target.replace(data.get("rules"), data.get("players"),
-                                                                data.get("labels"), data.get("bots")), now)
+                                                                data.get("labels"), data.get("bots")), now, "file")
 
-    def _change_rules(self, edit, now):
+    def _change_rules(self, edit, now, how):
         """Apply `edit` (it changes a copy of the rules and returns what changed: rule keys and
-        (name, key) pairs for players' own settings): at once in free play, else next round."""
-        target = (self.next_rules or self.rules).copy()
+        (name, key) pairs for players' own settings): at once in free play, else next round. `how`
+        says for the log what the host did: rules, player (one player's own), bots, file or reset."""
+        before = self.next_rules or self.rules
+        target = before.copy()
         changed = edit(target)
         if not changed:
             return changed
@@ -970,7 +976,35 @@ class Game:
             self._fill_team_health()
             self._sync_bots(now)
         self._event(now, "rules", n=len(changed), names=[self._change_name(c) for c in changed[:3]], next=later)
+        self._note_rules(before, target, changed, later, how)
         return changed
+
+    def _note_rules(self, before, after, changed, later, how):
+        """Each change with its value before and after, for the session log (rule_log). A player's own
+        setting is None where they play by everyone's value."""
+        old, new = before.values(), after.values()
+
+        def name_of(key):       # a label goes when a player's last own setting does: their name is still known
+            live = next((p.name for p in self.players.values() if p.key == key), None)
+            return live or key_label(key, {**before.labels, **after.labels})
+        items = []
+        for c in changed[:RULE_LOG_MAX]:
+            if isinstance(c, tuple):
+                key, rule = c
+                items.append({"player": name_of(key), "rule": rule, "label": display_name(rule),
+                              "from": before.players.get(key, {}).get(rule), "to": after.players.get(key, {}).get(rule)})
+            elif c in BY_KEY:
+                items.append({"rule": c, "label": display_name(c), "from": old[c], "to": new[c]})
+            else:
+                items.append({"note": str(c)})
+        more = {"more": len(changed) - RULE_LOG_MAX} if len(changed) > RULE_LOG_MAX else {}
+        self.rule_log.append({"how": how, "next": later, "changes": items, **more})
+
+    def take_rule_log(self):
+        """The rule changes since the last call (server.py logs them with who sent them)."""
+        out = list(self.rule_log)
+        self.rule_log.clear()
+        return out
 
     def who_name(self, key):
         """The name that goes with a key: a bot's, or the name a player was last seen with."""
@@ -991,6 +1025,7 @@ class Game:
                 self.next_rules = None
                 self.rules_version += 1
                 self._event(now, "rules", n=0, names=[], next=False, discard=True)
+                self.rule_log.append({"how": "discard", "next": False, "changes": []})
             return
         if isinstance(msg.get("player"), str):          # one player's (or bot's) own settings, by key
             values = msg.get("replace") if isinstance(msg.get("replace"), dict) else msg.get("set")
@@ -1000,7 +1035,7 @@ class Game:
         elif isinstance(msg.get("import"), dict):       # a settings file: the whole setup
             self.import_rules(msg["import"], now)
         elif msg.get("reset"):                          # everything back to the defaults, players' own settings too
-            self._change_rules(lambda target: target.replace({}, {}), now)
+            self._change_rules(lambda target: target.replace({}, {}), now, "reset")
         else:
             self.set_rules(msg.get("set"), now)
 
