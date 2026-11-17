@@ -3,6 +3,8 @@
 Every animation the athletes have, every change from one move into another, and what you should see in each. This is step 8's working list (decision 142): the user tries one move, writes what they saw and what they expected, Claude fixes that move only, and once the user approves it, it's **locked**.
 
 > **Not finished.** On hold from 2026-11-03 to 11-04 (decision 143): the user approved the three fixes from 11-01 (perfect dodges, strafing, getting up: now Locked) and other work came first. Picked up again on 2026-11-04 with **the animation tool** (option c at the end of this list; decisions 153–157): the "See every move" page (below), and on it, the editor for the moves placed by hand ("Edit this move"). Next: the rest of this list, one move at a time, starting with the mistakes the tester found with the viewer. This is the first item on `main`'s task list (section 15 of `docs/PROJECT.md`).
+>
+> **From 2026-11-17 (decision 170): the user makes the moves in Blender, with Claude teaching** (option a at the end of this list), starting when the user says. The animation tool stays until then. The first step will be to settle how a move made in Blender reaches the game.
 
 Times are with the default rules: the host can change the dash's time, each action's window and recovery, and the charge time, and the moves stretch to fit.
 
@@ -215,6 +217,7 @@ The user's options (decision 142), with Claude's view:
   - Mesh2Motion's web app (free, open source, CC0, where our clips come from) only applies its library's clips; it can't edit them. It's useful for browsing other clips to choose from.
   - The browser posing toys found are early, unlicensed, and rebuild the skeleton.
 - **The user's choice (2026-11-03, decision 143):** c), built before the moves are worked on again. Its viewer and its editor were built on 2026-11-04 (the "See every move" page and "Edit this move", above).
+- **The user's choice since 2026-11-17 (decision 170): a),** Blender, with Claude teaching. In the user's words, the tool was a mistake: "I think its more proper and principled to use the proper tool for it, you just have to teach me like a teacher." To start when the user says.
 - **c) A small web tool made here (Claude's recommendation):** a page in the game, like the "Hear every sound" page.
   - **First, a viewer:** pick any move or change from this list, loop it, slow it down, step frame by frame, turn the camera round, and see the time of each moment.
   - **Then an editor** for the moves made here: drag the hands and feet with handles at each key moment while the body follows, change the timing, save. The game then plays exactly what you made.

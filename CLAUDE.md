@@ -4,15 +4,16 @@
 
 **Open tasks** (the full list is in section 15 of `docs/PROJECT.md`):
 
-- **The athletes' animations: not finished** (decisions 142–143, 153–157; phase 17 in `docs/PROJECT.md`). Remind the user that they're still open. Built on `main`, no branch (decision 153).
-  - **The animation tool, stage 1, the viewer**, is built (2026-11-04) and the user tried it ("looks okay"; they found mistakes in some moves they hadn't noticed in play): the "See every move" page (`/static/moves.html`, `move_view.js`, `move_scenes.js`). It plays every move of `docs/ANIMATIONS.md` on the game's own athlete and code (79 scripted scenes), exact to the step, with a timeline and moment links (`#D2@0.540&cam=front`). To see a moment the user sends: open their link on the test server with `?clean` and screenshot it (`window.moveView` has `select`, `seek`, `where` for numbers).
-  - **Stage 2, the editor**, is built (2026-11-04), waiting for the user to try it: "Edit this move" on the 17 rows placed by hand (`move_edit.js`; handles on the athlete, key moments on the timeline that slow to a stop or keep moving, blends, undo, Save). Their numbers moved from `athlete.js` into `static/characters/made_moves.json` (`MADE`, loaded with the athlete), proven identical by `move_print.json`'s fingerprints of every scene's every step. Save (`server.py /moves/save`, `moves_file.py`) works only from the computer the game runs on, from the source folder, not with `--fresh`; it checks the file against the one it replaces and keeps that one in `move_saves/` (git-ignored).
-  - Then go through `docs/ANIMATIONS.md` one move at a time (decision 142), starting with the mistakes the user found with the viewer: the user tries a move and says what differs; fix only that move (or the user fixes it in the editor), and write their notes and the outcome into the list. To raise when D2 and D5 come up: in a match the parry and the catch fall short of their keys (the guard turns the hips 44°; the editor shows the parry's hand 9 cm off already at its second key moment).
-  - A change to a move placed by hand is a change to `made_moves.json`: edit it in the page or by hand, never back in `athlete.js`. The user's own saves land there too, so look at `git diff static/characters/made_moves.json` before changing it.
+- **The athletes' animations: not finished** (decisions 142 and 170; phases 17 and 20 in `docs/PROJECT.md`). Remind the user that they're still open.
+  - **The user makes them in Blender, with Claude teaching like a teacher** (decision 170, 2026-11-17), starting when the user says. In the user's view the animation tool was a mistake: "it's more proper and principled to use the proper tool". Teach in plain steps (the user isn't a developer, and is new to animating), one move at a time (decision 142), and check their work with pictures (`mcp__blender__look`) rather than words.
+  - The first thing to settle then: how a move made in Blender reaches the game. Today `art/athlete.py` and `art/moves.py` rebuild the athlete and retarget the CC0 clips by script (decision 120), and the moves placed by hand are numbers in `static/characters/made_moves.json` that `athlete.js` turns into poses with IK.
+  - The animation tool (phase 17) stays until then, separate from the game: the "See every move" page (`/static/moves.html`, `move_view.js`, `move_scenes.js`) plays every move of `docs/ANIMATIONS.md` on the game's own code, exact to the step, with moment links (`#D2@0.540&cam=front`: open one on the test server with `?clean` and screenshot it); its editor (`move_edit.js`) changes `made_moves.json`. Whether they stay is the user's call once the Blender work starts.
+  - Known: in a match the parry and the catch fall short of their keys (the guard turns the hips 44°). The mistakes the user found with the viewer aren't written down yet: ask for them.
+  - A change to a move placed by hand is a change to `made_moves.json`, never back in `athlete.js`. The user's own saves land there too, so look at `git diff static/characters/made_moves.json` before changing it.
   - Never change a **Locked** move without the user's say. When a move is locked, add its key numbers to `LOCKS` in `tests/browser/moves.js` and a `__lock` step to `moves.json`, so a later change that alters it prints `FAIL` and the run exits with 1; re-run `moves.json` after every change to the moves.
   - Claude can't see motion: show pictures of the moment that matters, and ask for a picture of the pose the user wants.
 - **The HUD and menus** in the new look (the look-and-feel plan's step 9): not started.
-- **Internet mode** waits on its own branch (see Git below).
+- **The internet server's findings** (phase 20; open task 4 in section 15 of `docs/PROJECT.md`): waiting for the user's decision.
 
 **The art and sound** (the look-and-feel cycle: phase 15 in `docs/PROJECT.md`; `docs/LOOK_AND_FEEL.md` holds its plan, the budgets, the style samples and its log):
 
@@ -37,17 +38,22 @@ Quick facts:
 - **Where things are:**
   - The game's code sits at the repository root (`server.py`, `sim.py`, `static/`, `tests/`, ...). Until v2.0.0 it was in `prototype/`, and the game was called Dodge & Parry.
   - `docs/MANUAL.md` is the player and host guide. `docs/LAG_ANALYSIS.md` is the cycle-2 lag study, with what the office sessions' logs showed (Updates 2 and 3). Logging is built, and the game-side fixes are settings under Network (advanced).
-  - `testlog/` holds the session logs the user collected (git-ignored: coworkers' names and IPs). Run `tools/log_report.py` on a session folder first.
+  - `testlog/` holds the session logs the user collected (git-ignored: coworkers' names and IPs), and so does `logs/`, where the user also drops zips. Run `tools/log_report.py` on a session folder first.
+- **The internet server:** a friend of the user's (a developer) runs `main` on an internet server of their own since 11 Nov, behind an HTTPS login they built (an account per person, a Player or an Administrator); the office plays there too.
+  - Its administrators arrive as `127.0.0.1`, so the game makes them hosts (`is_this_computer`). Don't change how the host is found without asking: it changes who is the host there.
+  - When `main` has a new version, the user tells the friend, who updates it with Docker: `Dockerfile`, `compose.yaml`, `docs/SERVER.md` (`git pull`, then `docker compose up -d --build`). The friend can send the server's session logs.
+  - Never write the server's address, the friend's name or anything about their login's setup into the repository.
+  - There's no Docker on this PC: CI's "Docker image" job builds and tests the image, so a change to `Dockerfile`, `compose.yaml` or `.dockerignore` is checked by pushing it (when the user says so).
 - **Git and GitHub:**
   - **Public** repo `github.com/amirtavakolihaghighi/dodgeball` (MIT). Never commit personal data: names, email addresses, local paths with the Windows user name, IP addresses, anything from `testlog/`. Anonymise examples taken from logs or conversations.
   - `main` holds the releases (tags `v1.0.0`, `v2.0.0`, `v2.1.0`, `v2.2.0`, `v2.3.0`). Commits use GitHub's noreply address (set in the repo's git config).
   - The history from before publishing was deleted everywhere on 2026-10-29: the user's old private repo `dodge-and-parry` and every local backup. Push `main`, explicit tags and explicitly named feature branches only (never `--all`, `--tags` or `--mirror`).
-  - The branch `internet-mode` (pushed, not merged) holds internet mode, waiting for the user's friend to test it on a cloud server. Merge it into main only when the user says so. At the merge, take `--branch internet-mode` (and the sentence after it) out of the clone command in `docs/INTERNET.md`. The next steps are at the end of phase 14 in `docs/PROJECT.md`.
+  - The branch `internet-mode` was deleted on 2026-11-17, on GitHub and here, at the user's word (decision 167): the friend's login took its place. Its record is phase 14 and decisions 102–111 in `docs/PROJECT.md`.
   - The look-and-feel cycle (graphics, juice, sound, the athletes and their moves, and the lobby batch of phase 16) was developed on the branch `look-and-feel` in its own worktree folder, merged into `main` on 2026-11-03 at the user's word, and released as v2.3.0; the worktree folder was removed. Its full record is phases 15 and 16 of `docs/PROJECT.md`.
   - Each development cycle gets its own branch from `main`, and `main` stays as it is meanwhile (decision 117). `main`'s docs say why each branch exists and give its plan; the branch's docs hold its full record and its progress. Phase and decision numbers can clash between branches: at a merge, renumber the incoming branch's after `main`'s.
   - CI starts by itself only for `main` and pull requests. On another branch, start it by hand: `gh workflow run ci.yml --ref <branch>`.
   - Commit or push only when the user asks.
-  - CI (`.github/workflows/ci.yml`) runs the Python tests on Windows, macOS and Linux with Python 3.10–3.14, plus a headless-Chrome match. Pushing a `vX.Y.Z` tag builds the Windows zip in GitHub Actions (`release.yml`); the release routine is in `CONTRIBUTING.md`.
+  - CI (`.github/workflows/ci.yml`) runs the Python tests on Windows, macOS and Linux with Python 3.10–3.14, a headless-Chrome match, and the Docker image (built with `compose.yaml`, a match against it, an update that keeps the host's rules). Pushing a `vX.Y.Z` tag builds the Windows zip in GitHub Actions (`release.yml`); the release routine is in `CONTRIBUTING.md`.
   - `requirements.txt` is a lockfile: edit `requirements.in`, then run `uv pip compile requirements.in --universal --python-version 3.10 -o requirements.txt`.
 - **Stack:**
   - A Python server (FastAPI + uvicorn) runs the authoritative rules in `sim.py` and `bots.py`.
@@ -63,7 +69,7 @@ Quick facts:
   - Always pass `--no-browser` in tests, or windows open on the user's desktop.
   - Always pass `--fresh`, or tests load or overwrite the user's `saved_rules.json`.
   - Restart the server after Python changes, and between browser test suites (it keeps changed rules in memory).
-- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 76 must pass) and `tests\test_server.py` (all 12 must pass).
+- **Rule tests:** `.venv\Scripts\python tests\test_sim.py` (all 76 must pass) and `tests\test_server.py` (all 13 must pass).
 - **Session logs:**
   - Every server run writes `logs\<date_time>\` next to the app (`diag.py`). Every browser sends in its own log (`static/js/diag.js`; L marks a laggy moment).
   - The host downloads them all as one zip, and `tools\log_report.py <zip or folder>` turns them into a diagnosis. The user sends these zips to be analysed. Logs from before the rename are named `dodgeparry-...`; the report reads them the same way.

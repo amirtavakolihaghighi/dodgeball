@@ -5,7 +5,7 @@ This document is the complete hand-off for the project. It's written so that a b
 - **In Claude Code:** `CLAUDE.md` in the repository root loads automatically and points here.
 - **In any other chat tool:** attach this file.
 
-Last updated: 2026-11-10 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it; then the look-and-feel cycle (graphics, juice and sound, with the art made in Blender), on the branch `look-and-feel`; on that branch also the office logs of 31 Oct to 2 Nov and a batch of lobby requests: longer names, players known by who they are rather than their name, renaming, a search across every tab, and bots with flags; all of it merged into `main` on 2026-11-03 and released as v2.3.0, with the athletes' animations and the HUD left on `main`'s task list; then, on `main`, the animation tool: the "See every move" page, and its editor for the moves placed by hand; then the office logs of 9 and 10 Nov and their fixes: other players' health bars, two balls waiting on one press, the session logs' own gaps, the log report, Auto graphics and a loading note).
+Last updated: 2026-11-17 (development cycle 2: lobby, host controls, rules editor, lag analysis, session logs; then the office logs, ball-curve rules, per-team bots, host spectating, the host's screen shown live, team cash, press feedback and the firewall helper; then the lag study's five suggestions and the press lockout as Network settings; then the 28 Oct office session and a fix for a browser whose clock ran fast; then publishing as **Dodgeball**: a public repository with a rebuilt history, the game at the repository root, CI and release builds; then a hit says why it got through, TOO EARLY or SECOND BALL, in v2.1.0; then each team's ball colours, team health, each player's own settings and settings files; then health regeneration and the lobby's round-time buttons; then standing still to regenerate; these three in v2.2.0; then internet mode, for friends over the internet, with a guide for a cloud server, on the branch `internet-mode` until the user's friend has tested it; then the look-and-feel cycle (graphics, juice and sound, with the art made in Blender), on the branch `look-and-feel`; on that branch also the office logs of 31 Oct to 2 Nov and a batch of lobby requests: longer names, players known by who they are rather than their name, renaming, a search across every tab, and bots with flags; all of it merged into `main` on 2026-11-03 and released as v2.3.0, with the athletes' animations and the HUD left on `main`'s task list; then, on `main`, the animation tool: the "See every move" page, and its editor for the moves placed by hand; then the office logs of 9 and 10 Nov and their fixes: other players' health bars, two balls waiting on one press, the session logs' own gaps, the log report, Auto graphics and a loading note; then the incoming-ball meter and R's tile; then the first logs from the internet server a friend of the user's runs `main` on, behind a login of their own, the branch `internet-mode` deleted, a Docker image for that server, and the decision that the user makes the animations in Blender, with Claude teaching).
 
 ## Contents
 
@@ -61,7 +61,7 @@ Last updated: 2026-11-10 (development cycle 2: lobby, host controls, rules edito
 - **Plays with coworkers in the office** (6–10 people, office Wi-Fi; several on Linux laptops). Some of them had lag; see `LAG_ANALYSIS.md`. The user collects the session logs and drops them in `testlog\` (git-ignored) for analysis.
 - **Works in development cycles:** a stable version on `main`, then a batch of requested changes, then the user tests.
 - **Wants to discuss before building** when a topic is open-ended (the lag plan was discussed first, then built as settings: phase 7).
-- **Isn't a developer, SRE or devops person.** Explain setup and infrastructure in plain steps. A friend who is a developer sets up servers (internet mode's test server, phase 14).
+- **Isn't a developer, SRE or devops person.** Explain setup and infrastructure in plain steps. A friend who is a developer runs the server: since 11 Nov, `main` on an internet server of their own, behind a login they built, where the office plays too (phases 14 and 20). They update it when the user says a new version is out.
 
 ## 3. Folder map
 
@@ -76,12 +76,13 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 ├── CODE_OF_CONDUCT.md
 ├── THIRD_PARTY_NOTICES.md     three.js, the sounds and music (CC0), the Python packages, PyInstaller's bootloader
 ├── .gitignore / .gitattributes / .editorconfig   venvs, builds, logs, saved rules ignored; LF except .bat (CRLF)
-├── .github\                   workflows\ci.yml (tests on 3 OSes x Python 3.10-3.14, a browser match),
+├── .github\                   workflows\ci.yml (tests on 3 OSes x Python 3.10-3.14, a browser match, the Docker image),
 │                              workflows\release.yml (the Windows zip from a tag), issue and PR templates
 ├── docs\
 │   ├── MANUAL.md              the player and host guide: run, share, lobby, controls, every rule's default, logs
 │   ├── PROJECT.md             this document
 │   ├── LAG_ANALYSIS.md        cycle 2: measured causes of lag, options, what the office logs showed
+│   ├── SERVER.md              running the game on a server with Docker, behind a login: setup, updates, the host, the data
 │   ├── LOOK_AND_FEEL.md       the look-and-feel cycle: its plan, the budgets, the style samples, its log
 │   ├── ANIMATIONS.md          every animation and change of move, what it should look like, the tester's notes, its status (the work: section 15)
 │   └── images\                the README's screenshots
@@ -89,6 +90,9 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 ├── build_exe.bat              build the standalone Windows app -> dist\Dodgeball-windows.zip
 ├── build_exe.py               the build logic (PyInstaller + zip with retries; ships the firewall helper too)
 ├── Allow friends to connect.bat   lets other PCs join through Windows Firewall: one rule, local network only
+├── Dockerfile                 the server as a Docker image: python:3.13-slim, a user without rights, its data in /data
+├── compose.yaml               runs that image: on 127.0.0.1:8000 only, the /data volume, the proxies it believes (docs\SERVER.md)
+├── .dockerignore              what the image leaves out: tests, art, docs but ANIMATIONS.md, local files
 ├── server.py                  FastAPI web server + WebSocket + game loop + host detection + rules broadcast/saving
 ├── moves_file.py              the moves placed by hand (static\characters\made_moves.json): checks and writes a save from the moves page
 ├── sim.py                     all game rules (server-authoritative), lobby/match states, host actions
@@ -135,8 +139,8 @@ dodgeball/                     (git repo -> github.com/amirtavakolihaghighi/dodg
 │   ├── arena\                 the sports hall: hall.glb, its lightmaps, the sky, arena.json; built by art\arena.py
 │   └── vendor\                three.js 0.185.1: three.module.min.js + three.core.min.js; addons\: its glTF loader, two helpers, the orbit camera, the handles
 ├── tests\
-│   ├── test_sim.py            74 rule tests: python tests\test_sim.py (or pytest)
-│   ├── test_server.py         11 server tests (lobby protocol, players' own settings and files, who a player is, the host's screen, saved rules, session logs, the log report, a dropped connection, the moves page's list, saving the moves placed by hand)
+│   ├── test_sim.py            76 rule tests: python tests\test_sim.py (or pytest)
+│   ├── test_server.py         13 server tests (lobby protocol, players' own settings and files, who a player is, the host's screen, saved rules, the data folder, session logs, the log report, a dropped connection, the moves page's list, saving the moves placed by hand)
 │   └── browser\               headless-Chrome end-to-end tests (cdp.js driver + step files, freeze_server.py)
 ├── logs\                      (made at runtime) one folder of session logs per server run; the 30 newest are kept
 ├── saved_rules.json           (made at runtime) the host's rules and players' own settings, reloaded at the next start
@@ -665,7 +669,7 @@ They also asked for questions wherever it was ambiguous, "so that the definition
 
 ### Phase 14: internet mode, on its own branch (2026-10-29)
 
-This is the short version, kept on `main` while internet mode waits on its branch. This file on the branch `internet-mode` has the full record: what was built, how it was tested, decisions 102–111, pitfalls, and the setup guide `docs/INTERNET.md`. The code isn't on `main` yet.
+This is the short version that `main` kept while internet mode waited on its branch. **The branch was deleted on 2026-11-17** (decision 167, phase 20): the user's friend put `main` on their server behind a login of their own instead, so it was no longer needed. Its decisions 103–110 are in the decision log; its last commit was `31e0fb9`. The code never reached `main`.
 
 **Where it started:** the user asked what it would take to run the game on a server on the internet instead of the office Wi-Fi, and how to get there step by step. It was discussed before anything was built:
 
@@ -684,9 +688,9 @@ This is the short version, kept on `main` while internet mode waits on its branc
 
 **Its purpose:** to let friends who aren't on the same Wi-Fi play together. First it has to be tried on a real server: the user isn't a developer, so a friend of theirs who is sets up the test server.
 
-**Where it stands:** on the branch `internet-mode`, pushed to GitHub and not merged. All its tests pass (CI, started by hand on the branch: all 16 jobs). The Linux setup and Caddy in front of the game haven't been run on a real server yet: that's the friend's test.
+**Where it stood** (until phase 20): on the branch `internet-mode`, pushed to GitHub and not merged. All its tests pass (CI, started by hand on the branch: all 16 jobs). The Linux setup and Caddy in front of the game haven't been run on a real server yet: that's the friend's test.
 
-**The plan:**
+**The plan, overtaken by phase 20:**
 
 1. The friend sets up a test server from the branch's `docs/INTERNET.md`. Anything that doesn't work as written gets fixed on the branch.
 2. The first internet game night. Its logs show the real lag (what to read: `docs/LAG_ANALYSIS.md` on the branch, Update 4).
@@ -1375,6 +1379,39 @@ On `main`. **The request:** the circle that warns of a ball coming at you should
   - pictures: the meter at 16 moments at its real size (both shapes, one colour), R's tile over 1.5 s (the pop, the glow, the shine), the meter in the match, and the settings with the meter and with the ring.
 - The other suites, with no page error: the smoke test; `lobby_controls.json` (watching, the hints as before); `team_health.json` (R buying a pack at 133 of 200, the wipe); `sound.json` (the incoming-ball whoosh 10 times in its match, so `showThreat` still plays it); `juice.json`; the auto-defender, catching: 18 of 19 balls defended, 17 perfect, no hit.
 
+**Tested by the user, then committed** (2026-11-17, `a4d1da9`): "I have played the game with them and its ok". `marker.json` and the smoke test passed again first.
+
+### Phase 20: the internet server's logs, the branch deleted, Docker, the animations in Blender (2026-11-17)
+
+On `main`. **The friend's server.** The user's friend, the developer who was to try internet mode (phase 14), found its branch older than `main` and, on their own Claude's advice, put `main` on a Linux server of theirs on 11 Nov, behind an HTTPS login they built: an account per person (a username and a password), each a Player or an Administrator, made on an admin page. Their reasons: on `main` anyone who found the server could join and pick any name, and the login lets in only people they or the user invite. They keep a way to switch their services off if anything goes wrong. The login is separate from the in-game name, which stays each player's own. They measured about 0.4 of a CPU core and 180 MB of memory with eight players and four bots, keep the game running all the time with its console log rotated, update it when the user says a new version is out, and suggested Docker to make updating easier.
+
+**The request:** "get rid of that now useless branch"; the log of a session "played in the office over the internet, check it and see if everything is ok"; "commit and push latest changes, I have played the game with them and its ok"; and Docker ("I don't know much about how it is done"). Then the animation tool: "Now I think it was a mistake. Between our other options, there was an option of 'you teach me how to do it in blender'. I prefer this… We start on this later." And: "Tell me what is remaining of the roadmap."
+
+**The logs:** one server run from 14 Nov to 16 Nov, with three afternoons of play (Iran time): the 14th 16:50–17:32 (up to 10 people and 10 bots, 4 matches, 33 rounds), the 15th 17:39–18:03 (5 people, 3 bots) and the 16th 15:59–16:22 (7 people, 3 bots). The build was `v2.3.0-3-g1f93bc2`, `main` as of phase 18, unmodified; 28 browser logs.
+
+- **Healthy:** no error on the server or in any browser log; one 130 ms stall, on the 14th at 12:11 with nobody on; the server at 9–11% CPU (median) during play; the office's players at 13–22 ms ping (median), one player far away at 175–200 ms; 60 frames a second everywhere but one laptop (43); the picture frozen under 2% of the time for 25 of the 28 page loads; loading in 1–4 s, or 4–9 s for a first visit's 4.3 MB (18–19 s for the far player). Over HTTPS the battery reading works on every browser (phase 18's item 6).
+- **Several hosts at once:** 7 of the 33 joins arrived as `127.0.0.1` and so counted as the server's own computer, the host; the others came with their real addresses (through `X-Forwarded-For`) and weren't. It looks like the login's way of giving its administrators the host's controls. Its side effects: those hosts' Auto graphics stays at Medium or lower ("this computer also runs the server"); the moves page's Save is open to them (on that server it would change the server's copy of `made_moves.json`); their menu shows the server's log folder; and everyone's menu lists the server's own addresses (public, VPN and Docker) as the ones to join.
+- **The lag compensation limit at 0.05 s,** from a change during a match on the 14th at 17:18 until the 16th, when it went to 0.20 s: 85–100% of most players' presses reached the server past it, so they counted later than pressed, by up to 0.38 s, and defences on time on screen failed. The log names the rules changed, not who changed them, nor to what.
+- **Sidestep compensation off on the 16th** (33–45 hits per player while clear on their own screen): the office's own settings, loaded that day.
+- **One log folder for the whole run:** 40 MB in 54 hours, 37 MB of it the server's line a second while nobody was on, and the report read the three afternoons as one session of 3,245 minutes (internet mode's decision 107 had foreseen it).
+- **Not bugs:** the far player's presses past the 0.25 s limit (20–34 a day arrived after the hit: the limit doing what it says), and mashing during recoveries.
+- Told to the user with Claude's advice; their decisions are open (section 15, open task 4).
+
+**The branch** (decision 167): `internet-mode` deleted on GitHub and locally; its last commit was `31e0fb9`. Its decisions 103–110, until now only on the branch, are in the decision log.
+
+**Committed and pushed** (the user's word): phase 19, as `a4d1da9`. GitHub's Dependabot then flagged `opentelemetry-api` 1.45.1, a dependency of FastAPI: a denial of service through quadratic-time `traceparent` parsing (GHSA-mf5v-w3w3-f6cg, medium). The lockfile now has 1.45.2, and nothing else changed (decision 171).
+
+**Docker** (decisions 168–169):
+
+- **`Dockerfile`:** `python:3.13-slim`, the locked dependencies (`PIP_INDEX_URL` for a mirror), then the game. It runs as uid 10001, who can read the game and write only to `/data`, a volume. A health check fetches the page every 30 s. It starts `server.py --host 0.0.0.0 --port 8000 --no-browser --data-dir /data`. The image has no git, so the `VERSION` build argument is written into `build_info.json` for the session logs.
+- **`compose.yaml`:** published on `127.0.0.1:8000` only (Docker's published ports skip firewalls such as ufw, and the login must not be bypassed); `FORWARDED_ALLOW_IPS` set to Docker's networks (`172.16.0.0/12`), not `*`, which would take a header a browser wrote; the `dodgeball-data` volume; the console log kept to 3 × 10 MB; `init`, so a stop is clean. A server's own settings (the proxy's network, say) go in `compose.override.yaml`, which git ignores.
+- **`server.py`:** `--data-dir` (`set_data_dir()`: the saved rules and the session logs go there), and `version_info()` reads `build_info.json` when there's no git.
+- **`.dockerignore`:** leaves out the tests, the art scripts, the docs but `ANIMATIONS.md` (the moves page's list), and local files.
+- **`docs/SERVER.md`,** for whoever runs the server: at a glance, the first start, updating (`git pull`, then `docker compose up -d --build`), who is the host and what the proxy must do, the data, stopping, mirrors. `README.md` and `SECURITY.md` point to it.
+- **Tests:** a new server test, the data folder (the host's rule saved there and back at the next start, the logs there, nothing next to the app, the version from `build_info.json` without git): 13 server tests and 76 rule tests pass. There's no Docker on this PC, so a new CI job does the rest: it builds the image with `compose.yaml`, waits for it to be healthy, checks it runs as uid 10001, can't change the game's files and logs its version and data folder, plays the smoke test in headless Chrome through the published port as the host (with the host link from its console), then sets a rule, replaces the container as an update does, and checks that the rule came back.
+
+**The animations** (decision 170): the user makes them in Blender, with Claude teaching, starting later; nothing changes in them meanwhile. The animation tool stays until then (section 15).
+
 ## 5. Decision log
 
 **U** = the user decided. **C** = Claude decided; reasonable to revisit, but say so first. Don't silently change a **U** decision.
@@ -1483,8 +1520,15 @@ On `main`. **The request:** the circle that warns of a ball coming at you should
 | 100 | Hurt bots stand still to regenerate (a Bots rule, on by default; a bot can have its own) | U | "Yes, when hurt". How (stop wandering, no sidesteps, still defend and throw): C |
 | 101 | Phases 11–13 are version 2.2.0 (minor) | C | They add features; settings saved by older versions still load, and nothing players rely on changes (bots' new names aside) |
 | 102 | Playing over the internet: friends with a password, on a cloud server | U | Chosen over "anyone" (which would need cheat checks and a kick button) and over the user's own PC through a tunnel |
-| 103–110 | Internet mode's own design: the host by password only, the limits, where it listens, logs per game night, the message size limit, refusals, the cloud setup | C | Recorded in this file on the branch `internet-mode` (phase 14) |
-| 111 | Internet mode waits on its own branch, `internet-mode` (pushed, not merged), until the user's friend has tried it on a cloud server; it goes into main only when the user says so | U | "Commit to a separate branch dedicated for this feature… then if it's okay, I tell you to merge." The user isn't a developer; the friend is |
+| 103 | Internet mode is a switch (`--internet`); without it the server works on a LAN as before | C | LAN play unchanged. The only changes there: the 1 MiB message limit and the per-session caps on browsers' logs (#108) |
+| 104 | In internet mode the host is whoever sends the host password (typed in the same box as the players' password, or in the `?host=` link), never an address; the two passwords must differ | C | Behind a proxy every player seems to connect from the server itself: measured, everyone became the host |
+| 105 | Internet mode's limits: 16 people (the host always gets in), a wait after 5 wrong passwords a minute per address, 10 connections per address and 64 in all, joining within 5 s with under 4 KB, then 512 KiB/s and 300 messages/s after a 16 MiB / 5,000-message burst | C | Far above what a browser sends (a stored log resent at once fits the burst), so one address can't wear the server down |
+| 106 | Internet mode listens on `127.0.0.1:8000` (a fixed port) behind HTTPS, and opens no browser | C | The game has no TLS of its own; Caddy needs to find it at a known port |
+| 107 | Internet mode logs a folder per game night (from the first join until 30 minutes with nobody on), with players' addresses only in part and never the passwords | C | A server running for weeks would otherwise grow one folder by ~30 MB a day, and "Download all logs" would zip all of it |
+| 108 | Everywhere: no message over 1 MiB; browsers' logs capped per session (200 pages, 300 MB) | C | Measured: a 15 MiB message stalled the game 361 ms, and new page ids got around the per-page cap. A whole settings file is 150 KB; a 3-hour night with 16 players logs ~90 MB |
+| 109 | A refused connection is closed with code 4001 and a reason, and the join screen says why | C | "Wrong password.", "The game is full.": not a silent "Disconnected" |
+| 110 | The cloud setup: Ubuntu 24.04; the game as a systemd service under its own user in `/opt/dodgeball`; the passwords in `/etc/dodgeball.env` (root only); Caddy from its official repository | C | Ubuntu's own Caddy (2.6.2, from 2022) misses security fixes. Not yet run on a real server (phase 14) |
+| 111 | Internet mode waits on its own branch, `internet-mode` (pushed, not merged), until the user's friend has tried it on a cloud server; it goes into main only when the user says so | U | "Commit to a separate branch dedicated for this feature… then if it's okay, I tell you to merge." The user isn't a developer; the friend is. Never merged: the branch was deleted on 2026-11-17 (decision 167) |
 | 112 | The game should look and feel professionally made: better models, animation, physics visuals, sound and effects, "juicy". Both juice and good art, starting from the highest expectations, then scaled down to what's realistic | U | "Juicy and good visual and art. I want both (if possible I'm starting with highest expectations to make the realistic afterward)" |
 | 113 | No money and no other people: the user, Claude and free tools. The user gives time: judging, testing, listening | U | Rules out paid assets and hired artists |
 | 114 | Claude makes the art in Blender, connected through an MCP add-on (the community "MCP for Blender") | U | The user installed Blender and the add-on. How it's connected: C, on the branch |
@@ -1540,6 +1584,11 @@ On `main`. **The request:** the circle that warns of a ball coming at you should
 | 164 | The incoming-ball marker is each player's choice, in Your settings and with H: the meter (the default), the ring as before, or off. The meter is an arc on the ball's side that grows as the ball comes, with its own shape (crescent or band), width (24 px by default) and size (150 px from the crosshair) | U | "I want it to have three options: off, current and one new style", a detection meter "with noticeable width", its shape and width each player's to change; a friend had found the ring hard to see, and small. The meter as the default, the size setting and the dark edge: C |
 | 165 | The meter's colours: three stripes, outer dodge, middle catch, inner deflect, each lit in its colour while pressing it would work (by the player's own windows) and gold at its perfect moment; or one stripe for one defence | U | "It changes color when you should catch/parry/dodge or perfect version of each." The user chose the stripes from Claude's two options; the single stripe stays as a setting, the user's standing preference for two good designs |
 | 166 | R's tile calls for attention while R can be used (a revive, or a team health pack): it pops up, then pulses with a gold glow and a passing shine | U | "When you are able to revive or add health, the button should have animation and effect that catches attention." The effect: C |
+| 167 | The branch `internet-mode` is deleted, on GitHub and locally: the user's friend runs `main` on their own server behind a login they built (an account per person, as a Player or an Administrator), which took the place of internet mode's passwords | U | "That branch is kinda useless… get rid of that now useless branch." Its decisions 103–110 stay in this log |
+| 168 | The game gets a Docker image for the friend's server, so that an update is `git pull` and one command | U | The friend's suggestion, "dockerizing it", to help "the process of updating the game on the server". The user: "So I want you to do it" |
+| 169 | The image: `python:3.13-slim`, the locked dependencies, a user without rights who writes only to the `/data` volume (`--data-dir`), the version as a build argument. Compose publishes it on `127.0.0.1:8000` only, believes `X-Forwarded-For` from Docker's networks only (not `*`), and caps its console log. CI builds it with Compose, plays a match against it and replaces it, on every push | C | The host is decided by address, so only the proxy may say a player's address, and no published port may go around the login. The volume keeps the host's rules and the logs through every update. There's no Docker on the user's PC |
+| 170 | The athletes' animations: the user makes them in Blender, with Claude teaching like a teacher, starting later when the user says. In the user's view the animation tool (decisions 154–157) was a mistake | U | "Between our other options, there was an option of 'you teach me how to do it in blender'. I prefer this. I think its more proper and principled to use the proper tool for it, you just have to teach me like a teacher. We start on this later." One of decision 142's ways; it replaces decision 143's "the web tool first" |
+| 171 | `opentelemetry-api` 1.45.1 → 1.45.2, nothing else in the lockfile: FastAPI's dependency had a denial of service through `traceparent` parsing (GHSA-mf5v-w3w3-f6cg, medium) | C | A security fix, now that the game runs on an internet server |
 
 ## 6. Current features
 
@@ -1572,6 +1621,7 @@ On `main`. **The request:** the circle that warns of a ball coming at you should
 - **Bots & flags:** the host's own named bots, put on any team, and flags (bundles of behaviour like Dodge master or Berserker) on any bot.
 - **Settings files:** export the whole setup (anyone) and import it (the host); each player's page exports and imports just their settings.
 - **Saved rules:** the host's rules and players' own settings survive restarts (`saved_rules.json`).
+- **On a server:** a Docker image and Compose file for running it behind an HTTPS proxy with a login (`docs/SERVER.md`); the saved rules and the logs live in a volume that outlives updates.
 
 **Fairness and network:**
 
@@ -2048,7 +2098,7 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
 **`server.py`:**
 
 - **`Client`:** wraps a WebSocket. Its send queue has maxsize 8 and drops the oldest message if full. A `pump` task writes to the socket. It counts dropped messages, its longest queue and its slowest send, for the log.
-- **Logging:** `start_logging()` (the `meta` record, the host watcher), `say()` (console prints that note when Windows held them up), `version_info()` (git describe, or the packaged `build_info.json`), `may_download_logs()` and the `/logs/download` route. The flags are `--no-log` and `--log-dir`; `--fresh` turns logs off unless `--log-dir` is given.
+- **Logging:** `start_logging()` (the `meta` record, the host watcher), `say()` (console prints that note when Windows held them up), `version_info()` (git describe; or a `build_info.json`: the packaged app's, or the Docker image's, written from its `VERSION` build argument), `may_download_logs()` and the `/logs/download` route. The flags are `--no-log` and `--log-dir`; `--fresh` turns logs off unless `--log-dir` is given.
 - **The moves page:** `/docs/ANIMATIONS.md` (its list), and the editor's `/moves/saving` and `/moves/save` (`why_no_saving()`: frozen, `--fresh`, not this computer). `--moves-file` names the file to save into, its old files going into `move_saves/` next to it (tests).
 - **`game_loop()`:**
   - ticks the game at `TICK_RATE` and sends one snapshot string per `1/SNAPSHOT_RATE` to every client (both are rules);
@@ -2061,11 +2111,11 @@ Host-only messages from anyone else get a `deny` with `why: host`. The old `team
   - `lan_addresses(wait)`: UDP-connect trick plus hostname lookup; the lookup runs on a thread, and startup waits at most 2 s for it (it can stall on macOS). It drops `127.x` and `169.254.x` and lists `192.168.x`, then `10.x`, first.
   - `watch_addresses()`: refreshes `own_ips` every 15 s on a thread (a hotspot or cable may appear mid-session).
   - `client_config()`, `rules_message()`.
-  - `load_saved_rules()` and `save_current_rules()`: `saved_rules.json` next to the exe or script (`{rules: {changed}, players}`; the older flat file still loads), written on a thread, atomically.
+  - `load_saved_rules()` and `save_current_rules()`: `saved_rules.json` next to the exe or script, or in `--data-dir` (`{rules: {changed}, players}`; the older flat file still loads), written on a thread, atomically.
   - `rules_message(name)` (a client's `rules` message, with its player's own `cfg`) and `send_rules()` (one per client).
   - `first_free_port()`; `open_browser_when_ready()` (a thread that polls the port, then calls `webbrowser.open`); Windows `timeBeginPeriod(1)` for a steady loop.
   - `HOST_KEY`: a random key per run, printed in the console's host link.
-- **Flags:** `--port`, `--host`, `--no-browser`, and `--fresh` (default rules, nothing saved; for tests).
+- **Flags:** `--port`, `--host`, `--no-browser`, `--fresh` (default rules, nothing saved; for tests), and `--data-dir` (where `saved_rules.json` and `logs/` go: `set_data_dir()`; the Docker image's `/data`).
 - **Static files** are served with `Cache-Control: no-cache`, so a browser reload always picks up client edits.
 
 **`diag.py`:**
@@ -2348,7 +2398,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **A test server remembers rules** that tests changed until it restarts, so restart it between test suites.
 - **Hosting from the test PC:** the browser on the server's PC is the host. Add `?guest` to a tab's URL to see the guest view.
 
-**Rule tests** (all 76 must pass) and **server tests** (all 12 must pass):
+**Rule tests** (all 76 must pass) and **server tests** (all 13 must pass):
 
 ```powershell
 .venv\Scripts\python tests\test_sim.py
@@ -2361,6 +2411,7 @@ Two-lane scenes run the default rules next to the lobby's (or the host's draft) 
 - **the host's screen:** relayed only from the host, cleaned (bad rules and values dropped, numbers clamped; whose page it is), sent to latecomers, and cleared when the host leaves;
 - **players' own settings:** only the host sets them, each browser gets its own numbers, the server plays by them, and a settings file replaces the whole setup (team health on, bars added up);
 - **saved rules:** saving and loading the rules and players' own settings, an older flat file, and ignoring a damaged `saved_rules.json`;
+- **the data folder** (`--data-dir`, the Docker image's `/data`): a rule the host changed is saved there and comes back at the next start, the session logs go there, nothing is written next to the app, and without git the version comes from `build_info.json`;
 - **the session log:** server and browser records reaching the host's zip, chunks out of order and a resent one each stored once, and inputs counted per player;
 - **the detectors:** stalls, late presses (one a hair after contact, by the press grace; and early ones that aren't), presses past the lag compensation limit (`capped`, and none for a late press), and console prints held up;
 - **the report:** it blames a freeze during a server stall on the host and a player's own freezes on them, and gives each L mark the right cause; and, from the 9–10 Nov logs: a page whose computer's clock runs two minutes slow kept, a page from an earlier session left out, the session's times on the host's clock, an overloaded computer's frozen picture put down to it rather than Wi-Fi, the stutter of joining left out, a renamed player under the new name, and L pressed four times in a row counted once (it fails on the old report);
@@ -2454,7 +2505,7 @@ node tests\browser\cdp.js "http://127.0.0.1:8123/?nolock" tests\browser\lobby_co
   - a match with bots and the auto-defender plays the announcer, the whistle, throws, hits with grunts, bounces, catches and your dashes; the sound check page lists all 43 sounds.
   - Re-run it after touching `sfx.js`, the sound calls in `main.js`, or `static/sounds/` (`art/sounds.py`).
 
-**CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, and a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`; any page error fails it).
+**CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: the rule and server tests on Windows, macOS and Linux with Python 3.10 to 3.14, a job that boots the server, checks it answers and plays a match in headless Chrome (`smoke.json`; any page error fails it), and the **Docker image** job: it builds the image with `compose.yaml`, waits for it to be healthy, checks it runs as uid 10001, can't change the game's files and logs its version and data folder, plays `smoke.json` through the published port as the host (with the host link from its console), then sets a rule, replaces the container as an update does, and checks the rule came back. It's the only place the image is built: the user's PC has no Docker.
 
 **Balance profiling** (a bots-only match; prints round lengths and event counts):
 
@@ -2491,6 +2542,7 @@ print(lengths, g.score, dict(counts))
 - **Friends can't connect (firewall):** the host double-clicks `Allow friends to connect.bat` next to the exe once (it asks for admin; `... check` shows what it would do, `... undo` removes the rule). Or set the Wi-Fi to Private and allow the prompt. Never turn the firewall off.
 - **Playing together on one Wi-Fi:** only the host runs it; others open the address shown in its window. The host sets up the lobby in the browser that opens on their PC and presses Start match.
 - **Passing on tuned rules:** Export settings in the lobby and give them the file (they Import it), or copy `saved_rules.json` next to another host's `Dodgeball.exe`, or `server.py`.
+- **On a server:** `docs/SERVER.md`. The user's friend runs `main` that way (phase 20). When `main` has a new version, the user tells them; they update with `git pull` and `docker compose up -d --build`.
 - **Sharing the source:** exclude `.venv`, `build`, `dist`. A copied `.venv` is auto-repaired by `run.bat`.
 - **Mac/Linux:** run from source with Python. There's no Mac build; it would have to be built on a Mac.
 
@@ -2536,6 +2588,9 @@ print(lengths, g.score, dict(counts))
 - **Headless Chrome** can't do pointer lock (use `?nolock`) and renders in software, so judge visual tuning on a real GPU.
 - **three.js r185** ships as `three.module.min.js`, which imports `./three.core.min.js`. Both must sit side by side in `static\vendor\`.
 - **The game server holds state in memory.** Restarting it resets everything except the host's saved rules. When the last human leaves, bots, score and round reset, but the rules stay.
+- **Behind a proxy, every player can look like the server's own computer,** and so the host (`is_this_computer`; measured in phase 14). uvicorn takes a player's address from `X-Forwarded-For` only on connections from `FORWARDED_ALLOW_IPS` (default `127.0.0.1,::1`), and with `*` it takes the header's first address, which a browser can write when the proxy adds to the header rather than replacing it. `compose.yaml` believes Docker's networks only. The friend's login seems to rely on this to make its administrators hosts (they arrive as `127.0.0.1`; phase 20): changing how the host is found changes who is the host there.
+- **A server that never stops writes one session log** (phase 20): its folder grows by about 17 MB a day, mostly the server's line a second while nobody plays, until it restarts, and the report reads days of it as one session.
+- **No Docker on the user's PC** (nor WSL): the image is built and tested only by CI's Docker image job, so a change to the Dockerfile, `compose.yaml` or `.dockerignore` is checked by pushing it.
 - **Test servers and rules:**
   - A test server keeps any rules a test changed until it restarts.
   - Start test servers with `--fresh`, so they neither load nor overwrite the user's `saved_rules.json`.
@@ -2602,7 +2657,7 @@ print(lengths, g.score, dict(counts))
 - **Movement is trusted** to each browser within the court limits: fine among friends, not for strangers.
 - **One lobby per server:** no separate rooms.
 - **No reconnect-with-state:** a reloaded tab rejoins as a fresh player with the same name, team and own settings (full HP, no cash). Only the host's rules persist between server runs.
-- **The host is whoever plays on the server's PC** (or holds the host link). Anyone with access to that PC's browser has host powers, and with several local tabs, every one of them is a host.
+- **The host is whoever plays on the server's PC** (or holds the host link). Anyone with access to that PC's browser has host powers, and with several local tabs, every one of them is a host. Behind a proxy, it's whoever the proxy reports as the server itself (phase 20).
 - **Rule previews are illustrations, though computed with the game's formulas:**
   - top views ignore gravity;
   - side views may stretch distances up to 1.5×;
@@ -2619,13 +2674,19 @@ print(lengths, g.score, dict(counts))
 
 **Open tasks, in order** (moved here from the look-and-feel plan when it was merged; decision 152):
 
-1. **The athletes' animations, not finished** (decisions 142, 143 and 154). The animation tool first, on `main` (decision 153):
-   - **Stage 1, the viewer** ("See every move", `/static/moves.html`): built 2026-11-04 (phase 17); the user tried it ("looks okay") and found mistakes in some moves they hadn't noticed in play.
-   - **Stage 2, the editor** for the moves placed by hand ("Edit this move" on that page): built 2026-11-04 (phase 17), waiting for the user to try it. Their numbers are in `static/characters/made_moves.json` now, proven identical.
-   - Then `docs/ANIMATIONS.md`, one move at a time: the user tries a move, Claude fixes only that one (or the user fixes it in the editor), and an approved move is locked (and checked by the moves test). Start with the mistakes the user found with the viewer. Already found: in a match the parry and the catch fall short of their keys (phase 17).
+1. **The athletes' animations, not finished.** The user makes them in Blender, with Claude teaching (decision 170, 2026-11-17), starting when the user says; nothing changes in them meanwhile. What there is to start from:
+   - `docs/ANIMATIONS.md`: every move, with what it should look like and its status. One move at a time still holds (decision 142), and a locked move is checked by the moves test.
+   - The mistakes the user found with the viewer aren't written down yet. Already known: in a match the parry and the catch fall short of their keys (phase 17).
+   - The first thing to settle then: how a move made in Blender reaches the game. Today `art/athlete.py` and `art/moves.py` rebuild the athlete and retarget the CC0 clips by script (decision 120), and the moves placed by hand are numbers in `static/characters/made_moves.json` that `athlete.js` turns into poses.
+   - The animation tool (phase 17: the "See every move" page and its editor) stays until then; it's separate from the game.
 2. **The HUD and menus** in the new look (the look-and-feel plan's step 9): not started.
-3. **Tested by the user:** the lobby batch of v2.3.0 (names, renaming, same names, the search, bots with flags), and the incoming-ball meter and R's tile (phase 19): built and tested by Claude, not yet by the user.
-4. **Internet mode:** on its own branch, waiting for the user's friend to test it on a cloud server (phase 14).
+3. **Tested by the user:** the lobby batch of v2.3.0 (names, renaming, same names, the search, bots with flags): built and tested by Claude, not yet on purpose by the user. (The meter and R's tile were played with and approved: phase 19.)
+4. **The internet server's findings** (phase 20), for the user to decide:
+   - a switch for running on a server, which the Docker image would turn on: no graphics cap for a host who isn't on the server's computer, the address the browser opened shown as the one to join (not the server's own addresses), no Save on the moves page, no log folder path;
+   - the session log saying who changed which rule, and to what;
+   - a log folder per game night, and nothing written each second while nobody plays (internet mode's decision 107);
+   - the lag compensation limit back to 0.25 s (the host's setting: Esc › Game rules › Network);
+   - with the friend: that the login's administrators are meant to be hosts, and that it replaces `X-Forwarded-For` rather than adding to it.
 
 **Ideas, not started:**
 
